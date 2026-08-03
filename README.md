@@ -1,6 +1,6 @@
 # Tetris Python
 
-Un jeu Tetris complet développé en Python avec Pygame, incluant des effets visuels spectaculaires, un système de son, un leaderboard et des options de personnalisation.
+Un jeu Tetris complet développé en Python avec Pygame, incluant des effets visuels spectaculaires, un système de son procédural, un leaderboard et une animation de fin de partie extravagante.
 
 ![Tetris Gameplay](https://via.placeholder.com/800x600/000000/FFFFFF?text=Tetris+Gameplay)
 
@@ -15,28 +15,31 @@ Un jeu Tetris complet développé en Python avec Pygame, incluant des effets vis
 
 ### Effets visuels
 
-- ✅ Particules spectaculaires lors de la destruction de lignes
-- ✅ Affichage de la pièce suivante
-- ✅ Interface utilisateur complète (score, lignes, niveau)
+- ✅ **Particules explosives** : Effets de haute densité et rapides lors de la destruction de lignes.
+- ✅ **Animation de Game Over Spectaculaire** : Séquence chaotique incluant screen-shake, glitchs visuels, flashs d'écran et texte arc-en-ciel pulsé.
+- ✅ Affichage de la pièce suivante.
+- ✅ Interface utilisateur complète (score, lignes, niveau).
 
 ### Audio
 
-- ✅ Musique générée procéduralement pour chaque type de ligne complétée
-- ✅ Sons de rotation (horaire/anti-horaire)
-- ✅ Option pour activer/désactiver le son
+- ✅ **Sons Procéduraux** : Générés via NumPy pour une expérience unique sans fichiers externes.
+- ✅ **Mélodies de Clear** : Musiques spécifiques selon le nombre de lignes effacées.
+- ✅ **Impacts & Rotations** : Sons de verrouillage de pièce (high-pitch thud) et rotations.
+- ✅ **Séquence Finale** : Mélodie dramatique descendante et effets sonores de glitch lors du Game Over.
+- ✅ Option pour activer/désactiver le son.
 
 ### Expérience utilisateur
 
-- ✅ Menu de démarrage avec sélection du handicap
-- ✅ Saisie du nom en fin de partie
-- ✅ Leaderboard top 10 affiché à l'écran
-- ✅ Option pour recommencer ou quitter
+- ✅ Menu de démarrage avec sélection du handicap.
+- ✅ Saisie du nom en fin de partie.
+- ✅ Leaderboard top 10 persistant.
+- ✅ Option pour recommencer ou quitter.
 
 ## Installation
 
 ### Prérequis
 
-- Python 3.7+
+- Python 3.7+ (Testé et optimisé pour Python 3.14)
 - Pygame (`pip install pygame`)
 - NumPy (`pip install numpy`)
 
@@ -70,11 +73,11 @@ python main.py
 
 ```
 tetris-python/
-├── main.py            # Point d'entrée principal
+├── main.py            # Point d'entrée principal, moteur de jeu et audio
 ├── tetris.py          # Logique du jeu (Board, Tetromino)
 ├── settings.py        # Constantes et configurations
 ├── leaderboard.txt    # Fichier de sauvegarde des scores
-└── README.md          # Ce fichier
+└── README.md          # Documentation du projet
 ```
 
 ## Personnalisation
@@ -88,20 +91,10 @@ tetris-python/
 - Taille des blocs
 - Couleurs des pièces
 
-### Ajouter des fonctionnalités
-
-Quelques idées d'améliorations possibles :
-
-1. Ajouter un système de "hold" (conserver une pièce)
-2. Implémenter un mode "marathon" avec objectifs
-3. Ajouter des skins pour les pièces
-4. Créer un mode multijoueur local
-5. Ajouter des effets visuels supplémentaires
-
 ## Crédits
 
 Développé par Frédéric Matray
-Musique générée procéduralement avec NumPy
+Musique et effets sonores générés procéduralement avec NumPy.
 
 ## Licence
 
