@@ -1,8 +1,8 @@
 import os
-import sys
 import random
-import numpy as np
+import sys
 
+import numpy as np
 import pygame
 from settings import (
     BLACK,
@@ -21,25 +21,29 @@ def generate_melody(notes):
     sample_rate = 44100
     full_buf = []
 
-    for freq, duration in notes:
-        n_samples = int(sample_rate * duration)
-        # Generate sine wave
-        buf = np.zeros((n_samples, 2), dtype=np.int16)
-        for i in range(n_samples):
-            # Simple envelope to avoid clicking (linear fade in/out)
-            envelope = 1.0
-            if i < 100:
-                envelope = i / 100
-            if i > n_samples - 100:
-                envelope = (n_samples - i) / 100
+    try:
+        for freq, duration in notes:
+            n_samples = int(sample_rate * duration)
+            # Generate sine wave
+            buf = np.zeros((n_samples, 2), dtype=np.int16)
+            for i in range(n_samples):
+                # Simple envelope to avoid clicking (linear fade in/out)
+                envelope = 1.0
+                if i < 100:
+                    envelope = i / 100
+                if i > n_samples - 100:
+                    envelope = (n_samples - i) / 100
 
-            val = int(32767 * np.sin(2 * np.pi * freq * i / sample_rate) * envelope)
-            buf[i][0] = val
-            buf[i][1] = val
-        full_buf.append(buf)
+                val = int(32767 * np.sin(2 * np.pi * freq * i / sample_rate) * envelope)
+                buf[i][0] = val
+                buf[i][1] = val
+            full_buf.append(buf)
 
-    combined_buf = np.concatenate(full_buf, axis=0)
-    return pygame.sndarray.make_sound(combined_buf)
+        combined_buf = np.concatenate(full_buf, axis=0)
+        return pygame.sndarray.make_sound(combined_buf)
+    except Exception as e:
+        print(f"Audio generation error: {e}")
+        return pygame.mixer.Sound(buffer=np.zeros((44100, 2), dtype=np.int16))
 
 
 def draw_grid(screen, board):
@@ -75,48 +79,57 @@ class Particle:
         self.x = x
         self.y = y
         self.color = color
-        # Spread wider and go higher
-        self.vx = random.uniform(-4, 4)
-        self.vy = random.uniform(-7, -2)
-        self.life = random.uniform(1.0, 2.0)
-        self.decay = random.uniform(0.003, 0.01)
+        # Faster, more explosive spread
+        self.vx = random.uniform(-8, 8)
+        self.vy = random.uniform(-12, -4)
+        self.life = random.uniform(0.6, 1.4)
+        self.decay = random.uniform(0.01, 0.03)
         self.size = random.randint(2, 6)
 
     def update(self):
         self.x += self.vx
         self.y += self.vy
-        self.vy += 0.05  # Even lighter gravity for a floating effect
-        self.vx *= 0.97  # Friction
+        self.vy += 0.1  # Stronger gravity for faster fall
+        self.vx *= 0.95  # Slightly more friction
         self.life -= self.decay
 
     def draw(self, screen):
         if self.life > 0:
-            # Dynamic size and fading color (approaching black)
-            current_size = max(1, int(self.size * self.life))
-            color_fade = [max(0, min(255, int(c * self.life))) for c in self.color]
-            rect = pygame.Rect(self.x, self.y, current_size, current_size)
-            pygame.draw.rect(screen, color_fade, rect)
+            try:
+                # Dynamic size and fading color (approaching black)
+                current_size = max(1, int(self.size * self.life))
+                color_fade = [max(0, min(255, int(c * self.life))) for c in self.color]
+                rect = pygame.Rect(self.x, self.y, current_size, current_size)
+                pygame.draw.rect(screen, color_fade, rect)
+            except (ValueError, TypeError):
+                pass
 
 
 def load_leaderboard():
     if not os.path.exists("leaderboard.txt"):
         return []
-    with open("leaderboard.txt", "r") as f:
-        scores = []
-        for line in f:
-            if ":" in line:
-                name, score = line.strip().split(":")
-                scores.append((name, int(score)))
-        return scores
+    try:
+        with open("leaderboard.txt") as f:
+            scores = []
+            for line in f:
+                if ":" in line:
+                    name, score = line.strip().split(":")
+                    scores.append((name, int(score)))
+            return scores
+    except (OSError, ValueError):
+        return []
 
 
 def save_score(name, score):
     scores = load_leaderboard()
     scores.append((name, score))
     scores.sort(key=lambda x: x[1], reverse=True)
-    with open("leaderboard.txt", "w") as f:
-        for n, s in scores[:10]:
-            f.write(f"{n}:{s}\n")
+    try:
+        with open("leaderboard.txt", "w") as f:
+            for n, s in scores[:10]:
+                f.write(f"{n}:{s}\n")
+    except OSError as e:
+        print(f"Failed to save score: {e}")
 
 
 def show_leaderboard_screen(screen, font):
@@ -266,6 +279,140 @@ def show_restart_menu(screen, font):
     return False
 
 
+def play_game_over_animation(
+    screen, font, board, current_piece, sound_enabled, game_over_sound, glitch_sound
+):
+    """Displays a truly extravagant and chaotic Game Over animation with audio."""
+    duration = 4000  # 4 seconds of madness
+    start_time = pygame.time.get_ticks()
+    particles = []
+
+    # Initial massive explosion of colors
+    for _ in range(400):
+        particles.append(
+            Particle(
+                random.randint(250, 250 + BOARD_WIDTH * BLOCK_SIZE),
+                random.randint(50, 50 + BOARD_HEIGHT * BLOCK_SIZE),
+                random.choice(
+                    [
+                        WHITE,
+                        GRAY,
+                        (255, 0, 0),
+                        (0, 255, 0),
+                        (0, 0, 255),
+                        (255, 255, 0),
+                        (255, 0, 255),
+                    ]
+                ),
+            )
+        )
+
+    if sound_enabled and game_over_sound:
+        game_over_sound.play()
+
+    while pygame.time.get_ticks() - start_time < duration:
+        elapsed = pygame.time.get_ticks() - start_time
+
+        # 1. Random Background Flash
+        if random.random() < 0.1:
+            screen.fill((random.randint(50, 150), 0, 0))  # Dark red flash
+            if sound_enabled and glitch_sound:
+                glitch_sound.play()
+        else:
+            screen.fill(BLACK)
+
+        # 2. Extreme Screen Shake
+        shake_x = random.randint(-15, 15) if elapsed < 1500 else random.randint(-3, 3)
+        shake_y = random.randint(-15, 15) if elapsed < 1500 else random.randint(-3, 3)
+
+        # 3. Glitchy Board Rendering
+        board_surface = pygame.Surface(
+            (BOARD_WIDTH * BLOCK_SIZE, BOARD_HEIGHT * BLOCK_SIZE)
+        )
+        board_surface.set_colorkey(BLACK)
+
+        # Occasionally invert colors or shift them
+        glitch_factor = random.random()
+
+        for y in range(BOARD_HEIGHT):
+            for x in range(BOARD_WIDTH):
+                rect = pygame.Rect(
+                    x * BLOCK_SIZE, y * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE
+                )
+
+                # Grid
+                pygame.draw.rect(board_surface, GRAY, rect, 1)
+
+                # Blocks
+                if board.grid[y][x]:
+                    color = board.grid[y][x]
+                    if glitch_factor > 0.95:  # Random color glitch
+                        color = (
+                            random.randint(0, 255),
+                            random.randint(0, 255),
+                            random.randint(0, 255),
+                        )
+                    pygame.draw.rect(board_surface, color, rect)
+
+        # Piece that killed the player
+        for x, y in current_piece.get_blocks():
+            if y >= 0:
+                rect = pygame.Rect(
+                    x * BLOCK_SIZE, y * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE
+                )
+                pygame.draw.rect(board_surface, current_piece.color, rect)
+
+        screen.blit(board_surface, (250 + shake_x, 50 + shake_y))
+
+        # 4. Chaotic Particles
+        # Add more particles over time
+        if random.random() < 0.3:
+            particles.append(
+                Particle(
+                    random.randint(0, SCREEN_WIDTH),
+                    random.randint(0, SCREEN_HEIGHT),
+                    random.choice([WHITE, (255, 0, 0), (0, 255, 0)]),
+                )
+            )
+
+        for p in particles[:]:
+            p.update()
+            p.draw(screen)
+            if p.life <= 0:
+                particles.remove(p)
+
+        # 5. Rainbow Pulsing Text
+        # Cycle colors using sine waves
+        try:
+            r = int(127 + 127 * np.sin(elapsed * 0.01))
+            g = int(127 + 127 * np.sin(elapsed * 0.01 + 2 * np.pi / 3))
+            b = int(127 + 127 * np.sin(elapsed * 0.01 + 4 * np.pi / 3))
+        except (ValueError, TypeError):
+            r, g, b = 255, 0, 0
+
+        text_str = "!!! GAME OVER !!!"
+        rainbow_color = (r, g, b)
+        game_over_text = font.render(text_str, True, rainbow_color)
+
+        # Make text "dance" (random offset)
+        dance_x = random.randint(-10, 10) if elapsed < 2000 else 0
+        dance_y = random.randint(-10, 10) if elapsed < 2000 else 0
+
+        text_rect = game_over_text.get_rect(
+            center=(SCREEN_WIDTH // 2 + dance_x, SCREEN_HEIGHT // 2 + dance_y)
+        )
+        screen.blit(game_over_text, text_rect)
+
+        pygame.display.flip()
+
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
+
+        pygame.time.delay(16)  # ~60 FPS
+
+
 def main():
     pygame.init()
     pygame.mixer.init()
@@ -315,6 +462,17 @@ def main():
     rotate_cw_sound = generate_melody([(440.0, 0.05), (659.25, 0.05)])  # Quick rising
     rotate_ccw_sound = generate_melody([(659.25, 0.05), (440.0, 0.05)])  # Quick falling
 
+    # Game over sounds
+    game_over_sound = generate_melody(
+        [
+            (261.63, 0.2),  # C4
+            (196.00, 0.2),  # G3
+            (130.81, 0.5),  # C3
+        ]
+    )
+    glitch_sound = generate_melody([(880.0, 0.01), (1760.0, 0.01)])  # Fast blip
+    lock_sound = generate_melody([(600.0, 0.05), (400.0, 0.05)])  # Higher pitch thud
+
     handicap_level, sound_enabled = show_start_menu(screen, font)
 
     while True:
@@ -335,8 +493,8 @@ def main():
         paused = False
 
         while not game_over:
-            drop_time += clock.get_rawtime()
-            clock.tick()
+            dt = clock.tick(60)
+            drop_time += dt
 
             # Calculate current drop speed based on level (2% faster per level)
             current_base_speed = base_drop_speed * (0.98**level)
@@ -366,6 +524,8 @@ def main():
                     # Play sound based on number of lines cleared
                     if sound_enabled and cleared_count in line_sounds:
                         line_sounds[cleared_count].play()
+                    elif sound_enabled:
+                        lock_sound.play()
 
                     # Spectacular particles explosion
                     for row_idx, row_colors in cleared_rows_data:
@@ -394,33 +554,34 @@ def main():
                     pygame.quit()
                     sys.exit()
 
-                if event.type == pygame.KEYDOWN:
+                elif event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_SPACE:
                         paused = not paused
-                    elif event.key == pygame.K_DOWN:
-                        down_pressed_for_current_piece = True
-                    elif event.key == pygame.K_LEFT and board.is_valid_move(
-                        current_piece, dx=-1
-                    ):
-                        current_piece.move(-1, 0)
-                    elif event.key == pygame.K_RIGHT and board.is_valid_move(
-                        current_piece, dx=1
-                    ):
-                        current_piece.move(1, 0)
-                    elif event.key == pygame.K_UP:
-                        # Rotation logic (Clockwise)
-                        new_rot = current_piece.rotation + 1
-                        if board.is_valid_move(current_piece, rotation=new_rot):
-                            current_piece.rotate(1)
-                            if sound_enabled:
-                                rotate_cw_sound.play()
-                    elif event.key == pygame.K_s:
-                        # Rotation logic (Counter-Clockwise)
-                        new_rot = current_piece.rotation - 1
-                        if board.is_valid_move(current_piece, rotation=new_rot):
-                            current_piece.rotate(-1)
-                            if sound_enabled:
-                                rotate_ccw_sound.play()
+                    elif not paused:
+                        if event.key == pygame.K_DOWN:
+                            down_pressed_for_current_piece = True
+                        elif event.key == pygame.K_LEFT and board.is_valid_move(
+                            current_piece, dx=-1
+                        ):
+                            current_piece.move(-1, 0)
+                        elif event.key == pygame.K_RIGHT and board.is_valid_move(
+                            current_piece, dx=1
+                        ):
+                            current_piece.move(1, 0)
+                        elif event.key == pygame.K_UP:
+                            # Rotation logic (Clockwise)
+                            new_rot = current_piece.rotation + 1
+                            if board.is_valid_move(current_piece, rotation=new_rot):
+                                current_piece.rotate(1)
+                                if sound_enabled:
+                                    rotate_cw_sound.play()
+                        elif event.key == pygame.K_s:
+                            # Rotation logic (Counter-Clockwise)
+                            new_rot = current_piece.rotation - 1
+                            if board.is_valid_move(current_piece, rotation=new_rot):
+                                current_piece.rotate(-1)
+                                if sound_enabled:
+                                    rotate_ccw_sound.play()
                 elif event.type == pygame.KEYUP:
                     if event.key == pygame.K_DOWN:
                         down_pressed_for_current_piece = False
@@ -472,6 +633,17 @@ def main():
             pygame.display.flip()
 
         print(f"Game Over! Final Score: {score}")
+
+        # Jouer l'animation de Game Over
+        play_game_over_animation(
+            screen,
+            font,
+            board,
+            current_piece,
+            sound_enabled,
+            game_over_sound,
+            glitch_sound,
+        )
 
         # Gestion du leaderboard via popup
         name = get_user_name(screen, font)
