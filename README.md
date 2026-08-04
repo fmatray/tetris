@@ -59,24 +59,33 @@ python main.py
 
 ## Contrôles
 
-| Touche | Action |
-| -------- | -------- |
-| ← → | Déplacer la pièce |
-| ↑ | Rotation horaire |
-| S | Rotation anti-horaire |
-| ↓ | Accélérer la chute (soft drop) |
-| Espace | Pause |
-| Entrée | Valider dans les menus |
-| S (menu) | Activer/désactiver le son |
+| Touche | Jeu | Menu |
+| -------- | -------- | -------- |
+| ← → | Déplacer la pièce | Modifier valeur (Handicap, Son) |
+| ↑ | Rotation horaire | Navigation vers le haut |
+| ↓ | Accélérer la chute | Navigation vers le bas |
+| S | Rotation anti-horaire | - |
+| Espace | Pause | - |
+| Entrée | - | Valider l'action |
+
+## Architecture Technique
+
+Le projet repose sur une architecture modulaire et extensible :
+
+- **Machine à États Finis (FSM)** : Utilisation du *State Pattern* pour gérer les transitions fluides entre le `MenuState`, `GameState`, `GameOverState` et `LeaderboardState`.
+- **Audio Procédural** : Génération de ondes sinusoïdales via NumPy pour créer des mélodies et effets sonores sans dépendances de fichiers externes.
+- **Système de Particules** : Moteur d'effets visuels gérant la physique (gravité, friction) et le cycle de vie des particules pour des explosions dynamiques.
+- **Rendu Isolé** : Classe `Renderer` dédiée pour séparer la logique de mise à jour du moteur graphique.
+- **Persistance JSON** : Leaderboard stocké dans un format JSON structuré incluant le nom, le score, le niveau, les lignes effacées et la date.
 
 ## Structure du projet
 
 ```
 tetris-python/
-├── main.py            # Point d'entrée principal, moteur de jeu et audio
-├── tetris.py          # Logique du jeu (Board, Tetromino)
+├── main.py            # FSM, Moteur de jeu, Audio et Rendu
+├── tetris.py          # Logique métier (Board, Tetromino)
 ├── settings.py        # Constantes et configurations
-├── leaderboard.txt    # Fichier de sauvegarde des scores
+├── leaderboard.json   # Sauvegarde des scores (JSON)
 └── README.md          # Documentation du projet
 ```
 

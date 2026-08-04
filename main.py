@@ -1,9 +1,9 @@
+import json
 import os
 import random
 import sys
-import json
 from datetime import datetime
-from typing import List, Tuple, Dict, Any, Optional
+from typing import Any, Optional
 
 import numpy as np
 import pygame
@@ -25,7 +25,7 @@ class AudioManager:
 
     def __init__(self, enabled: bool = True) -> None:
         self.enabled = enabled
-        self.sounds: Dict[str, pygame.mixer.Sound] = {}
+        self.sounds: dict[str, pygame.mixer.Sound] = {}
         self._init_sounds()
 
     def _init_sounds(self) -> None:
@@ -66,7 +66,7 @@ class AudioManager:
         self.sounds["glitch"] = self.generate_melody([(880.0, 0.01), (1760.0, 0.01)])
         self.sounds["lock"] = self.generate_melody([(600.0, 0.05), (400.0, 0.05)])
 
-    def generate_melody(self, notes: List[Tuple[float, float]]) -> pygame.mixer.Sound:
+    def generate_melody(self, notes: list[tuple[float, float]]) -> pygame.mixer.Sound:
         sample_rate = 44100
         full_buf = []
         try:
@@ -96,7 +96,7 @@ class AudioManager:
 
 
 class Particle:
-    def __init__(self, x: float, y: float, color: Tuple[int, int, int]) -> None:
+    def __init__(self, x: float, y: float, color: tuple[int, int, int]) -> None:
         self.x, self.y, self.color = x, y, color
         self.vx = random.uniform(-8, 8)
         self.vy = random.uniform(-12, -4)
@@ -125,10 +125,10 @@ class Particle:
 
 class ParticleSystem:
     def __init__(self) -> None:
-        self.particles: List[Particle] = []
+        self.particles: list[Particle] = []
 
     def emit(
-        self, x: float, y: float, color: Tuple[int, int, int], count: int = 1
+        self, x: float, y: float, color: tuple[int, int, int], count: int = 1
     ) -> None:
         for _ in range(count):
             self.particles.append(Particle(x, y, color))
@@ -171,7 +171,7 @@ class Renderer:
         particles.draw(self.screen)
         pygame.display.flip()
 
-    def _draw_text(self, text: str, pos: Tuple[int, int]) -> None:
+    def _draw_text(self, text: str, pos: tuple[int, int]) -> None:
         surf = self.font.render(text, True, WHITE)
         self.screen.blit(surf, pos)
 
@@ -311,39 +311,97 @@ class State:
         pass
 
 
+class LeaderboardState(State):
+    def __init__(
+        self, screen: pygame.Surface, font: pygame.font.Font, audio: AudioManager
+    ) -> None:
+        self.screen, self.font, self.audio = screen, font, audio
+
+    def handle_event(self, event: pygame.event.Event) -> Optional["State"]:
+        if event.type == pygame.KEYDOWN:
+            return MenuState(self.screen, self.font, self.audio)
+        return None
+
+    def draw(self, screen: pygame.Surface) -> None:
+        screen.fill(BLACK)
+        scores = load_leaderboard()
+        title = self.font.render("TOP 10 LEADERBOARD", True, WHITE)
+        screen.blit(title, (SCREEN_WIDTH // 2 - title.get_width() // 2, 30))
+        header = self.font.render("Name       Score    Lvl   Lines   Date", True, GRAY)
+        screen.blit(header, (SCREEN_WIDTH // 2 - header.get_width() // 2, 80))
+        for i, entry in enumerate(scores[:10], 1):
+            row_str = (
+                f"{i:<2} {entry['name']:<10} {entry['score']:<8} "
+                f"{entry['level']:<5} {entry['lines']:<7} {entry['date']}"
+            )
+            row = self.font.render(row_str, True, WHITE)
+            screen.blit(row, (SCREEN_WIDTH // 2 - row.get_width() // 2, 120 + i * 30))
+        instr = self.font.render("Press any key to continue", True, GRAY)
+        screen.blit(instr, (SCREEN_WIDTH // 2 - instr.get_width() // 2, 600))
+
+
 class MenuState(State):
     def __init__(
         self, screen: pygame.Surface, font: pygame.font.Font, audio: AudioManager
     ) -> None:
         self.screen, self.font, self.audio = screen, font, audio
         self.h, self.s = 0, True
+        self.selection = 0
+        self.options = [
+            "Modifier Handicap",
+            "Son",
+            "Démarrer le jeu",
+            "Leaderboard",
+            "Quitter",
+        ]
 
     def handle_event(self, event: pygame.event.Event) -> Optional["State"]:
         if event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_LEFT:
-                self.h = max(0, self.h - 1)
+            if event.key == pygame.K_UP:
+                self.selection = (self.selection - 1) % len(self.options)
+            elif event.key == pygame.K_DOWN:
+                self.selection = (self.selection + 1) % len(self.options)
+            elif event.key == pygame.K_LEFT:
+                if self.selection == 0:
+                    self.h = max(0, self.h - 1)
+                elif self.selection == 1:
+                    self.s = not self.s
             elif event.key == pygame.K_RIGHT:
-                self.h = min(5, self.h + 1)
-            elif event.key == pygame.K_s:
-                self.s = not self.s
+                if self.selection == 0:
+                    self.h = min(5, self.h + 1)
+                elif self.selection == 1:
+                    self.s = not self.s
             elif event.key == pygame.K_RETURN:
-                return GameState(self.screen, self.font, self.audio, self.h)
+                if self.selection == 2:  # Start
+                    return GameState(self.screen, self.font, self.audio, self.h)
+                elif self.selection == 3:  # Leaderboard
+                    return LeaderboardState(self.screen, self.font, self.audio)
+                elif self.selection == 4:  # Quit
+                    pygame.quit()
+                    sys.exit()
         return None
 
     def draw(self, screen: pygame.Surface) -> None:
         screen.fill(BLACK)
         title = self.font.render("TETRIS", True, WHITE)
         screen.blit(title, (SCREEN_WIDTH // 2 - title.get_width() // 2, 100))
-        instr = self.font.render("Select Handicap Level (0-5)", True, GRAY)
-        screen.blit(instr, (SCREEN_WIDTH // 2 - instr.get_width() // 2, 200))
-        lvl = self.font.render(f"Current Level: {self.h}", True, WHITE)
-        screen.blit(lvl, (SCREEN_WIDTH // 2 - lvl.get_width() // 2, 250))
-        snd = self.font.render(f"Sound: {'ON' if self.s else 'OFF'}", True, WHITE)
-        screen.blit(snd, (SCREEN_WIDTH // 2 - snd.get_width() // 2, 300))
-        ctrl = self.font.render(
-            "LEFT/RIGHT: Level | S: Sound | ENTER: Start", True, GRAY
-        )
-        screen.blit(ctrl, (SCREEN_WIDTH // 2 - ctrl.get_width() // 2, 400))
+
+        for i, option in enumerate(self.options):
+            color = WHITE if i == self.selection else GRAY
+            prefix = "> " if i == self.selection else "  "
+
+            # Add value to the option text
+            text = option
+            if i == 0:
+                text = f"{option} : {self.h}"
+            if i == 1:
+                text = f"{option} : {'ON' if self.s else 'OFF'}"
+
+            surf = self.font.render(f"{prefix}{text}", True, color)
+            screen.blit(surf, (SCREEN_WIDTH // 2 - surf.get_width() // 2, 200 + i * 60))
+
+        instr = self.font.render("Flèches: Navigation | Entrée: Valider", True, GRAY)
+        screen.blit(instr, (SCREEN_WIDTH // 2 - instr.get_width() // 2, 550))
 
 
 class GameState(State):
@@ -472,8 +530,8 @@ class GameOverState(State):
         return None
 
     def handle_event(self, event: pygame.event.Event) -> Optional["State"]:
-        if self.step == "NAME":
-            if event.type == pygame.KEYDOWN:
+        if event.type == pygame.KEYDOWN:
+            if self.step == "NAME":
                 if event.key == pygame.K_RETURN and self.name.strip():
                     save_score(
                         self.name,
@@ -486,11 +544,9 @@ class GameOverState(State):
                     self.name = self.name[:-1]
                 elif len(self.name) < 15:
                     self.name += event.unicode
-        elif self.step == "LEADERBOARD":
-            if event.type == pygame.KEYDOWN:
+            elif self.step == "LEADERBOARD":
                 self.step = "RESTART"
-        elif self.step == "RESTART":
-            if event.type == pygame.KEYDOWN:
+            elif self.step == "RESTART":
                 if event.key == pygame.K_r:
                     return MenuState(self.screen, self.font, self.audio)
                 if event.key == pygame.K_q:
@@ -542,11 +598,11 @@ class GameOverState(State):
             screen.blit(q_txt, (SCREEN_WIDTH // 2 - q_txt.get_width() // 2, 280))
 
 
-def load_leaderboard() -> List[Dict[str, Any]]:
+def load_leaderboard() -> list[dict[str, Any]]:
     if not os.path.exists("leaderboard.json"):
         return []
     try:
-        with open("leaderboard.json", "r") as f:
+        with open("leaderboard.json") as f:
             data = json.load(f)
             # Ensure data is a list of dicts
             return [
@@ -586,6 +642,7 @@ def save_score(name: str, score: int, level: int, lines: int) -> None:
 
 
 def main() -> None:
+    print("Starting Tetris... Please wait.")
     pygame.init()
     pygame.mixer.init()
     screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
@@ -593,42 +650,46 @@ def main() -> None:
     clock = pygame.time.Clock()
     font = pygame.font.SysFont("Arial", 32)
 
-    # Initial Menu to get settings
-    h_lvl, s_en = 0, True
-    # Temporarily use MenuState just to get settings if we wanted to be pure,
-    # but for simplicity, let's just instantiate a MenuState as the start.
-
-    audio = AudioManager(True)  # Default True, updated by menu
+    audio = AudioManager(True)
     particles = ParticleSystem()
     state: State = MenuState(screen, font, audio)
+    print("Game window should be open now.")
 
     while True:
-        dt = clock.tick(60)
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                pygame.quit()
-                sys.exit()
-            new_state = state.handle_event(event)
-            if new_state:
-                # If we transition to GameState, we can pass the handicap from MenuState
-                if isinstance(new_state, GameState):
-                    # we need to pass the handicap from the previous state
-                    if isinstance(state, MenuState):
+        try:
+            dt = clock.tick(60)
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    pygame.quit()
+                    sys.exit()
+                new_state = state.handle_event(event)
+                if new_state:
+                    if isinstance(new_state, GameState) and isinstance(
+                        state, MenuState
+                    ):
                         new_state.board.apply_handicap(state.h)
                         audio.enabled = state.s
+                    state = new_state
+
+            new_state = (
+                state.update(dt, particles) if hasattr(state, "update") else None
+            )
+            if new_state:
                 state = new_state
 
-        new_state = state.update(dt, particles) if hasattr(state, "update") else None
-        if new_state:
-            state = new_state
+            if isinstance(state, GameState):
+                state.render(particles)
+            else:
+                state.draw(screen)
+                pygame.display.flip()
 
-        if isinstance(state, GameState):
-            state.render(particles)
-        else:
-            state.draw(screen)
-            pygame.display.flip()
+            particles.update()
+        except Exception as e:
+            print(f"Runtime error in main loop: {e}")
+            import traceback
 
-        particles.update()
+            traceback.print_exc()
+            break
 
 
 if __name__ == "__main__":
