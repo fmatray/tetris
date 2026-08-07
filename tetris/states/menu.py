@@ -58,7 +58,9 @@ class MenuState(State):
 
             if self.selection == 3:  # Start
                 if self.player == "IA":
-                    return None  # AI mode not implemented yet
+                    from tetris.states.ai import AIState
+
+                    return AIState(self.screen, self.font, self.audio, self.h, self.s)
                 return GameState(self.screen, self.font, self.audio, self.h, self.s)
             elif self.selection == 4:  # Leaderboard
                 return LeaderboardState(self.screen, self.font, self.audio)

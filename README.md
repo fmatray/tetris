@@ -32,6 +32,7 @@ Un jeu Tetris complet développé en Python avec Pygame, incluant des effets vis
 - ✅ Saisie du nom (15 caractères max) en fin de partie.
 - ✅ Leaderboard top 10 persistant (JSON).
 - ✅ Retour automatique au menu principal après le leaderboard.
+- ✅ **Joueur IA (DQN)** : Mode apprentissage par renforcement (Deep Q-Learning). L'IA apprend à jouer de manière autonome, à vitesse humaine, et affiche ses statistiques d'apprentissage en temps réel (épisodes, epsilon, pas de gradient, score moyen/meilleur, perte).
 
 ## Installation
 
@@ -40,6 +41,7 @@ Un jeu Tetris complet développé en Python avec Pygame, incluant des effets vis
 - Python 3.9+
 - Pygame ≥ 2.5.0
 - NumPy ≥ 1.24.0
+- PyTorch ≥ 2.0 (requis pour le mode IA)
 
 ### Installation
 
@@ -64,17 +66,19 @@ python main.py
 | ↓ | Accélérer la chute | Navigation vers le bas |
 | S | Rotation anti-horaire | - |
 | Espace | Pause | - |
+| Échap | Retour au menu (sans sauvegarde du score) | - |
 | Entrée | - | Valider l'action |
 
 ## Architecture Technique
 
 Le projet repose sur une architecture modulaire et extensible :
 
-- **Machine à États Finis (FSM)** : Utilisation du *State Pattern* pour gérer les transitions fluides entre `MenuState`, `GameState`, `GameOverState` et `LeaderboardState`.
+- **Machine à États Finis (FSM)** : Utilisation du *State Pattern* pour gérer les transitions fluides entre `MenuState`, `GameState`, `AIState`, `GameOverState` et `LeaderboardState`.
 - **Audio Procédural** : Génération d'ondes sinusoïdales via NumPy pour créer des mélodies et effets sonores sans dépendances de fichiers externes.
 - **Système de Particules** : Moteur d'effets visuels gérant la physique (gravité, friction) et le cycle de vie des particules pour des explosions dynamiques.
 - **Rendu Isolé** : Classe `Renderer` dédiée pour séparer la logique de mise à jour du moteur graphique.
 - **Persistance JSON** : Leaderboard stocké dans `leaderboard.json`, trié par score décroissant, incluant le nom, le score, le niveau, les lignes effacées et la date.
+- **Apprentissage par Renforcement (DQN)** : Agent Deep Q-Network implémenté avec PyTorch. L'IA apprend en jouant de manière autonome : exploration ε-greedy, experience replay (buffer 50 000), target network (sync toutes les 1 000 étapes). L'état du plateau est encodé en vecteur de 218 features (grille 200 + pièce courante 7 + pièce suivante 7 + orientation 4). La fonction de récompense pénalise les trous, la hauteur et l'irrégularité, et récompense les lignes effacées. Le modèle et les statistiques sont sauvegardés entre les sessions (`ai_model.pt`, `ai_training_log.json`).
 
 
 ## Principes de conception
@@ -126,9 +130,16 @@ tetris/
 │   ├── game/                    # Logique métier (sans pygame)
 │   │   ├── __init__.py
 │   │   ├── tetromino.py         # Modèle de pièce
-│   │   ├── board.py             # Grille, collisions, lignes, handicap
+│   │   ├── board.py             # Grille, collisions, lignes, handicap, hard drop
 │   │   ├── scoring.py           # Règles de score (bonus multi-lignes)
 │   │   └── stats.py             # Score, lignes, niveau
+│   ├── ai/                      # Apprentissage par renforcement (DQN)
+│   │   ├── __init__.py
+│   │   ├── network.py           # Réseau de neurones (218→256→128→64→6)
+│   │   ├── agent.py             # DQNAgent (ε-greedy, replay, target net)
+│   │   ├── replay_buffer.py     # Buffer d'experience replay (50 000)
+│   │   ├── rewards.py           # Récompense et extraction de features
+│   │   └── trainer.py           # Journal d'entraînement (JSON)
 │   ├── audio/                   # Audio procédural (NumPy)
 │   │   └── __init__.py          # AudioManager
 │   ├── visuals/                 # Rendu et effets visuels
@@ -140,14 +151,16 @@ tetris/
 │   │   ├── __init__.py
 │   │   ├── base.py              # State (classe de base)
 │   │   ├── menu.py              # MenuState
-│   │   ├── game.py              # GameState
+│   │   ├── ai.py                # AIState (DQN agent, HUD apprentissage)
 │   │   ├── game_over.py         # GameOverState
 │   │   └── leaderboard.py       # LeaderboardState
 │   └── storage/                 # Persistance JSON
 │       └── __init__.py          # load_leaderboard, save_score
 ├── leaderboard.json             # Sauvegarde des scores top 10 (JSON)
-├── requirements.txt             # Dépendances (pygame, numpy)
-├── AI.md                        # Document de conception : mode joueur IA (DQN, non implémenté)
+├── ai_model.pt                  # Poids du modèle DQN (généré)
+├── ai_training_log.json         # Journal d'entraînement (généré)
+├── requirements.txt             # Dépendances (pygame, numpy, torch)
+├── AI.md                        # Document de conception : mode joueur IA (DQN)
 └── README.md                    # Documentation du projet
 
 ## Personnalisation
@@ -165,7 +178,7 @@ tetris/
 
 ## Roadmap
 
-Un mode **Joueur IA** basé sur le Deep Q-Learning (DQN) est conçu dans `AI.md` : entraînement par renforcement, représentation de l'état du plateau, fonction de récompense et pipeline d'entraînement. Ce mode n'est pas encore implémenté.
+Un mode **Joueur IA** basé sur le Deep Q-Learning (DQN) est implémenté dans le package `tetris/ai/` et intégré via `AIState` (voir `AI.md` pour le design détaillé). L'IA apprend en jouant de manière autonome, à cadence humaine (~12 actions/sec), avec sauvegarde du modèle et des statistiques entre les sessions. Améliorations futures possibles : Double DQN, Prioritized Experience Replay, macro-actions, entraînement accéléré hors-ligne.
 
 ## Crédits
 

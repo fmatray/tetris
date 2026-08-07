@@ -55,6 +55,14 @@ class Board:
                 self.grid[y][x] = tetromino.color
         return self.clear_lines()
 
+    def hard_drop(self, tetromino: Tetromino) -> int:
+        """Drop *tetromino* to the lowest valid position. Returns distance fallen."""
+        distance = 0
+        while self.is_valid_move(tetromino, dy=1):
+            tetromino.move(0, 1)
+            distance += 1
+        return distance
+
     def apply_handicap(self, level: int) -> None:
         """Pre-fill bottom rows with random gray blocks.
 

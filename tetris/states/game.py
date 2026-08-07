@@ -82,6 +82,27 @@ class GameState(State):
     def _toggle_down_true(self) -> None:
         self.down_pressed = True
 
+    def _hard_drop(self) -> None:
+        """Drop piece to bottom instantly, lock, and spawn next piece."""
+        if self.paused:
+            return
+        self.board.hard_drop(self.current_piece)
+        self._lock_and_spawn()
+
+    def _lock_and_spawn(self) -> tuple[int, list]:
+        """Lock current piece, update stats, spawn next. Returns (cleared, rows_data)."""
+        cleared, rows_data = self.board.lock_tetromino(self.current_piece)
+        self.stats.add_lines(cleared)
+        if cleared > 0:
+            self.audio.play(f"clear_{cleared}")
+        else:
+            self.audio.play("lock")
+        self.current_piece, self.next_piece = self.next_piece, Tetromino()
+        self.down_pressed = False
+        if not self.board.is_valid_move(self.current_piece):
+            self.game_over = True
+        return cleared, rows_data
+
     # --- Event / update / render ----------------------------------------
 
     def handle_event(self, event: pygame.event.Event) -> Optional[State]:
@@ -122,17 +143,9 @@ class GameState(State):
             self.current_piece.move(0, 1)
             return
 
-        cleared, rows_data = self.board.lock_tetromino(self.current_piece)
-        self.stats.add_lines(cleared)
+        cleared, rows_data = self._lock_and_spawn()
         if cleared > 0:
-            self.audio.play(f"clear_{cleared}")
             self._emit_line_particles(particles, rows_data)
-        else:
-            self.audio.play("lock")
-        self.current_piece, self.next_piece = self.next_piece, Tetromino()
-        self.down_pressed = False
-        if not self.board.is_valid_move(self.current_piece):
-            self.game_over = True
 
     def _emit_line_particles(self, particles: ParticleSystem, rows_data) -> None:
         for r_idx, colors in rows_data:
