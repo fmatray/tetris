@@ -75,7 +75,7 @@ HUD_POSITIONS = {
     "score": (20, 20),
     "lines": (20, 60),
     "level": (20, 100),
-    "next": (550, 50),
+    "next": (570, 50),
 }
 
 # Game-over animation

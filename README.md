@@ -28,7 +28,7 @@ Un jeu Tetris complet développé en Python avec Pygame, incluant des effets vis
 
 ### Expérience utilisateur
 
-- ✅ Menu de démarrage avec sélection du handicap et du son.
+- ✅ Menu de démarrage avec sélection du joueur (Humain/IA), du handicap et du son.
 - ✅ Saisie du nom (15 caractères max) en fin de partie.
 - ✅ Leaderboard top 10 persistant (JSON).
 - ✅ Retour automatique au menu principal après le leaderboard.
@@ -59,7 +59,7 @@ python main.py
 
 | Touche | Jeu | Menu |
 | -------- | -------- | -------- |
-| ← → | Déplacer la pièce | Modifier valeur (Handicap, Son) |
+| ← → | Déplacer la pièce | Modifier valeur (Joueur, Handicap, Son) |
 | ↑ | Rotation horaire | Navigation vers le haut |
 | ↓ | Accélérer la chute | Navigation vers le bas |
 | S | Rotation anti-horaire | - |

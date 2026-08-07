@@ -88,6 +88,10 @@ class GameState(State):
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_SPACE:
                 self.paused = not self.paused
+            elif event.key == pygame.K_ESCAPE:
+                from tetris.states.menu import MenuState
+
+                return MenuState(self.screen, self.font, self.audio)
             elif event.key in self.input_map:
                 self.input_map[event.key]()
         elif event.type == pygame.KEYUP and event.key == pygame.K_DOWN:
