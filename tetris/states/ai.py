@@ -66,9 +66,14 @@ class AIState(GameState):
         piece_provider: "PieceProvider | None" = None,
         speed: str = "fast",
         menu: "MenuState | None" = None,
+        epsilon_decay: float = 0.999,
+        epsilon_end: float = 0.1,
     ) -> None:
         super().__init__(screen, font, audio, handicap, sound_enabled, piece_provider, menu)
-        self.agent = DQNAgent()
+        self.agent = DQNAgent(
+            epsilon_decay=epsilon_decay,
+            epsilon_end=epsilon_end,
+        )
         self.log = TrainingLog(LOG_PATH)
         self.episode = self.log.total_episodes
         self.speed = speed

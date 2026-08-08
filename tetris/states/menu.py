@@ -40,6 +40,8 @@ class MenuState(State):
         self.player = "Humain"
         self.mode = "Normal"
         self.ai_speed = "normal"
+        self.ai_epsilon_decay = 0.999
+        self.ai_epsilon_end = 0.1
         self.selection = 0
 
     # --- Value helpers --------------------------------------------------
@@ -115,6 +117,8 @@ class MenuState(State):
                 return AIState(
                     self.screen, self.font, self.audio, self.h, self.s,
                     provider, self.ai_speed, self,
+                    epsilon_decay=self.ai_epsilon_decay,
+                    epsilon_end=self.ai_epsilon_end,
                 )
             return GameState(
                 self.screen, self.font, self.audio, self.h, self.s, provider, self

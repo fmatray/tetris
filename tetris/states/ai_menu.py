@@ -32,7 +32,7 @@ class AIMenuState(State):
     inline. Reset requires a double-press confirmation.
     """
 
-    _OPTIONS = ["Vitesse", "Réinitialiser IA", "Retour"]
+    _OPTIONS = ["Vitesse", "Epsilon decay", "Epsilon fin", "Réinitialiser IA", "Retour"]
 
     def __init__(self, screen, font, audio, menu) -> None:
         self.screen, self.font, self.audio = screen, font, audio
@@ -53,9 +53,20 @@ class AIMenuState(State):
             self.selection = (self.selection + 1) % len(self._OPTIONS)
             self._confirm_reset = False
         elif event.key in (pygame.K_LEFT, pygame.K_RIGHT):
+            direction = 1 if event.key == pygame.K_RIGHT else -1
             if self.selection == 0:  # Vitesse
                 self.menu.ai_speed = (
                     "fast" if self.menu.ai_speed == "normal" else "normal"
+                )
+            elif self.selection == 1:  # Epsilon decay
+                self.menu.ai_epsilon_decay = round(
+                    max(0.990, min(0.999, self.menu.ai_epsilon_decay + direction * 0.0001)),
+                    4,
+                )
+            elif self.selection == 2:  # Epsilon fin
+                self.menu.ai_epsilon_end = round(
+                    max(0.02, min(0.10, self.menu.ai_epsilon_end + direction * 0.01)),
+                    2,
                 )
         elif event.key == pygame.K_RETURN:
             return self._on_select()
@@ -67,14 +78,14 @@ class AIMenuState(State):
         sel = self.selection
         if sel == 0:  # Vitesse — toggle
             self.menu.ai_speed = "fast" if self.menu.ai_speed == "normal" else "normal"
-        elif sel == 1:  # Réinitialiser IA
+        elif sel == 3:  # Réinitialiser IA
             if not self._confirm_reset:
                 self._confirm_reset = True
             else:
                 self._reset_ai()
                 self._confirm_reset = False
                 self._stats = TrainingLog()
-        elif sel == 2:  # Retour
+        elif sel == 4:  # Retour
             return self.menu
         return None
 
@@ -114,14 +125,18 @@ class AIMenuState(State):
             if i == 0:  # Vitesse
                 label = "Rapide" if self.menu.ai_speed == "fast" else "Normal"
                 text = f"{option} : {label}"
-            if i == 1 and self._confirm_reset:
+            elif i == 1:  # Epsilon decay
+                text = f"{option} : {self.menu.ai_epsilon_decay:.4f}"
+            elif i == 2:  # Epsilon fin
+                text = f"{option} : {self.menu.ai_epsilon_end:.2f}"
+            if i == 3 and self._confirm_reset:
                 text = "Confirmer ? (Entrée)"
                 color = RED
             surf = self.font.render(f"{prefix}{text}", True, color)
             screen.blit(surf, (SCREEN_WIDTH // 2 - surf.get_width() // 2, 140 + i * 48))
 
         # Stats section
-        y = 310
+        y = 410
         header = self.font.render("Statistiques", True, WHITE)
         screen.blit(header, (SCREEN_WIDTH // 2 - header.get_width() // 2, y))
         y += 45
