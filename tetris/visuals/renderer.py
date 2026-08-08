@@ -67,7 +67,6 @@ class Renderer:
                 (SCREEN_WIDTH // 2 - pause_text.get_width() // 2, SCREEN_HEIGHT // 2),
             )
         particles.draw(self.screen)
-        pygame.display.flip()
 
     def _draw_text(self, text: str, pos: tuple[int, int]) -> None:
         surf = self.font.render(text, True, WHITE)

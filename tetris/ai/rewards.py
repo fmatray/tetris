@@ -118,8 +118,10 @@ def compute_reward(
 ) -> float:
     """Reward shaping per AI.md §4.
 
-    Combines line-clear bonuses with structural penalties (holes,
-    height, bumpiness) to give dense feedback even when no lines clear.
+    Combines line-clear bonuses with structural penalties to give dense
+    feedback. Hole penalty is delta-based (new holes minus old holes) so
+    the agent learns which actions create holes rather than inheriting
+    a constant penalty for pre-existing holes.
     """
     if game_over:
         return -10.0
@@ -128,16 +130,22 @@ def compute_reward(
     reward += 50.0 * lines_cleared
     reward += 5.0 * lines_cleared * lines_cleared
 
-    # Absolute board quality (not deltas) — teaches the agent to keep
-    # the board flat and hole-free, not just "less bad than before"
-    holes = count_holes(new_grid)
+    # Delta-based hole penalty: punish only NEW holes created
+    old_holes = count_holes(prev_grid)
+    new_holes = count_holes(new_grid)
+    holes_created = max(0, new_holes - old_holes)
+    reward -= 5.0 * holes_created
+
+    # Small residual on absolute holes so the agent still wants to clear
+    # existing holes over time, but the signal is dominated by delta
+    reward -= 0.1 * new_holes
+
     height = aggregate_height(new_grid)
     bumps = bumpiness(new_grid)
 
-    reward -= 0.5 * holes          # penalize existing holes
-    reward -= 0.05 * height        # penalize tall stacks
-    reward -= 0.1 * bumps          # penalize uneven surface
+    reward -= 0.05 * height
+    reward -= 0.1 * bumps
 
     if step_survived:
-        reward += 1.0  # strong survival incentive — each piece placed is good
+        reward += 1.0
     return reward

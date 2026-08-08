@@ -179,3 +179,4 @@ class GameState(State):
 
     def render(self, particles: ParticleSystem) -> None:
         self.renderer.render_frame(self, particles)
+        pygame.display.flip()

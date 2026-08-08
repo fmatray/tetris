@@ -1,7 +1,8 @@
 """AI game state: DQN agent plays Tetris autonomously with learning.
 
 Subclasses ``GameState`` (Open/Closed). The AI uses macro-actions: one
-decision per piece (column + rotation), then hard-drop. On game over,
+decision per piece (column + rotation), then BFS soft-drop to the deepest
+reachable position — allowing placement under overhangs. On game over,
 the episode is logged and a new episode starts automatically — the agent
 learns continuously.
 
@@ -22,12 +23,13 @@ import pygame
 from tetris.ai.agent import DQNAgent
 from tetris.ai.rewards import (
     compute_reward,
+    count_holes,
     extract_state,
     board_to_grid,
 )
 from tetris.ai.trainer import TrainingLog
 from tetris.audio import AudioManager
-from tetris.settings import BOARD_WIDTH, SHAPES
+from tetris.settings import BOARD_HEIGHT, BOARD_WIDTH, SHAPES
 from tetris.game.piece_provider import PieceProvider
 from tetris.states.base import State
 from tetris.states.game import GameState
@@ -132,18 +134,93 @@ class AIState(GameState):
         temp.x = column - min_bx
         temp.y = 0
 
-        # Check if piece fits within board bounds at spawn position
-        if not self.board.is_valid_move(temp):
-            return False
+        # Valid if piece fits within board bounds at spawn position
+        return self.board.is_valid_move(temp)
 
-        # Simulate hard drop to verify it can land
-        while self.board.is_valid_move(temp, dy=1):
-            temp.move(0, 1)
+    def _piece_fits(self, piece, x: int, y: int, rotation: int) -> bool:
+        """Check if piece would be valid at (x, y, rotation) on the board."""
+        from tetris.game.tetromino import Tetromino
 
-        return True
+        temp = Tetromino()
+        temp.type = piece.type
+        temp.color = piece.color
+        temp.rotation = rotation
+        temp.shape = temp.get_current_shape()
+        temp.x = x
+        temp.y = y
+        return self.board.is_valid_move(temp)
+    def _find_deepest_reachable(self, piece, target_rot: int) -> tuple[int, int]:
+        """BFS to find the best reachable (x, y) for the piece.
+
+        Explores soft-drop and lateral slides from the current position.
+        Among all terminal positions (can't move down further), picks the
+        one that results in the fewest holes after placement. Ties are
+        broken by depth (deepest first), ensuring overhang access while
+        avoiding unnecessary hole creation.
+        """
+        from collections import deque
+
+        start = (piece.x, piece.y)
+        visited: set[tuple[int, int]] = {start}
+        queue: deque[tuple[int, int]] = deque([start])
+        terminals: list[tuple[int, int]] = []
+
+        while queue:
+            x, y = queue.popleft()
+
+            # Terminal: piece can't move down — candidate placement
+            if not self._piece_fits(piece, x, y + 1, target_rot):
+                terminals.append((x, y))
+
+            # Explore: down, left, right
+            for dx, dy in [(0, 1), (-1, 0), (1, 0)]:
+                nx, ny = x + dx, y + dy
+                if (nx, ny) not in visited and self._piece_fits(piece, nx, ny, target_rot):
+                    visited.add((nx, ny))
+                    queue.append((nx, ny))
+
+        if not terminals:
+            return start
+
+        # Score each terminal by holes created; tie-break by depth (max y)
+        best = start
+        best_holes = float("inf")
+        best_y = -1
+        prev_holes = count_holes(board_to_grid(self.board))
+
+        for x, y in terminals:
+            holes = self._evaluate_placement_holes(piece, x, y, target_rot, prev_holes)
+            if holes < best_holes or (holes == best_holes and y > best_y):
+                best = (x, y)
+                best_holes = holes
+                best_y = y
+
+        return best
+
+    def _evaluate_placement_holes(
+        self, piece, x: int, y: int, rotation: int, baseline_holes: int
+    ) -> int:
+        """Simulate placing piece at (x, y, rotation) and count resulting holes."""
+        from tetris.game.tetromino import Tetromino
+
+        temp_piece = Tetromino()
+        temp_piece.type = piece.type
+        temp_piece.color = piece.color
+        temp_piece.rotation = rotation
+        temp_piece.shape = temp_piece.get_current_shape()
+        temp_piece.x = x
+        temp_piece.y = y
+
+        # Build grid with piece locked
+        grid = board_to_grid(self.board)
+        for bx, by in temp_piece.get_blocks():
+            if 0 <= bx < BOARD_WIDTH and 0 <= by < BOARD_HEIGHT:
+                grid[by][bx] = 1
+
+        return count_holes(grid)
 
     def _execute_macro_action(self, action: int) -> None:
-        """Rotate and move piece to target (rotation, column), then hard-drop."""
+        """Rotate, move to target column, then BFS-drop to deepest reachable position."""
         rotation = action // BOARD_WIDTH
         column = action % BOARD_WIDTH
 
@@ -172,8 +249,14 @@ class AIState(GameState):
                 else:
                     break
 
-        # Hard drop to lock
-        self._hard_drop()
+        # BFS to deepest reachable position (allows sliding under overhangs)
+        final_x, final_y = self._find_deepest_reachable(piece, target_rot)
+        piece.x = final_x
+        piece.y = final_y
+
+        # Lock piece at final position
+        if not self.paused:
+            self._lock_and_spawn()
 
     # --- Override _lock_and_spawn to capture RL transitions --------------
 
@@ -303,7 +386,7 @@ class AIState(GameState):
     # --- Rendering with AI HUD overlay ----------------------------------
 
     def render(self, particles: ParticleSystem) -> None:
-        super().render(particles)
+        self.renderer.render_frame(self, particles)
         self._draw_ai_hud()
         pygame.display.flip()
 
