@@ -60,7 +60,7 @@ class AIMenuState(State):
                 )
             elif self.selection == 1:  # Epsilon decay
                 self.menu.ai_epsilon_decay = round(
-                    max(0.990, min(0.999, self.menu.ai_epsilon_decay + direction * 0.0001)),
+                    max(0.990, min(0.9999, self.menu.ai_epsilon_decay + direction * 0.0001)),
                     4,
                 )
             elif self.selection == 2:  # Epsilon fin
