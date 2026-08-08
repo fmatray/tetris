@@ -19,6 +19,8 @@ _STAT_LABELS = [
     "Score moyen",
     "Meilleur score",
     "Moyenne (100 derniers)",
+    "Niveau moyen",
+    "Meilleur niveau",
     "Lignes totales",
     "Pièces totales",
 ]
@@ -106,6 +108,8 @@ class AIMenuState(State):
             f"{s.avg_score:.0f}",
             str(s.best_score),
             f"{s.last_100_avg:.0f}",
+            f"{s.avg_level:.1f}",
+            str(s.best_level),
             str(s.total_lines),
             str(s.total_steps),
         ]

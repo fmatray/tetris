@@ -94,6 +94,18 @@ class TrainingLog:
         return sum(e["steps"] for e in self.episodes)
 
     @property
+    def avg_level(self) -> float:
+        if not self.episodes:
+            return 0.0
+        return sum(e["level"] for e in self.episodes) / len(self.episodes)
+
+    @property
+    def best_level(self) -> int:
+        if not self.episodes:
+            return 0
+        return max(e["level"] for e in self.episodes)
+
+    @property
     def last_100_avg(self) -> float:
         """Average score over the last 100 episodes (recent performance)."""
         recent = self.episodes[-100:]
