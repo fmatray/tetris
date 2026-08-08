@@ -21,21 +21,23 @@ from tetris.ai.replay_buffer import ReplayBuffer
 class DQNAgent:
     """Deep Q-Network agent with experience replay and target network.
 
-    Hyperparameters follow AI.md §1.1 and §5.
+    Hyperparameters: lr=1e-4, gamma=0.97, epsilon 1.0→0.10 (decay 0.999/episode),
+    batch=64, target sync=500, SmoothL1Loss + grad clipping at 1.0.
+    Action space: 40 macro-actions (10 columns × 4 rotations).
     """
 
     def __init__(
         self,
-        state_size: int = 218,
-        action_size: int = 6,
+        state_size: int = 220,
+        action_size: int = 40,
         lr: float = 1e-4,
-        gamma: float = 0.95,
+        gamma: float = 0.97,
         epsilon_start: float = 1.0,
-        epsilon_end: float = 0.05,
-        epsilon_decay: float = 0.9995,
-        buffer_size: int = 50_000,
+        epsilon_end: float = 0.10,
+        epsilon_decay: float = 0.999,
         batch_size: int = 64,
-        target_sync_steps: int = 1_000,
+        buffer_size: int = 50_000,
+        target_sync_steps: int = 500,
         device: str = "cpu",
     ) -> None:
         self.state_size = state_size
@@ -54,7 +56,7 @@ class DQNAgent:
         self.target_net.eval()
 
         self.optimizer = optim.Adam(self.online_net.parameters(), lr=lr)
-        self.loss_fn = nn.MSELoss()
+        self.loss_fn = nn.SmoothL1Loss()
         self.buffer = ReplayBuffer(buffer_size)
 
         self.steps = 0
@@ -62,14 +64,32 @@ class DQNAgent:
 
     # --- Action selection -----------------------------------------------
 
-    def select_action(self, state: np.ndarray) -> int:
-        """ε-greedy: random action with prob ε, greedy otherwise."""
+    def select_action(self, state: np.ndarray, valid_mask: list[bool] | None = None) -> int:
+        """ε-greedy: random action with prob ε, greedy otherwise.
+
+        If valid_mask is provided, only valid actions are considered.
+        """
+        if valid_mask is not None:
+            valid_indices = [i for i, v in enumerate(valid_mask) if v]
+        else:
+            valid_indices = list(range(self.action_size))
+
+        if not valid_indices:
+            valid_indices = list(range(self.action_size))
+
         if random.random() < self.epsilon:
-            return random.randrange(self.action_size)
+            return random.choice(valid_indices)
         with torch.no_grad():
             s = torch.from_numpy(state).float().unsqueeze(0).to(self.device)
-            q_values = self.online_net(s)
-            return q_values.argmax(dim=1).item()
+            q_values = self.online_net(s).squeeze(0)
+            # Mask invalid actions with -inf
+            if valid_mask is not None:
+                mask_tensor = torch.full((self.action_size,), float('-inf'), device=self.device)
+                for i, v in enumerate(valid_mask):
+                    if v:
+                        mask_tensor[i] = 0.0
+                q_values = q_values + mask_tensor
+            return q_values.argmax(dim=0).item()
 
     # --- Learning --------------------------------------------------------
 
@@ -82,6 +102,11 @@ class DQNAgent:
         done: bool,
     ) -> None:
         self.buffer.push(state, action, reward, next_state, done)
+
+    def decay_epsilon(self) -> None:
+        """Decay epsilon once per episode (not per transition)."""
+        if self.epsilon > self.epsilon_end:
+            self.epsilon = max(self.epsilon_end, self.epsilon * self.epsilon_decay)
 
     def learn(self) -> float | None:
         """Run one gradient update from a mini-batch. Returns loss or None."""
@@ -108,22 +133,20 @@ class DQNAgent:
             .squeeze(1)
         )
 
-        # Target Q-values: r + γ max_a' Q_target(s', a')
+        # Double DQN: online net selects best action, target net evaluates it
         with torch.no_grad():
-            max_next_q = self.target_net(next_states_t).max(dim=1)[0]
+            best_actions = self.online_net(next_states_t).argmax(dim=1)
+            max_next_q = self.target_net(next_states_t).gather(1, best_actions.unsqueeze(1)).squeeze(1)
             target_q = rewards_t + self.gamma * max_next_q * (1 - dones_t)
 
         loss = self.loss_fn(current_q, target_q)
         self.optimizer.zero_grad()
         loss.backward()
+        torch.nn.utils.clip_grad_norm_(self.online_net.parameters(), 1.0)
         self.optimizer.step()
 
         self.last_loss = loss.item()
         self.steps += 1
-
-        # Decay epsilon
-        if self.epsilon > self.epsilon_end:
-            self.epsilon = max(self.epsilon_end, self.epsilon * self.epsilon_decay)
 
         # Sync target network
         if self.steps % self.target_sync_steps == 0:

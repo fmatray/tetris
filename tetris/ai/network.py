@@ -1,4 +1,4 @@
-"""DQN neural network: 218 → 256 → 128 → 64 → 6 Q-values."""
+"""DQN neural network: 220 → 256 → 128 → 64 → 40 Q-values."""
 
 from __future__ import annotations
 
@@ -10,11 +10,11 @@ class DQNetwork(nn.Module):
     """Feed-forward Q-network mapping state features to per-action Q-values.
 
     Architecture (per AI.md §5):
-        Input (218) → Dense(256, ReLU) → Dense(128, ReLU)
-        → Dense(64, ReLU) → Output (6, Linear)
+        Input (220) → Dense(256, ReLU) → Dense(128, ReLU)
+        → Dense(64, ReLU) → Output (40, Linear)
     """
 
-    def __init__(self, state_size: int = 218, action_size: int = 6) -> None:
+    def __init__(self, state_size: int = 220, action_size: int = 40) -> None:
         super().__init__()
         self.net = nn.Sequential(
             nn.Linear(state_size, 256),

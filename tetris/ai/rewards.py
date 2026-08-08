@@ -25,6 +25,15 @@ def board_to_grid(board) -> np.ndarray:
     return grid
 
 
+def board_to_grid_with_piece(board, piece) -> np.ndarray:
+    """Convert a ``Board`` into a 0/1 grid including the falling piece's cells."""
+    grid = board_to_grid(board)
+    for bx, by in piece.get_blocks():
+        if 0 <= by < BOARD_HEIGHT and 0 <= bx < BOARD_WIDTH:
+            grid[by][bx] = 1.0
+    return grid
+
+
 def one_hot_piece(piece_type: str) -> np.ndarray:
     """7-element one-hot encoding of a piece type."""
     vec = np.zeros(len(PIECE_TYPES), dtype=np.float32)
@@ -44,15 +53,17 @@ def one_hot_rotation(piece_type: str, rotation: int) -> np.ndarray:
 def extract_state(
     board, current_piece, next_piece
 ) -> np.ndarray:
-    """Build the full 218-dim state vector (AI.md §2.5).
+    """Build the full 220-dim state vector (AI.md §2.5).
 
-    Layout: [board(200), current_piece(7), next_piece(7), orientation(4)]
+    Layout: [board_with_piece(200), current_piece(7), next_piece(7),
+             orientation(4), piece_x_norm(1), piece_y_norm(1)]
     """
-    grid = board_to_grid(board).flatten()  # 200
+    grid = board_to_grid_with_piece(board, current_piece).flatten()  # 200
     cur = one_hot_piece(current_piece.type)  # 7
     nxt = one_hot_piece(next_piece.type)  # 7
     rot = one_hot_rotation(current_piece.type, current_piece.rotation)  # 4
-    return np.concatenate([grid, cur, nxt, rot])  # 218
+    pos = np.array([current_piece.x / BOARD_WIDTH, current_piece.y / BOARD_HEIGHT], dtype=np.float32)  # 2
+    return np.concatenate([grid, cur, nxt, rot, pos])  # 220
 
 
 # --- Board heuristics (AI.md §4.1) -----------------------------------
@@ -111,23 +122,22 @@ def compute_reward(
     height, bumpiness) to give dense feedback even when no lines clear.
     """
     if game_over:
-        return -1.0
+        return -10.0
 
     reward = 0.0
-    reward += 1.0 * lines_cleared
-    reward += 0.1 * lines_cleared * lines_cleared
+    reward += 50.0 * lines_cleared
+    reward += 5.0 * lines_cleared * lines_cleared
 
-    new_holes = count_holes(new_grid)
-    prev_holes = count_holes(prev_grid)
-    reward -= 0.5 * max(0, new_holes - prev_holes)
+    # Absolute board quality (not deltas) — teaches the agent to keep
+    # the board flat and hole-free, not just "less bad than before"
+    holes = count_holes(new_grid)
+    height = aggregate_height(new_grid)
+    bumps = bumpiness(new_grid)
 
-    height_delta = aggregate_height(new_grid) - aggregate_height(prev_grid)
-    reward -= 0.2 * max(0, height_delta)
-
-    bump_delta = bumpiness(new_grid) - bumpiness(prev_grid)
-    reward -= 0.3 * max(0, bump_delta)
+    reward -= 0.5 * holes          # penalize existing holes
+    reward -= 0.05 * height        # penalize tall stacks
+    reward -= 0.1 * bumps          # penalize uneven surface
 
     if step_survived:
-        reward += 0.01
-
+        reward += 1.0  # strong survival incentive — each piece placed is good
     return reward
