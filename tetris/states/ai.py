@@ -186,10 +186,9 @@ class AIState(GameState):
         best = start
         best_holes = float("inf")
         best_y = -1
-        prev_holes = count_holes(board_to_grid(self.board))
 
         for x, y in terminals:
-            holes = self._evaluate_placement_holes(piece, x, y, target_rot, prev_holes)
+            holes = self._evaluate_placement_holes(piece, x, y, target_rot)
             if holes < best_holes or (holes == best_holes and y > best_y):
                 best = (x, y)
                 best_holes = holes
@@ -198,7 +197,7 @@ class AIState(GameState):
         return best
 
     def _evaluate_placement_holes(
-        self, piece, x: int, y: int, rotation: int, baseline_holes: int
+        self, piece, x: int, y: int, rotation: int
     ) -> int:
         """Simulate placing piece at (x, y, rotation) and count resulting holes."""
         from tetris.game.tetromino import Tetromino
