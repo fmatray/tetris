@@ -407,6 +407,8 @@ class AIState(GameState):
             f"Avg Score: {self.log.avg_score:.0f}",
             f"Best Score: {self.log.best_score}",
             f"Last 100 Avg: {self.log.last_100_avg:.0f}",
+            f"Avg Level: {self.log.avg_level:.1f}",
+            f"Best Level: {self.log.best_level}",
             f"Total Lines: {self.log.total_lines}",
             f"Loss: {self.agent.last_loss:.4f}",
         ]
