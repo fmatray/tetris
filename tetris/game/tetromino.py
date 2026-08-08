@@ -12,8 +12,8 @@ class Tetromino:
     current block coordinates but nothing about the board or collision.
     """
 
-    def __init__(self) -> None:
-        self.type = random.choice(list(SHAPES.keys()))
+    def __init__(self, piece_type: str | None = None) -> None:
+        self.type = piece_type if piece_type else random.choice(list(SHAPES.keys()))
         self.color = SHAPES_COLORS[self.type]
         self.rotation = 0
         self.x = BOARD_WIDTH // 2 - 2

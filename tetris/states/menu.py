@@ -16,6 +16,7 @@ class MenuState(State):
 
     _OPTIONS = [
         "Joueur",
+        "Mode",
         "Modifier Handicap",
         "Son",
         "Démarrer le jeu",
@@ -28,6 +29,7 @@ class MenuState(State):
         self.h = 0
         self.s = True
         self.player = "Humain"
+        self.mode = "Normal"
         self.selection = 0
 
     def handle_event(self, event: pygame.event.Event) -> Optional[State]:
@@ -41,30 +43,41 @@ class MenuState(State):
             if self.selection == 0:
                 self.player = "IA" if self.player == "Humain" else "Humain"
             elif self.selection == 1:
-                self.h = max(0, self.h - 1)
+                self.mode = "Replay" if self.mode == "Normal" else "Normal"
             elif self.selection == 2:
+                self.h = max(0, self.h - 1)
+            elif self.selection == 3:
                 self.s = not self.s
         elif event.key == pygame.K_RIGHT:
             if self.selection == 0:
                 self.player = "IA" if self.player == "Humain" else "Humain"
             elif self.selection == 1:
-                self.h = min(5, self.h + 1)
+                self.mode = "Replay" if self.mode == "Normal" else "Normal"
             elif self.selection == 2:
+                self.h = min(5, self.h + 1)
+            elif self.selection == 3:
                 self.s = not self.s
         elif event.key == pygame.K_RETURN:
             # Lazy imports to avoid circular dependency between states
             from tetris.states.game import GameState
             from tetris.states.leaderboard import LeaderboardState
 
-            if self.selection == 3:  # Start
+            if self.selection == 4:  # Start
+                from tetris.game.piece_provider import PieceProvider
+
+                provider = PieceProvider(mode="replay" if self.mode == "Replay" else "normal")
                 if self.player == "IA":
                     from tetris.states.ai import AIState
 
-                    return AIState(self.screen, self.font, self.audio, self.h, self.s)
-                return GameState(self.screen, self.font, self.audio, self.h, self.s)
-            elif self.selection == 4:  # Leaderboard
+                    return AIState(
+                        self.screen, self.font, self.audio, self.h, self.s, provider
+                    )
+                return GameState(
+                    self.screen, self.font, self.audio, self.h, self.s, provider
+                )
+            elif self.selection == 5:  # Leaderboard
                 return LeaderboardState(self.screen, self.font, self.audio)
-            elif self.selection == 5:  # Quit
+            elif self.selection == 6:  # Quit
                 pygame.quit()
                 sys.exit()
         return None
@@ -81,11 +94,13 @@ class MenuState(State):
             if i == 0:
                 text = f"{option} : {self.player}"
             if i == 1:
-                text = f"{option} : {self.h}"
+                text = f"{option} : {self.mode}"
             if i == 2:
+                text = f"{option} : {self.h}"
+            if i == 3:
                 text = f"{option} : {'ON' if self.s else 'OFF'}"
             surf = self.font.render(f"{prefix}{text}", True, color)
             screen.blit(surf, (SCREEN_WIDTH // 2 - surf.get_width() // 2, 200 + i * 60))
 
         instr = self.font.render("Flèches: Navigation | Entrée: Valider", True, GRAY)
-        screen.blit(instr, (SCREEN_WIDTH // 2 - instr.get_width() // 2, 550))
+        screen.blit(instr, (SCREEN_WIDTH // 2 - instr.get_width() // 2, 620))

@@ -1,0 +1,58 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# --- Packaging / builds ---
+build/
+dist/
+*.egg-info/
+*.egg
+.eggs/
+sdist/
+
+# --- Virtual environments ---
+.venv/
+venv/
+env/
+ENV/
+
+# --- Tool caches ---
+.ruff_cache/
+.mypy_cache/
+.pytest_cache/
+.tox/
+.coverage
+.coverage.*
+htmlcov/
+.pi/
+
+# --- AI artifacts (regenerable, large) ---
+*.pt
+*.pth
+*.onnx
+ai_training_log.json
+# --- Tetris runtime data (regenerated per session) ---
+leaderboard.json
+replay_pieces.json
+
+# --- OS files ---
+.DS_Store
+.AppleDouble
+.LSOverride
+Thumbs.db
+Desktop.ini
+
+# --- Editor / IDE ---
+.idea/
+.vscode/
+*.swp
+*.swo
+*.swn
+*~
+
+# --- Secrets / local config ---
+.env
+.env.*
+!.env.example

@@ -18,6 +18,7 @@ from tetris.audio import AudioManager
 from tetris.game.board import Board
 from tetris.game.stats import GameStats
 from tetris.game.tetromino import Tetromino
+from tetris.game.piece_provider import PieceProvider
 from tetris.states.base import State
 from tetris.visuals.particles import ParticleSystem
 from tetris.visuals.renderer import Renderer
@@ -33,14 +34,16 @@ class GameState(State):
         audio: AudioManager,
         handicap: int,
         sound_enabled: bool = True,
+        piece_provider: "PieceProvider | None" = None,
     ) -> None:
         self.screen, self.font, self.audio = screen, font, audio
         self.audio.enabled = sound_enabled
         self.renderer = Renderer(screen, font)
         self.board = Board()
         self.board.apply_handicap(handicap)
-        self.current_piece = Tetromino()
-        self.next_piece = Tetromino()
+        self.pieces = piece_provider or PieceProvider()
+        self.current_piece = Tetromino(self.pieces.next_type())
+        self.next_piece = Tetromino(self.pieces.next_type())
         self.stats = GameStats()
         self.drop_time = 0
         self.game_over = False
@@ -97,7 +100,9 @@ class GameState(State):
             self.audio.play(f"clear_{cleared}")
         else:
             self.audio.play("lock")
-        self.current_piece, self.next_piece = self.next_piece, Tetromino()
+        self.current_piece, self.next_piece = self.next_piece, Tetromino(
+            self.pieces.next_type()
+        )
         self.down_pressed = False
         if not self.board.is_valid_move(self.current_piece):
             self.game_over = True
@@ -110,6 +115,7 @@ class GameState(State):
             if event.key == pygame.K_SPACE:
                 self.paused = not self.paused
             elif event.key == pygame.K_ESCAPE:
+                self.pieces.save()
                 from tetris.states.menu import MenuState
 
                 return MenuState(self.screen, self.font, self.audio)
@@ -132,6 +138,7 @@ class GameState(State):
             self._tick(particles)
             self.drop_time = 0
         if self.game_over:
+            self.pieces.save()
             from tetris.states.game_over import GameOverState
 
             return GameOverState(self.screen, self.font, self.audio, self)
