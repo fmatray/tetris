@@ -1,7 +1,7 @@
 """Game constants and configuration."""
 
 # Screen dimensions
-SCREEN_WIDTH = 1000
+SCREEN_WIDTH = 1440
 SCREEN_HEIGHT = 800
 BLOCK_SIZE = 30
 

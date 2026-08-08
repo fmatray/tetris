@@ -396,11 +396,11 @@ class AIState(GameState):
 
     def _draw_ai_hud(self) -> None:
         """Overlay training parameters and a statistics table on the game screen."""
-        from tetris.settings import RED
+        from tetris.settings import RED, SCREEN_WIDTH
 
         x0 = HUD_POSITIONS["ai_stats"][0]
         y = HUD_POSITIONS["ai_stats"][1]
-        lh = 22  # line height
+        lh = 28  # line height
 
         # --- Training section ---
         training_lines = [
@@ -422,25 +422,23 @@ class AIState(GameState):
         # --- Statistics table ---
         # Columns: [Tetromino, Lines, Score, Level] — right-aligned
         # Rows: [Current, Total, Best, Average, Last 100]
-        tbl_font = pygame.font.SysFont("monospace", 14)
-        col_w = 85  # 10 digits + period at size 14
-        label_w = 80
+        label_w = 130
+        col_w = (SCREEN_WIDTH - x0 - label_w) // 4
         col_x = [x0 + label_w + i * col_w for i in range(5)]
 
         headers = ["", "Tetromino", "Lines", "Score", "Level"]
         for i in range(1, 5):
-            surf = tbl_font.render(f"{headers[i]:>10}", True, RED)
+            surf = self.font.render(headers[i], True, RED)
             self.screen.blit(surf, (col_x[i] - surf.get_width(), y))
         y += lh
 
         rows = self._hud_table_rows()
         for row in rows:
             label = row[0]
-            surf = tbl_font.render(label, True, RED)
+            surf = self.font.render(label, True, RED)
             self.screen.blit(surf, (x0, y))
             for i in range(1, 5):
-                val = f"{row[i]:>10}"
-                surf = tbl_font.render(val, True, RED)
+                surf = self.font.render(str(row[i]), True, RED)
                 self.screen.blit(surf, (col_x[i] - surf.get_width(), y))
             y += lh
 
