@@ -400,7 +400,7 @@ class AIState(GameState):
 
         x0 = HUD_POSITIONS["ai_stats"][0]
         y = HUD_POSITIONS["ai_stats"][1]
-        lh = 28  # line height
+        lh = 30  # line height
 
         # --- Training section ---
         training_lines = [
@@ -444,7 +444,7 @@ class AIState(GameState):
             y += lh
 
     def _hud_table_rows(self) -> list[list]:
-        """Build the 5 statistics rows: Current, Total, Best, Average, Last 100."""
+        """Build the 6 statistics rows: Current, Total, Best, Average, Last 100, Trend."""
         log = self.log
         cur_steps = self.episode_steps
         cur_lines = self.stats.total_lines
@@ -469,8 +469,17 @@ class AIState(GameState):
              f"{log.last_100_avg_lines:.1f}",
              f"{log.last_100_avg:.1f}",
              f"{log.last_100_avg_level:.1f}"],
+            ["Trend",
+             self._trend_arrow(log._trend("steps")),
+             self._trend_arrow(log._trend("lines")),
+             self._trend_arrow(log._trend("score")),
+             self._trend_arrow(log._trend("level"))],
         ]
 
+    @staticmethod
+    def _trend_arrow(trend: str) -> str:
+        """Convert a trend string to an arrow symbol."""
+        return {"up": "↑", "down": "↓", "stable": "→"}.get(trend, "→")
     # --- ESC handling (return to menu) -----------------------------------
 
     def handle_event(self, event: pygame.event.Event) -> Optional[State]:

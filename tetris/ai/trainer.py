@@ -161,3 +161,25 @@ class TrainingLog:
         if not recent:
             return 0.0
         return sum(e["steps"] for e in recent) / len(recent)
+
+    def _trend(self, key: str) -> str:
+        """Compare last-100 avg vs previous-100 avg for a metric.
+
+        Returns 'up', 'down', or 'stable' based on whether the recent
+        average improved, declined, or stayed within 5% of the previous.
+        Needs at least 200 episodes for a meaningful comparison.
+        """
+        if len(self.episodes) < 200:
+            return "stable"
+        recent = self.episodes[-100:]
+        previous = self.episodes[-200:-100]
+        recent_avg = sum(e[key] for e in recent) / len(recent)
+        prev_avg = sum(e[key] for e in previous) / len(previous)
+        if prev_avg == 0:
+            return "up" if recent_avg > 0 else "stable"
+        ratio = recent_avg / prev_avg
+        if ratio > 1.05:
+            return "up"
+        if ratio < 0.95:
+            return "down"
+        return "stable"
