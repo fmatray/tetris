@@ -423,7 +423,8 @@ class AIState(GameState):
         # Columns: [Tetromino, Lines, Score, Level] — right-aligned
         # Rows: [Current, Total, Best, Average, Last 100]
         label_w = 130
-        col_w = (SCREEN_WIDTH - x0 - label_w) // 4
+        margin = 20
+        col_w = (SCREEN_WIDTH - x0 - label_w - margin) // 4
         col_x = [x0 + label_w + i * col_w for i in range(5)]
 
         headers = ["", "Tetromino", "Lines", "Score", "Level"]
