@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
+
+if TYPE_CHECKING:
+    from tetris.states.menu import MenuState
 
 import pygame
 
@@ -29,8 +32,10 @@ class GameOverState(State):
         font: pygame.font.Font,
         audio: AudioManager,
         game: GameState,
+        menu: "MenuState | None" = None,
     ) -> None:
         self.screen, self.font, self.audio, self.game = screen, font, audio, game
+        self.menu = menu
         self.renderer = Renderer(screen, font)
         self.name = ""
         self.step = "ANIMATION"
@@ -47,6 +52,8 @@ class GameOverState(State):
         if self.step == "NAME":
             return self._handle_name_event(event)
         elif self.step == "LEADERBOARD":
+            if self.menu is not None:
+                return self.menu
             from tetris.states.menu import MenuState
 
             return MenuState(self.screen, self.font, self.audio)

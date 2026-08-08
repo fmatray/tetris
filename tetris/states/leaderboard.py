@@ -13,11 +13,14 @@ from tetris.visuals.leaderboard_view import draw_leaderboard
 class LeaderboardState(State):
     """Shows the leaderboard. Any keypress returns to the menu."""
 
-    def __init__(self, screen, font, audio) -> None:
+    def __init__(self, screen, font, audio, menu=None) -> None:
         self.screen, self.font, self.audio = screen, font, audio
+        self.menu = menu
 
     def handle_event(self, event: pygame.event.Event) -> Optional[State]:
         if event.type == pygame.KEYDOWN:
+            if self.menu is not None:
+                return self.menu
             from tetris.states.menu import MenuState
 
             return MenuState(self.screen, self.font, self.audio)

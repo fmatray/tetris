@@ -11,7 +11,10 @@ the HUD for real-time learning feedback.
 
 from __future__ import annotations
 
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
+
+if TYPE_CHECKING:
+    from tetris.states.menu import MenuState
 
 import numpy as np
 import pygame
@@ -59,11 +62,14 @@ class AIState(GameState):
         handicap: int,
         sound_enabled: bool = True,
         piece_provider: "PieceProvider | None" = None,
+        speed: str = "fast",
+        menu: "MenuState | None" = None,
     ) -> None:
-        super().__init__(screen, font, audio, handicap, sound_enabled, piece_provider)
+        super().__init__(screen, font, audio, handicap, sound_enabled, piece_provider, menu)
         self.agent = DQNAgent()
         self.log = TrainingLog(LOG_PATH)
         self.episode = self.log.total_episodes
+        self.speed = speed
 
         # Per-episode tracking
         self.episode_steps = 0
@@ -72,6 +78,9 @@ class AIState(GameState):
         # Pending transition data (set after AI places a piece)
         self._prev_state: np.ndarray | None = None
         self._prev_action: int | None = None
+
+        # Action delay accumulator (normal mode only — human-like reaction speed)
+        self._action_timer: float = 0.0
 
         # Load existing model if available
         import os
@@ -208,12 +217,19 @@ class AIState(GameState):
         return cleared, rows_data
 
     # --- Update: AI macro-action per piece ------------------------------
-
     def update(self, dt: float, particles: ParticleSystem) -> Optional[State]:
         if self.paused or self.game_over:
             return self._on_episode_end()
 
-        # Act immediately — no artificial delay for faster training
+        # Normal mode: throttle decisions to ~80ms for human-like reaction speed.
+        # Fast mode: act immediately — no artificial delay for faster training.
+        if self.speed == "normal" and self._prev_action is None and not self.game_over:
+            self._action_timer += dt
+            if self._action_timer < 80:
+                new_state = super().update(dt, particles)
+                return self._on_episode_end() if new_state is not None else None
+            self._action_timer = 0.0
+
         if self._prev_action is None and not self.game_over:
             valid_mask = self._get_valid_actions()
             action = self.agent.select_action(self._current_state, valid_mask)
@@ -263,6 +279,7 @@ class AIState(GameState):
         self.game_over = False
         self.paused = False
         self.drop_time = 0
+        self._action_timer = 0.0
         self.down_pressed = False
         self._prev_state = None
         self._prev_action = None
@@ -293,9 +310,9 @@ class AIState(GameState):
     def _draw_ai_hud(self) -> None:
         """Overlay learning statistics on the game screen."""
         from tetris.settings import RED, SCREEN_WIDTH
-
         hud_lines = [
             "AI MODE",
+            f"Vitesse: {'Rapide' if self.speed == 'fast' else 'Normal'}",
             f"Episode: {self.episode}",
             f"Epsilon: {self.agent.epsilon:.3f}",
             f"Pieces: {self.episode_steps}",
@@ -322,8 +339,6 @@ class AIState(GameState):
                 self.agent.save(MODEL_PATH)
             except Exception as e:
                 print(f"Failed to save AI model: {e}")
-            from tetris.states.menu import MenuState
-
-            return MenuState(self.screen, self.font, self.audio)
+            return self._return_to_menu()
         # Ignore other key input — AI controls the game
         return None

@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
+if TYPE_CHECKING:
+    from tetris.states.menu import MenuState
 
 import pygame
 
@@ -35,9 +37,11 @@ class GameState(State):
         handicap: int,
         sound_enabled: bool = True,
         piece_provider: "PieceProvider | None" = None,
+        menu: "MenuState | None" = None,
     ) -> None:
         self.screen, self.font, self.audio = screen, font, audio
         self.audio.enabled = sound_enabled
+        self.menu = menu
         self.renderer = Renderer(screen, font)
         self.board = Board()
         self.board.apply_handicap(handicap)
@@ -110,15 +114,21 @@ class GameState(State):
 
     # --- Event / update / render ----------------------------------------
 
+    def _return_to_menu(self) -> State:
+        """Return the originating menu if available, else create a fresh one."""
+        if self.menu is not None:
+            return self.menu
+        from tetris.states.menu import MenuState
+
+        return MenuState(self.screen, self.font, self.audio)
+
     def handle_event(self, event: pygame.event.Event) -> Optional[State]:
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_SPACE:
                 self.paused = not self.paused
             elif event.key == pygame.K_ESCAPE:
                 self.pieces.save()
-                from tetris.states.menu import MenuState
-
-                return MenuState(self.screen, self.font, self.audio)
+                return self._return_to_menu()
             elif event.key in self.input_map:
                 self.input_map[event.key]()
         elif event.type == pygame.KEYUP and event.key == pygame.K_DOWN:
@@ -141,7 +151,7 @@ class GameState(State):
             self.pieces.save()
             from tetris.states.game_over import GameOverState
 
-            return GameOverState(self.screen, self.font, self.audio, self)
+            return GameOverState(self.screen, self.font, self.audio, self, self.menu)
         return None
 
     def _tick(self, particles: ParticleSystem) -> None:

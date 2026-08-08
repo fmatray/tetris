@@ -1,8 +1,8 @@
 """Game constants and configuration."""
 
 # Screen dimensions
-SCREEN_WIDTH = 800
-SCREEN_HEIGHT = 700
+SCREEN_WIDTH = 1000
+SCREEN_HEIGHT = 800
 BLOCK_SIZE = 30
 
 # Game board dimensions
