@@ -439,7 +439,7 @@ class AIState(GameState):
             surf = tbl_font.render(label, True, RED)
             self.screen.blit(surf, (x0, y))
             for i in range(1, 5):
-                val = f"{row[i]:>10}" if not isinstance(row[i], str) else f"{row[i]:>10}"
+                val = f"{row[i]:>10}"
                 surf = tbl_font.render(val, True, RED)
                 self.screen.blit(surf, (col_x[i] - surf.get_width(), y))
             y += lh
