@@ -77,6 +77,7 @@ HUD_POSITIONS = {
     "lines": (20, 60),
     "level": (20, 100),
     "next": (570, 50),
+    "ai_stats": (570, 180), 
 }
 
 # Game-over animation

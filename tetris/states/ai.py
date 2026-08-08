@@ -29,7 +29,7 @@ from tetris.ai.rewards import (
 )
 from tetris.ai.trainer import TrainingLog
 from tetris.audio import AudioManager
-from tetris.settings import BOARD_HEIGHT, BOARD_WIDTH, SHAPES
+from tetris.settings import BOARD_HEIGHT, BOARD_WIDTH, SHAPES, HUD_POSITIONS
 from tetris.game.piece_provider import PieceProvider
 from tetris.states.base import State
 from tetris.states.game import GameState
@@ -395,29 +395,82 @@ class AIState(GameState):
         pygame.display.flip()
 
     def _draw_ai_hud(self) -> None:
-        """Overlay learning statistics on the game screen."""
-        from tetris.settings import RED, SCREEN_WIDTH
-        hud_lines = [
+        """Overlay training parameters and a statistics table on the game screen."""
+        from tetris.settings import RED
+
+        x0 = HUD_POSITIONS["ai_stats"][0]
+        y = HUD_POSITIONS["ai_stats"][1]
+        lh = 22  # line height
+
+        # --- Training section ---
+        training_lines = [
             "AI MODE",
             f"Vitesse: {'Rapide' if self.speed == 'fast' else 'Normal'}",
             f"Episode: {self.episode}",
-            f"Epsilon: {self.agent.epsilon:.3f}",
-            f"Pieces: {self.episode_steps}",
-            f"Total Pieces: {self.log.total_steps + self.episode_steps}",
-            f"Avg Score: {self.log.avg_score:.0f}",
-            f"Best Score: {self.log.best_score}",
-            f"Last 100 Avg: {self.log.last_100_avg:.0f}",
-            f"Avg Level: {self.log.avg_level:.1f}",
-            f"Best Level: {self.log.best_level}",
-            f"Total Lines: {self.log.total_lines}",
+            f"Epsilon: {self.agent.epsilon:.5f}",
+            f"Epsilon decay: {self.agent.epsilon_decay:.4f}",
+            f"Epsilon end: {self.agent.epsilon_end:.2f}",
             f"Loss: {self.agent.last_loss:.4f}",
         ]
-
-        y = 180
-        for line in hud_lines:
+        for line in training_lines:
             surf = self.font.render(line, True, RED)
-            self.screen.blit(surf, (SCREEN_WIDTH - surf.get_width() - 20, y))
-            y += 28
+            self.screen.blit(surf, (x0, y))
+            y += lh
+
+        y += 10  # gap between sections
+
+        # --- Statistics table ---
+        # Columns: [Tetromino, Lines, Score, Level] — right-aligned
+        # Rows: [Current, Total, Best, Average, Last 100]
+        tbl_font = pygame.font.SysFont("monospace", 14)
+        col_w = 85  # 10 digits + period at size 14
+        label_w = 80
+        col_x = [x0 + label_w + i * col_w for i in range(5)]
+
+        headers = ["", "Tetromino", "Lines", "Score", "Level"]
+        for i in range(1, 5):
+            surf = tbl_font.render(f"{headers[i]:>10}", True, RED)
+            self.screen.blit(surf, (col_x[i] - surf.get_width(), y))
+        y += lh
+
+        rows = self._hud_table_rows()
+        for row in rows:
+            label = row[0]
+            surf = tbl_font.render(label, True, RED)
+            self.screen.blit(surf, (x0, y))
+            for i in range(1, 5):
+                val = f"{row[i]:>10}" if not isinstance(row[i], str) else f"{row[i]:>10}"
+                surf = tbl_font.render(val, True, RED)
+                self.screen.blit(surf, (col_x[i] - surf.get_width(), y))
+            y += lh
+
+    def _hud_table_rows(self) -> list[list]:
+        """Build the 5 statistics rows: Current, Total, Best, Average, Last 100."""
+        log = self.log
+        cur_steps = self.episode_steps
+        cur_lines = self.stats.total_lines
+        cur_score = self.stats.score
+        cur_level = self.stats.level
+
+        total_steps = log.total_steps + cur_steps
+        total_lines = log.total_lines + cur_lines
+        total_score = log.total_score + cur_score
+
+        return [
+            ["Current", cur_steps, cur_lines, cur_score, cur_level],
+            ["Total", total_steps, total_lines, total_score, "—"],
+            ["Best", log.best_steps, log.best_lines, log.best_score, log.best_level],
+            ["Average",
+             f"{log.avg_steps:.1f}",
+             f"{log.avg_lines:.1f}",
+             f"{log.avg_score:.1f}",
+             f"{log.avg_level:.1f}"],
+            ["Last 100",
+             f"{log.last_100_avg_steps:.1f}",
+             f"{log.last_100_avg_lines:.1f}",
+             f"{log.last_100_avg:.1f}",
+             f"{log.last_100_avg_level:.1f}"],
+        ]
 
     # --- ESC handling (return to menu) -----------------------------------
 
