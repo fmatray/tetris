@@ -11,8 +11,7 @@ import random
 
 import numpy as np
 import torch
-import torch.nn as nn
-import torch.optim as optim
+from torch import nn, optim
 
 from tetris.ai.network import DQNetwork
 from tetris.ai.replay_buffer import ReplayBuffer

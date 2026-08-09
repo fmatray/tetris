@@ -7,13 +7,15 @@ never mutates it.
 
 from __future__ import annotations
 
+import math
 import random
 import sys
 from typing import TYPE_CHECKING
 
-import numpy as np
 import pygame
 
+from tetris.game.board import Board
+from tetris.game.tetromino import Tetromino
 from tetris.settings import (
     BLACK,
     BLOCK_SIZE,
@@ -31,8 +33,6 @@ from tetris.settings import (
     SCREEN_WIDTH,
     WHITE,
 )
-from tetris.game.board import Board
-from tetris.game.tetromino import Tetromino
 from tetris.visuals.particles import Particle, ParticleSystem
 
 if TYPE_CHECKING:
@@ -43,7 +43,7 @@ if TYPE_CHECKING:
 class Renderer:
     """Draws game frames and the game-over animation."""
 
-    _GLITCH_COLORS = [WHITE, GRAY, (255, 0, 0), (0, 255, 0), (0, 0, 255), (255, 255, 0), (255, 0, 255)]
+    _GLITCH_COLORS = (WHITE, GRAY, (255, 0, 0), (0, 255, 0), (0, 0, 255), (255, 255, 0), (255, 0, 255))
 
     def __init__(self, screen: pygame.Surface, font: pygame.font.Font) -> None:
         self.screen = screen
@@ -51,7 +51,7 @@ class Renderer:
 
     # --- In-game frame --------------------------------------------------
 
-    def render_frame(self, game: "GameState", particles: ParticleSystem) -> None:
+    def render_frame(self, game: GameState, particles: ParticleSystem) -> None:
         self.screen.fill(BLACK)
         self.draw_grid(game.board)
         self.draw_tetromino(game.current_piece)
@@ -109,7 +109,7 @@ class Renderer:
 
     # --- Game-over animation --------------------------------------------
 
-    def play_game_over_animation(self, game: "GameState", audio) -> None:
+    def play_game_over_animation(self, game: GameState, audio) -> None:
         """Run the chaotic 4-second game-over sequence (blocking)."""
         start_time = pygame.time.get_ticks()
         particles: list[Particle] = []
@@ -179,12 +179,9 @@ class Renderer:
                 p.draw(self.screen)
                 if p.life <= 0:
                     particles.remove(p)
-            try:
-                r = int(127 + 127 * np.sin(elapsed * 0.01))
-                g = int(127 + 127 * np.sin(elapsed * 0.01 + 2 * np.pi / 3))
-                b = int(127 + 127 * np.sin(elapsed * 0.01 + 4 * np.pi / 3))
-            except Exception:
-                r, g, b = 255, 0, 0
+            r = int(127 + 127 * math.sin(elapsed * 0.01))
+            g = int(127 + 127 * math.sin(elapsed * 0.01 + 2 * math.pi / 3))
+            b = int(127 + 127 * math.sin(elapsed * 0.01 + 4 * math.pi / 3))
             txt = self.font.render("!!! GAME OVER !!!", True, (r, g, b))
             dx, dy = (
                 (random.randint(-10, 10), random.randint(-10, 10))

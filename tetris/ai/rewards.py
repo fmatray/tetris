@@ -11,7 +11,6 @@ import numpy as np
 
 from tetris.settings import BOARD_HEIGHT, BOARD_WIDTH, SHAPES
 
-
 PIECE_TYPES = list(SHAPES.keys())  # ["I", "O", "T", "S", "Z", "J", "L"]
 
 

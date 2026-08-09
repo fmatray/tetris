@@ -2,12 +2,19 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Optional
+from collections.abc import Callable
+from typing import TYPE_CHECKING
+
 if TYPE_CHECKING:
     from tetris.states.menu import MenuState
 
 import pygame
 
+from tetris.audio import AudioManager
+from tetris.game.board import Board
+from tetris.game.piece_provider import PieceProvider
+from tetris.game.stats import GameStats
+from tetris.game.tetromino import Tetromino
 from tetris.settings import (
     BLOCK_SIZE,
     BOARD_OFFSET_X,
@@ -16,11 +23,6 @@ from tetris.settings import (
     DROP_DECAY,
     SOFT_DROP_FACTOR,
 )
-from tetris.audio import AudioManager
-from tetris.game.board import Board
-from tetris.game.stats import GameStats
-from tetris.game.tetromino import Tetromino
-from tetris.game.piece_provider import PieceProvider
 from tetris.states.base import State
 from tetris.visuals.particles import ParticleSystem
 from tetris.visuals.renderer import Renderer
@@ -36,8 +38,8 @@ class GameState(State):
         audio: AudioManager,
         handicap: int,
         sound_enabled: bool = True,
-        piece_provider: "PieceProvider | None" = None,
-        menu: "MenuState | None" = None,
+        piece_provider: PieceProvider | None = None,
+        menu: MenuState | None = None,
     ) -> None:
         self.screen, self.font, self.audio = screen, font, audio
         self.audio.enabled = sound_enabled
@@ -56,12 +58,12 @@ class GameState(State):
 
         self._setup_keybinds(menu)
 
-    def _setup_keybinds(self, menu: "MenuState | None") -> None:
+    def _setup_keybinds(self, menu: MenuState | None) -> None:
         """Build key → action map from the menu's keybindings (or defaults)."""
         from tetris.settings import DEFAULT_KEYBINDS
 
         kb = menu.keybinds if menu is not None else dict(DEFAULT_KEYBINDS)
-        self.input_map: dict[int, callable] = {
+        self.input_map: dict[int, Callable[[], None]] = {
             kb["move_left"]: self._move_left,
             kb["move_right"]: self._move_right,
             kb["rotate_cw"]: self._rotate_cw,
@@ -109,7 +111,7 @@ class GameState(State):
     def _lock_and_spawn(self) -> tuple[int, list]:
         """Lock current piece, update stats, spawn next. Returns (cleared, rows_data)."""
         cleared, rows_data = self.board.lock_tetromino(self.current_piece)
-        self.stats.add_lines(cleared)
+        self.stats.on_piece_locked(cleared)
         if cleared > 0:
             self.audio.play(f"clear_{cleared}")
         else:
@@ -132,7 +134,7 @@ class GameState(State):
 
         return MenuState(self.screen, self.font, self.audio)
 
-    def handle_event(self, event: pygame.event.Event) -> Optional[State]:
+    def handle_event(self, event: pygame.event.Event) -> State | None:
         if event.type == pygame.KEYDOWN:
             if event.key == self._pause_key:
                 self.paused = not self.paused
@@ -145,7 +147,7 @@ class GameState(State):
             self.down_pressed = False
         return None
 
-    def update(self, dt: float, particles: ParticleSystem) -> Optional[State]:
+    def update(self, dt: float, particles: ParticleSystem) -> State | None:
         if self.paused or self.game_over:
             return None
         self.drop_time += dt
@@ -184,9 +186,6 @@ class GameState(State):
                     80,
                 )
 
-    def draw(self, screen: pygame.Surface) -> None:
-        pass  # GameState uses render() instead, called by the app loop.
-
-    def render(self, particles: ParticleSystem) -> None:
-        self.renderer.render_frame(self, particles)
-        pygame.display.flip()
+    def draw(self, screen: pygame.Surface, *, particles: ParticleSystem | None = None) -> None:
+        if particles is not None:
+            self.renderer.render_frame(self, particles)

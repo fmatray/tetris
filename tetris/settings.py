@@ -4,13 +4,16 @@ import os
 
 import pygame
 
-
 # --- Data directory ----------------------------------------------------
 # All generated runtime data (settings, leaderboard, stats, AI model,
 # training log, replay sequences) lives under this directory so the repo
-# root stays clean. Created on import.
+# root stays clean. Created on first use via ``ensure_data_dir()``.
 DATA_DIR = "data"
-os.makedirs(DATA_DIR, exist_ok=True)
+
+
+def ensure_data_dir() -> None:
+    """Create the data directory if it doesn't exist."""
+    os.makedirs(DATA_DIR, exist_ok=True)
 
 
 # Screen dimensions
@@ -96,6 +99,10 @@ HUD_POSITIONS = {
 # Game-over animation
 GAME_OVER_DURATION_MS = 4000
 GAME_OVER_PARTICLE_COUNT = 400
+
+# AI behavior
+AI_ACTION_DELAY_MS = 80        # normal-mode reaction delay
+AI_MODEL_SAVE_INTERVAL = 50    # save model every N episodes
 
 # Leaderboard
 LEADERBOARD_SIZE = 10

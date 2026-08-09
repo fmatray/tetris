@@ -11,15 +11,17 @@ import sys
 os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
 os.environ.setdefault("SDL_AUDIODRIVER", "dummy")
 
-import pygame  # noqa: E402
+import pygame
 
 pygame.init()
 pygame.mixer.init()
 
-from tetris.audio import AudioManager  # noqa: E402
-from tetris.settings import MODEL_PATH  # noqa: E402
-from tetris.states.ai import AIState  # noqa: E402
-from tetris.visuals.particles import ParticleSystem  # noqa: E402
+from tetris.audio import AudioManager
+from tetris.settings import MODEL_PATH, ensure_data_dir
+from tetris.states.ai import AIState
+from tetris.visuals.particles import ParticleSystem
+
+ensure_data_dir()
 
 # Step duration in ms (matches 60fps game loop)
 DT = 16.67
@@ -42,7 +44,7 @@ def run_training(n_episodes: int) -> None:
     frame = 0
     while state.log.total_episodes < target:
         state.update(DT, particles)
-        state.render(particles)
+        state.draw(screen, particles=particles)
         particles.update()
         frame += 1
 
@@ -50,10 +52,11 @@ def run_training(n_episodes: int) -> None:
             ep = state.log.total_episodes
             print(f"  Frame {frame}: {ep} episodes, eps={state.agent.epsilon:.4f}")
 
-    # Save model at end
+    # Save model and flush training log at end
+    state.log.flush()
     try:
         state.agent.save(MODEL_PATH)
-    except Exception as e:
+    except (OSError, RuntimeError) as e:
         print(f"Failed to save model: {e}")
 
     # Analyze results

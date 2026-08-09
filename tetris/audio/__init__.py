@@ -59,26 +59,24 @@ class AudioManager:
 
     def generate_melody(self, notes: list[tuple[float, float]]) -> pygame.mixer.Sound:
         """Synthesize a sequence of ``(freq, duration)`` notes into a Sound."""
-        full_buf = []
         try:
+            buffers = []
             for freq, duration in notes:
-                n_samples = int(self._SAMPLE_RATE * duration)
-                buf = np.zeros((n_samples, 2), dtype=np.int16)
-                for i in range(n_samples):
-                    envelope = 1.0
-                    if i < 100:
-                        envelope = i / 100
-                    if i > n_samples - 100:
-                        envelope = (n_samples - i) / 100
-                    val = int(
-                        32767 * np.sin(2 * np.pi * freq * i / self._SAMPLE_RATE)
-                        * envelope
-                    )
-                    buf[i][0] = buf[i][1] = val
-                full_buf.append(buf)
-            combined_buf = np.concatenate(full_buf, axis=0)
-            return pygame.sndarray.make_sound(combined_buf)
-        except Exception as e:
+                n = int(self._SAMPLE_RATE * duration)
+                t = np.arange(n) / self._SAMPLE_RATE
+                envelope = np.ones(n)
+                attack = min(100, n)
+                release = min(100, n)
+                if attack > 0:
+                    envelope[:attack] = np.linspace(0, 1, attack)
+                if release > 0:
+                    envelope[-release:] = np.linspace(1, 0, release)
+                wave = 32767 * np.sin(2 * np.pi * freq * t) * envelope
+                buf = np.column_stack([wave, wave]).astype(np.int16)
+                buffers.append(buf)
+            combined = np.concatenate(buffers, axis=0)
+            return pygame.sndarray.make_sound(combined)
+        except (ValueError, pygame.error) as e:
             print(f"Audio error: {e}")
             return pygame.mixer.Sound(
                 buffer=np.zeros((self._SAMPLE_RATE, 2), dtype=np.int16)

@@ -8,7 +8,7 @@ ESC returns to the human menu.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 import pygame
 
@@ -27,6 +27,7 @@ from tetris.states.base import State
 
 if TYPE_CHECKING:
     from tetris.states.human_menu import HumanMenuState
+    from tetris.visuals.particles import ParticleSystem
 
 # Keys that cannot be rebound (reserved for navigation / quit).
 _RESERVED = {pygame.K_UP, pygame.K_DOWN, pygame.K_LEFT, pygame.K_RIGHT,
@@ -49,7 +50,7 @@ class KeybindState(State):
     ESC returns to the human menu.
     """
 
-    def __init__(self, screen, font, audio, human_menu: "HumanMenuState") -> None:
+    def __init__(self, screen, font, audio, human_menu: HumanMenuState) -> None:
         self.screen, self.font, self.audio = screen, font, audio
         self.human_menu = human_menu
         self.selection = 0
@@ -64,7 +65,7 @@ class KeybindState(State):
     def _keybinds(self) -> dict[str, int]:
         return self.menu.keybinds
 
-    def handle_event(self, event: pygame.event.Event) -> Optional[State]:
+    def handle_event(self, event: pygame.event.Event) -> State | None:
         if event.type != pygame.KEYDOWN:
             return None
 
@@ -93,7 +94,7 @@ class KeybindState(State):
         self.menu.save_settings()
         self._conflict_msg = ""
 
-    def _handle_listening(self, event: pygame.event.Event) -> Optional[State]:
+    def _handle_listening(self, event: pygame.event.Event) -> State | None:
         """Rebind the selected action to the pressed key."""
         if event.key == pygame.K_ESCAPE:
             # Cancel rebinding
@@ -125,7 +126,7 @@ class KeybindState(State):
 
     # --- Rendering ------------------------------------------------------
 
-    def draw(self, screen: pygame.Surface) -> None:
+    def draw(self, screen: pygame.Surface, *, particles: ParticleSystem | None = None) -> None:
         screen.fill(BLACK)
 
         title = self.font.render("Touches", True, WHITE)

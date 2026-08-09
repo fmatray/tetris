@@ -8,8 +8,8 @@ updated after every episode.
 from __future__ import annotations
 
 import json
-import os
-from datetime import datetime
+from datetime import datetime, timezone
+from pathlib import Path
 
 from tetris.settings import LOG_PATH
 
@@ -17,10 +17,13 @@ from tetris.settings import LOG_PATH
 class TrainingLog:
     """Append-only per-episode log with rolling summary stats.
 
-    The full JSON file is rewritten each save (small data, ~hundreds of
-    episodes). Summary stats (avg/best score, best episode, line clears)
-    are derived from the log entries.
+    The full JSON file is rewritten every ``_SAVE_INTERVAL`` episodes
+    (default 10) for efficiency. ``flush()`` forces a save on exit.
+    Summary stats (avg/best score, best episode, line clears) are
+    derived from the log entries.
     """
+
+    _SAVE_INTERVAL = 10
 
     def __init__(self, path: str = LOG_PATH) -> None:
         self.path = path
@@ -28,10 +31,10 @@ class TrainingLog:
         self._load()
 
     def _load(self) -> None:
-        if os.path.exists(self.path):
+        path = Path(self.path)
+        if path.exists():
             try:
-                with open(self.path) as f:
-                    self.episodes = json.load(f)
+                self.episodes = json.loads(path.read_text())
             except (OSError, json.JSONDecodeError):
                 self.episodes = []
 
@@ -55,15 +58,19 @@ class TrainingLog:
                 "steps": steps,
                 "epsilon": epsilon,
                 "loss": loss,
-                "timestamp": datetime.now().isoformat(),
+                "timestamp": datetime.now(timezone.utc).isoformat(),
             }
         )
+        if len(self.episodes) % self._SAVE_INTERVAL == 0:
+            self._save()
+
+    def flush(self) -> None:
+        """Force-save the log (call on exit)."""
         self._save()
 
     def _save(self) -> None:
         try:
-            with open(self.path, "w") as f:
-                json.dump(self.episodes, f, indent=2)
+            Path(self.path).write_text(json.dumps(self.episodes, indent=2))
         except OSError as e:
             print(f"Training log save error: {e}")
 

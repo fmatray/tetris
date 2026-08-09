@@ -2,8 +2,8 @@
 
 import random
 
-from tetris.settings import BOARD_HEIGHT, BOARD_WIDTH, GRAY
 from tetris.game.tetromino import Tetromino
+from tetris.settings import BOARD_HEIGHT, BOARD_WIDTH, GRAY, SHAPES
 
 
 class Board:
@@ -20,24 +20,15 @@ class Board:
         ]
 
     def is_valid_move(self, tetromino: Tetromino, dx=0, dy=0, rotation=None) -> bool:
-        """Check whether *tetromino* shifted by (dx, dy) fits on the board.
-
-        If *rotation* is given, the piece is virtually rotated before the
-        check. The original tetromino is not mutated.
-        """
-        temp_tetro = Tetromino()
-        temp_tetro.type = tetromino.type
-        temp_tetro.color = tetromino.color
-        temp_tetro.x = tetromino.x + dx
-        temp_tetro.y = tetromino.y + dy
-
+        """Check whether *tetromino* shifted by (dx, dy) fits on the board."""
         if rotation is not None:
-            temp_tetro.rotation = rotation
-            temp_tetro.shape = temp_tetro.get_current_shape()
+            shapes = SHAPES[tetromino.type]
+            shape = shapes[rotation % len(shapes)]
         else:
-            temp_tetro.shape = tetromino.shape
-
-        for x, y in temp_tetro.get_blocks():
+            shape = tetromino.shape
+        for bx, by in shape:
+            x = tetromino.x + bx + dx
+            y = tetromino.y + by + dy
             if x < 0 or x >= BOARD_WIDTH or y >= BOARD_HEIGHT:
                 return False
             if y >= 0 and self.grid[y][x] is not None:

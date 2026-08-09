@@ -6,7 +6,7 @@ Used by: Touches (human), Statistiques (human), Stratégies (AI training).
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 import pygame
 
@@ -15,6 +15,7 @@ from tetris.states.base import State
 
 if TYPE_CHECKING:
     from tetris.states.base import State as StateType
+    from tetris.visuals.particles import ParticleSystem
 
 
 class PlaceholderState(State):
@@ -25,12 +26,12 @@ class PlaceholderState(State):
         self.parent = parent
         self.title = title
 
-    def handle_event(self, event: pygame.event.Event) -> Optional[State]:
+    def handle_event(self, event: pygame.event.Event) -> State | None:
         if event.type == pygame.KEYDOWN:
             return self.parent
         return None
 
-    def draw(self, screen: pygame.Surface) -> None:
+    def draw(self, screen: pygame.Surface, *, particles: ParticleSystem | None = None) -> None:
         screen.fill(BLACK)
 
         title = self.font.render(self.title, True, WHITE)

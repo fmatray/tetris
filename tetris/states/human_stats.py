@@ -7,7 +7,10 @@ Any key returns to the human menu.
 
 from __future__ import annotations
 
-from typing import Optional
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from tetris.visuals.particles import ParticleSystem
 
 import pygame
 
@@ -54,7 +57,7 @@ class HumanStatsState(State):
 
     # --- Rendering ------------------------------------------------------
 
-    def draw(self, screen: pygame.Surface) -> None:
+    def draw(self, screen: pygame.Surface, *, particles: ParticleSystem | None = None) -> None:
         self._load()
         screen.fill(BLACK)
 
@@ -149,7 +152,7 @@ class HumanStatsState(State):
 
     # --- Input ----------------------------------------------------------
 
-    def handle_event(self, event: pygame.event.Event) -> Optional[State]:
+    def handle_event(self, event: pygame.event.Event) -> State | None:
         if event.type == pygame.KEYDOWN:
             return self.human_menu
         return None

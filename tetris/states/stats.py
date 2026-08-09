@@ -7,7 +7,10 @@ slow) and cached. Any key returns to the AI menu.
 
 from __future__ import annotations
 
-from typing import Optional
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from tetris.visuals.particles import ParticleSystem
 
 import pygame
 
@@ -38,7 +41,7 @@ class StatsState(State):
     def __init__(self, screen, font, audio, ai_menu) -> None:
         self.screen, self.font, self.audio = screen, font, audio
         self.ai_menu = ai_menu
-        self._surface: Optional[pygame.Surface] = None
+        self._surface: pygame.Surface | None = None
         self._episode_count = 0
         self._stats = TrainingLog(LOG_PATH)
 
@@ -64,7 +67,7 @@ class StatsState(State):
         self._episode_count = len(episodes)
         self._surface = render_score_graph(episodes, scores)
 
-    def draw(self, screen: pygame.Surface) -> None:
+    def draw(self, screen: pygame.Surface, *, particles: ParticleSystem | None = None) -> None:
         if self._surface is None:
             self._build_surface()
 
@@ -105,7 +108,7 @@ class StatsState(State):
 
     # --- Input ----------------------------------------------------------
 
-    def handle_event(self, event: pygame.event.Event) -> Optional[State]:
+    def handle_event(self, event: pygame.event.Event) -> State | None:
         if event.type == pygame.KEYDOWN:
             return self.ai_menu
         return None

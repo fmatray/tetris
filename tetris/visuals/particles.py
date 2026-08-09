@@ -8,7 +8,7 @@ import pygame
 class Particle:
     """A single particle with gravity, friction, and life decay."""
 
-    __slots__ = ("x", "y", "color", "vx", "vy", "life", "decay", "size")
+    __slots__ = ("color", "decay", "life", "size", "vx", "vy", "x", "y")
 
     def __init__(self, x: float, y: float, color: tuple[int, int, int]) -> None:
         self.x, self.y, self.color = x, y, color
@@ -50,10 +50,9 @@ class ParticleSystem:
             self.particles.append(Particle(x, y, color))
 
     def update(self) -> None:
-        for p in self.particles[:]:
+        for p in self.particles:
             p.update()
-            if p.life <= 0:
-                self.particles.remove(p)
+        self.particles = [p for p in self.particles if p.life > 0]
 
     def draw(self, screen: pygame.Surface) -> None:
         for p in self.particles:

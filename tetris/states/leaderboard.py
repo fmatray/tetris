@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
-from typing import Optional
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from tetris.visuals.particles import ParticleSystem
 
 import pygame
 
@@ -17,7 +20,7 @@ class LeaderboardState(State):
         self.screen, self.font, self.audio = screen, font, audio
         self.menu = menu
 
-    def handle_event(self, event: pygame.event.Event) -> Optional[State]:
+    def handle_event(self, event: pygame.event.Event) -> State | None:
         if event.type == pygame.KEYDOWN:
             if self.menu is not None:
                 return self.menu
@@ -26,5 +29,5 @@ class LeaderboardState(State):
             return MenuState(self.screen, self.font, self.audio)
         return None
 
-    def draw(self, screen: pygame.Surface) -> None:
+    def draw(self, screen: pygame.Surface, *, particles: ParticleSystem | None = None) -> None:
         draw_leaderboard(screen, self.font)

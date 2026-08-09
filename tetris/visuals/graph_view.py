@@ -11,8 +11,8 @@ import matplotlib
 
 matplotlib.use("Agg")  # headless renderer — no GUI window
 
-import matplotlib.pyplot as plt  # noqa: E402
-import pygame  # noqa: E402
+import matplotlib.pyplot as plt
+import pygame
 
 # Matplotlib colors (normalized 0-1 floats) and matching pygame color.
 _BG = (0.0, 0.0, 0.0)

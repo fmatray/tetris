@@ -1,8 +1,8 @@
 """Leaderboard persistence (JSON file storage)."""
 
 import json
-import os
-from datetime import datetime
+from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any
 
 from tetris.settings import HUMAN_STATS_PATH, LEADERBOARD_PATH, LEADERBOARD_SIZE
@@ -14,23 +14,23 @@ def load_leaderboard() -> list[dict[str, Any]]:
     Tolerates missing file, corrupt JSON, and legacy list/tuple entries
     (converted to dict form). Returns an empty list on any error.
     """
-    if not os.path.exists(LEADERBOARD_PATH):
+    path = Path(LEADERBOARD_PATH)
+    if not path.exists():
         return []
     try:
-        with open(LEADERBOARD_PATH) as f:
-            data = json.load(f)
-            return [
-                d
-                if isinstance(d, dict)
-                else {
-                    "name": d[0],
-                    "score": d[1],
-                    "level": 0,
-                    "lines": 0,
-                    "date": "Unknown",
-                }
-                for d in data
-            ]
+        data = json.loads(path.read_text())
+        return [
+            d
+            if isinstance(d, dict)
+            else {
+                "name": d[0],
+                "score": d[1],
+                "level": 0,
+                "lines": 0,
+                "date": "Unknown",
+            }
+            for d in data
+        ]
     except (OSError, json.JSONDecodeError):
         return []
 
@@ -44,25 +44,24 @@ def save_score(name: str, score: int, level: int, lines: int) -> None:
             "score": score,
             "level": level,
             "lines": lines,
-            "date": datetime.now().strftime("%Y-%m-%d %H:%M"),
+            "date": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M"),
         }
     )
     scores.sort(key=lambda x: x["score"], reverse=True)
     try:
-        with open(LEADERBOARD_PATH, "w") as f:
-            json.dump(scores[:LEADERBOARD_SIZE], f, indent=4)
+        Path(LEADERBOARD_PATH).write_text(json.dumps(scores[:LEADERBOARD_SIZE], indent=4))
     except OSError as e:
         print(f"Save error: {e}")
 
 
 def load_human_games() -> list[dict[str, Any]]:
     """Load all recorded human games. Returns an empty list on any error."""
-    if not os.path.exists(HUMAN_STATS_PATH):
+    path = Path(HUMAN_STATS_PATH)
+    if not path.exists():
         return []
     try:
-        with open(HUMAN_STATS_PATH) as f:
-            data = json.load(f)
-            return data if isinstance(data, list) else []
+        data = json.loads(path.read_text())
+        return data if isinstance(data, list) else []
     except (OSError, json.JSONDecodeError):
         return []
 
@@ -79,11 +78,10 @@ def save_human_game(
             "level": level,
             "lines": lines,
             "tetrominos": tetrominos,
-            "date": datetime.now().strftime("%Y-%m-%d %H:%M"),
+            "date": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M"),
         }
     )
     try:
-        with open(HUMAN_STATS_PATH, "w") as f:
-            json.dump(games, f, indent=4)
+        Path(HUMAN_STATS_PATH).write_text(json.dumps(games, indent=4))
     except OSError as e:
         print(f"Human stats save error: {e}")

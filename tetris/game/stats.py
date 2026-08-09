@@ -1,7 +1,7 @@
 """Mutable running game statistics (score, lines, level)."""
 
-from tetris.settings import LINES_PER_LEVEL
 from tetris.game.scoring import ScoreEngine
+from tetris.settings import LINES_PER_LEVEL
 
 
 class GameStats:
@@ -17,7 +17,7 @@ class GameStats:
         self.level = 0
         self.piece_count = 0
 
-    def add_lines(self, lines_cleared: int) -> None:
+    def on_piece_locked(self, lines_cleared: int) -> None:
         self.total_lines += lines_cleared
         self.level = self.total_lines // LINES_PER_LEVEL
         self.score += ScoreEngine.score_for(lines_cleared)

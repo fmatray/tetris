@@ -14,10 +14,9 @@ import traceback
 import pygame
 
 from tetris.audio import AudioManager
-from tetris.settings import SCREEN_HEIGHT, SCREEN_WIDTH
-from tetris.states.menu import MenuState
+from tetris.settings import SCREEN_HEIGHT, SCREEN_WIDTH, ensure_data_dir
 from tetris.states.base import State
-from tetris.states.game import GameState
+from tetris.states.menu import MenuState
 from tetris.visuals.particles import ParticleSystem
 
 
@@ -25,6 +24,7 @@ class TetrisApp:
     """Owns pygame initialization and the FSM main loop."""
 
     def __init__(self) -> None:
+        ensure_data_dir()
         pygame.init()
         pygame.mixer.init()
         self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
@@ -41,7 +41,7 @@ class TetrisApp:
         while True:
             try:
                 self._frame()
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001  # top-level safety net
                 print(f"Runtime error in main loop: {e}")
                 traceback.print_exc()
                 break
@@ -64,11 +64,8 @@ class TetrisApp:
         if new_state:
             self.state = new_state
 
-        if isinstance(self.state, GameState):
-            self.state.render(self.particles)
-        else:
-            self.state.draw(self.screen)
-            pygame.display.flip()
+        self.state.draw(self.screen, particles=self.particles)
+        pygame.display.flip()
 
         self.particles.update()
 

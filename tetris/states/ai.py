@@ -12,7 +12,9 @@ the HUD for real-time learning feedback.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Optional
+import os
+from collections import deque
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from tetris.states.menu import MenuState
@@ -22,15 +24,28 @@ import pygame
 
 from tetris.ai.agent import DQNAgent
 from tetris.ai.rewards import (
+    board_to_grid,
     compute_reward,
     count_holes,
     extract_state,
-    board_to_grid,
 )
 from tetris.ai.trainer import TrainingLog
 from tetris.audio import AudioManager
-from tetris.settings import BOARD_HEIGHT, BOARD_WIDTH, MODEL_PATH, LOG_PATH, SHAPES, HUD_POSITIONS
+from tetris.game.board import Board
 from tetris.game.piece_provider import PieceProvider
+from tetris.game.tetromino import Tetromino
+from tetris.settings import (
+    AI_ACTION_DELAY_MS,
+    AI_MODEL_SAVE_INTERVAL,
+    BOARD_HEIGHT,
+    BOARD_WIDTH,
+    HUD_POSITIONS,
+    LOG_PATH,
+    MODEL_PATH,
+    RED,
+    SCREEN_WIDTH,
+    SHAPES,
+)
 from tetris.states.base import State
 from tetris.states.game import GameState
 from tetris.visuals.particles import ParticleSystem
@@ -60,9 +75,9 @@ class AIState(GameState):
         audio: AudioManager,
         handicap: int,
         sound_enabled: bool = True,
-        piece_provider: "PieceProvider | None" = None,
+        piece_provider: PieceProvider | None = None,
         speed: str = "fast",
-        menu: "MenuState | None" = None,
+        menu: MenuState | None = None,
         epsilon_decay: float = 0.999,
         epsilon_end: float = 0.1,
         ai_mode: str = "learning",
@@ -88,12 +103,10 @@ class AIState(GameState):
         self._action_timer: float = 0.0
 
         # Load existing model if available
-        import os
-
         if os.path.exists(MODEL_PATH):
             try:
                 self.agent.load(MODEL_PATH)
-            except Exception as e:
+            except (OSError, RuntimeError, KeyError) as e:
                 print(f"Failed to load AI model: {e}")
 
         # In playing mode: always greedy (no exploration, no learning)
@@ -123,37 +136,30 @@ class AIState(GameState):
 
     def _is_valid_placement(self, piece, rotation: int, column: int) -> bool:
         """Check if piece can be placed at (column, rotation) at spawn height."""
-        from tetris.game.tetromino import Tetromino
-
-        temp = Tetromino()
-        temp.type = piece.type
-        temp.color = piece.color
-        temp.rotation = rotation
-        temp.shape = temp.get_current_shape()
-
-        # Use shape's relative offsets to compute piece width
-        shape_offsets = temp.shape  # list of (bx, by) relative to piece origin
-        min_bx = min(bx for bx, _ in shape_offsets)
-
-        # For column to be the leftmost: piece.x + min_bx = column => piece.x = column - min_bx
-        temp.x = column - min_bx
-        temp.y = 0
-
-        # Valid if piece fits within board bounds at spawn position
-        return self.board.is_valid_move(temp)
+        shapes = SHAPES[piece.type]
+        shape = shapes[rotation % len(shapes)]
+        min_bx = min(bx for bx, _ in shape)
+        px = column - min_bx
+        py = 0
+        for bx, by in shape:
+            x, y = px + bx, py + by
+            if x < 0 or x >= BOARD_WIDTH or y >= BOARD_HEIGHT:
+                return False
+            if y >= 0 and self.board.grid[y][x] is not None:
+                return False
+        return True
 
     def _piece_fits(self, piece, x: int, y: int, rotation: int) -> bool:
         """Check if piece would be valid at (x, y, rotation) on the board."""
-        from tetris.game.tetromino import Tetromino
-
-        temp = Tetromino()
-        temp.type = piece.type
-        temp.color = piece.color
-        temp.rotation = rotation
-        temp.shape = temp.get_current_shape()
-        temp.x = x
-        temp.y = y
-        return self.board.is_valid_move(temp)
+        shapes = SHAPES[piece.type]
+        shape = shapes[rotation % len(shapes)]
+        for bx, by in shape:
+            nx, ny = x + bx, y + by
+            if nx < 0 or nx >= BOARD_WIDTH or ny >= BOARD_HEIGHT:
+                return False
+            if ny >= 0 and self.board.grid[ny][nx] is not None:
+                return False
+        return True
     def _find_deepest_reachable(self, piece, target_rot: int) -> tuple[int, int]:
         """BFS to find the best reachable (x, y) for the piece.
 
@@ -163,8 +169,6 @@ class AIState(GameState):
         broken by depth (deepest first), ensuring overhang access while
         avoiding unnecessary hole creation.
         """
-        from collections import deque
-
         start = (piece.x, piece.y)
         visited: set[tuple[int, int]] = {start}
         queue: deque[tuple[int, int]] = deque([start])
@@ -205,22 +209,13 @@ class AIState(GameState):
         self, piece, x: int, y: int, rotation: int
     ) -> int:
         """Simulate placing piece at (x, y, rotation) and count resulting holes."""
-        from tetris.game.tetromino import Tetromino
-
-        temp_piece = Tetromino()
-        temp_piece.type = piece.type
-        temp_piece.color = piece.color
-        temp_piece.rotation = rotation
-        temp_piece.shape = temp_piece.get_current_shape()
-        temp_piece.x = x
-        temp_piece.y = y
-
-        # Build grid with piece locked
-        grid = board_to_grid(self.board)
-        for bx, by in temp_piece.get_blocks():
-            if 0 <= bx < BOARD_WIDTH and 0 <= by < BOARD_HEIGHT:
-                grid[by][bx] = 1
-
+        shapes = SHAPES[piece.type]
+        shape = shapes[rotation % len(shapes)]
+        grid = board_to_grid(self.board).copy()
+        for bx, by in shape:
+            nx, ny = x + bx, y + by
+            if 0 <= nx < BOARD_WIDTH and 0 <= ny < BOARD_HEIGHT:
+                grid[ny][nx] = 1
         return count_holes(grid)
 
     def _execute_macro_action(self, action: int) -> None:
@@ -304,7 +299,7 @@ class AIState(GameState):
         return cleared, rows_data
 
     # --- Update: AI macro-action per piece ------------------------------
-    def update(self, dt: float, particles: ParticleSystem) -> Optional[State]:
+    def update(self, dt: float, particles: ParticleSystem) -> State | None:
         if self.paused or self.game_over:
             return self._on_episode_end()
 
@@ -312,7 +307,7 @@ class AIState(GameState):
         # Fast mode: act immediately — no artificial delay for faster training.
         if self.speed == "normal" and self._prev_action is None and not self.game_over:
             self._action_timer += dt
-            if self._action_timer < 80:
+            if self._action_timer < AI_ACTION_DELAY_MS:
                 new_state = super().update(dt, particles)
                 return self._on_episode_end() if new_state is not None else None
             self._action_timer = 0.0
@@ -335,7 +330,7 @@ class AIState(GameState):
 
     # --- Episode management ---------------------------------------------
 
-    def _on_episode_end(self) -> Optional[State]:
+    def _on_episode_end(self) -> State | None:
         """Log episode, save model, and restart a new episode."""
         if not self.game_over:
             return None
@@ -356,10 +351,10 @@ class AIState(GameState):
             self.agent.decay_epsilon()
 
             # Save model periodically (not every episode — too slow)
-            if self.episode % 50 == 0:
+            if self.episode % AI_MODEL_SAVE_INTERVAL == 0:
                 try:
                     self.agent.save(MODEL_PATH)
-                except Exception as e:
+                except (OSError, RuntimeError) as e:
                     print(f"Failed to save AI model: {e}")
 
         # Start new episode (reset game state)
@@ -374,9 +369,6 @@ class AIState(GameState):
         self._prev_action = None
 
         # Reset board and pieces
-        from tetris.game.board import Board
-        from tetris.game.tetromino import Tetromino
-
         self.board = Board()
         # Fresh board for learning diversity — no handicap carried over
         self.current_piece = Tetromino(self.pieces.next_type())
@@ -391,15 +383,13 @@ class AIState(GameState):
 
     # --- Rendering with AI HUD overlay ----------------------------------
 
-    def render(self, particles: ParticleSystem) -> None:
-        self.renderer.render_frame(self, particles)
-        self._draw_ai_hud()
-        pygame.display.flip()
+    def draw(self, screen: pygame.Surface, *, particles: ParticleSystem | None = None) -> None:
+        if particles is not None:
+            self.renderer.render_frame(self, particles)
+            self._draw_ai_hud()
 
     def _draw_ai_hud(self) -> None:
         """Overlay training parameters and a statistics table on the game screen."""
-        from tetris.settings import RED, SCREEN_WIDTH
-
         x0 = HUD_POSITIONS["ai_stats"][0]
         y = HUD_POSITIONS["ai_stats"][1]
         lh = 30  # line height
@@ -485,12 +475,13 @@ class AIState(GameState):
         return {"up": "↑", "down": "↓", "stable": "→"}.get(trend, "→")
     # --- ESC handling (return to menu) -----------------------------------
 
-    def handle_event(self, event: pygame.event.Event) -> Optional[State]:
+    def handle_event(self, event: pygame.event.Event) -> State | None:
         if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
             self.pieces.save()
+            self.log.flush()
             try:
                 self.agent.save(MODEL_PATH)
-            except Exception as e:
+            except (OSError, RuntimeError) as e:
                 print(f"Failed to save AI model: {e}")
             return self._return_to_menu()
         # Ignore other key input — AI controls the game

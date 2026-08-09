@@ -11,7 +11,7 @@ flat via :mod:`tetris.states`.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 import pygame
 
@@ -22,11 +22,11 @@ if TYPE_CHECKING:
 class State:
     """Base FSM state. Subclasses override the hooks they need."""
 
-    def handle_event(self, event: pygame.event.Event) -> Optional["State"]:
+    def handle_event(self, event: pygame.event.Event) -> State | None:
         return None
 
-    def update(self, dt: float, particles: "ParticleSystem") -> Optional["State"]:
+    def update(self, dt: float, particles: ParticleSystem) -> State | None:
         return None
 
-    def draw(self, screen: pygame.Surface) -> None:
+    def draw(self, screen: pygame.Surface, *, particles: ParticleSystem | None = None) -> None:
         pass

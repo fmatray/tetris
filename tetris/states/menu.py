@@ -4,35 +4,25 @@ from __future__ import annotations
 
 import json
 import sys
-from typing import TYPE_CHECKING, Optional
+from typing import ClassVar
 
 import pygame
 
 from tetris.settings import (
-    BLACK,
-    GRAY,
-    SCREEN_HEIGHT,
-    SCREEN_WIDTH,
     SETTINGS_PATH,
-    WHITE,
 )
 from tetris.states.base import State
-
-if TYPE_CHECKING:
-    pass
-
-# Options that have a left/right-toggable value displayed inline.
-_TOGGLE_INDICES = {0, 1}  # Joueur, Son
+from tetris.states.menu_base import MenuBase
 
 
-class MenuState(State):
+class MenuState(MenuBase):
     """Start menu with player, sound, human/AI submenus, and navigation.
 
     All settings persist across game/leaderboard round-trips because child
     states receive and return *this same* ``MenuState`` instance.
     """
 
-    _OPTIONS = [
+    _OPTIONS = (
         "Joueur",
         "Son",
         "Humain",
@@ -40,16 +30,18 @@ class MenuState(State):
         "Démarrer le jeu",
         "Leaderboard",
         "Quitter",
-    ]
-
-    # Indices that lead to a submenu (ENTER navigates, not toggles).
-    _SUBMENU_INDICES = {2, 3}
+    )
+    _toggle_indices = frozenset({0, 1})  # Joueur, Son
+    _title = "TETRIS"
+    _title_y = 80
+    _options_y = 160
+    _instructions = "Flèches: Navigation | Entrée: Valider | Échap: Quitter"
 
     def __init__(self, screen, font, audio) -> None:
-        self.screen, self.font, self.audio = screen, font, audio
+        super().__init__(screen, font, audio)
         # Defaults — overridden by _load_settings() if a file exists
-        self.h = 0
-        self.s = True
+        self.handicap = 0
+        self.sound_enabled = True
         self.player = "Humain"
         self.mode = "Normal"
         self.ai_speed = "normal"
@@ -59,17 +51,16 @@ class MenuState(State):
         from tetris.settings import DEFAULT_KEYBINDS
 
         self.keybinds: dict[str, int] = dict(DEFAULT_KEYBINDS)
-        self.selection = 0
         self._load_settings()
 
     # --- Settings persistence -------------------------------------------
 
     # Maps internal attribute names to human-readable JSON keys.
-    _SETTINGS_MAP = {
+    _SETTINGS_MAP: ClassVar[dict[str, str]] = {
         "player": "player",
         "mode": "mode",
-        "h": "handicap",
-        "s": "sound",
+        "handicap": "handicap",
+        "sound_enabled": "sound",
         "ai_speed": "ai_speed",
         "ai_epsilon_decay": "ai_epsilon_decay",
         "ai_epsilon_end": "ai_epsilon_end",
@@ -103,79 +94,32 @@ class MenuState(State):
         except OSError as e:
             print(f"Settings save error: {e}")
 
-    # --- Value helpers --------------------------------------------------
+    # --- Hooks ----------------------------------------------------------
 
     def _value_label(self, i: int) -> str:
-        """Inline value shown after the option label, if any."""
         if i == 0:
             return self.player
         if i == 1:
-            return "ON" if self.s else "OFF"
+            return "ON" if self.sound_enabled else "OFF"
         return ""
 
     def _is_disabled(self, i: int) -> bool:
-        """Greyed-out options that can't be selected."""
-        if i == 2 and self.player == "IA":
-            return True
-        if i == 3 and self.player == "Humain":
-            return True
-        return False
+        return bool(i == 3 and self.player == "Humain" or i == 2 and self.player == "IA")
 
-    # --- Input ----------------------------------------------------------
-
-    def _toggle_left(self) -> None:
-        if self.selection == 0:
+    def _toggle(self, direction: int) -> None:
+        if self.selection == 0:  # Joueur
             self.player = "IA" if self.player == "Humain" else "Humain"
-        elif self.selection == 1:
-            self.s = not self.s
+        elif self.selection == 1:  # Son
+            self.sound_enabled = not self.sound_enabled
 
-    def _toggle_right(self) -> None:
-        if self.selection == 0:
-            self.player = "IA" if self.player == "Humain" else "Humain"
-        elif self.selection == 1:
-            self.s = not self.s
+    def _save(self) -> None:
+        self.save_settings()
 
-    def handle_event(self, event: pygame.event.Event) -> Optional[State]:
-        if event.type != pygame.KEYDOWN:
-            return None
-        # Skip disabled options when navigating
-        if event.key == pygame.K_UP:
-            self.selection = self._prev_enabled(self.selection)
-        elif event.key == pygame.K_DOWN:
-            self.selection = self._next_enabled(self.selection)
-        elif event.key == pygame.K_LEFT:
-            if self.selection in _TOGGLE_INDICES:
-                self._toggle_left()
-                self.save_settings()
-        elif event.key == pygame.K_RIGHT:
-            if self.selection in _TOGGLE_INDICES:
-                self._toggle_right()
-                self.save_settings()
-        elif event.key == pygame.K_RETURN:
-            if not self._is_disabled(self.selection):
-                return self._on_select()
-        elif event.key == pygame.K_ESCAPE:
-            pygame.quit()
-            sys.exit()
-        return None
+    def _on_back(self) -> State | None:
+        pygame.quit()
+        sys.exit()
 
-    def _prev_enabled(self, current: int) -> int:
-        n = len(self._OPTIONS)
-        for step in range(1, n + 1):
-            idx = (current - step) % n
-            if not self._is_disabled(idx):
-                return idx
-        return current
-
-    def _next_enabled(self, current: int) -> int:
-        n = len(self._OPTIONS)
-        for step in range(1, n + 1):
-            idx = (current + step) % n
-            if not self._is_disabled(idx):
-                return idx
-        return current
-
-    def _on_select(self) -> Optional[State]:
+    def _on_select(self) -> State | None:
         sel = self.selection
         if sel == 2:  # Humain sub-menu
             from tetris.states.human_menu import HumanMenuState
@@ -186,8 +130,8 @@ class MenuState(State):
 
             return AIMenuState(self.screen, self.font, self.audio, self)
         if sel == 4:  # Start
-            from tetris.states.game import GameState
             from tetris.game.piece_provider import PieceProvider
+            from tetris.states.game import GameState
 
             provider = PieceProvider(
                 mode="replay" if self.mode == "Replay" else "normal"
@@ -196,14 +140,14 @@ class MenuState(State):
                 from tetris.states.ai import AIState
 
                 return AIState(
-                    self.screen, self.font, self.audio, self.h, self.s,
+                    self.screen, self.font, self.audio, self.handicap, self.sound_enabled,
                     provider, self.ai_speed, self,
                     epsilon_decay=self.ai_epsilon_decay,
                     epsilon_end=self.ai_epsilon_end,
                     ai_mode=self.ai_mode,
                 )
             return GameState(
-                self.screen, self.font, self.audio, self.h, self.s, provider, self
+                self.screen, self.font, self.audio, self.handicap, self.sound_enabled, provider, self
             )
         if sel == 5:  # Leaderboard
             from tetris.states.leaderboard import LeaderboardState
@@ -213,35 +157,3 @@ class MenuState(State):
             pygame.quit()
             sys.exit()
         return None
-
-    # --- Rendering ------------------------------------------------------
-
-    def draw(self, screen: pygame.Surface) -> None:
-        screen.fill(BLACK)
-
-        title = self.font.render("TETRIS", True, WHITE)
-        screen.blit(title, (SCREEN_WIDTH // 2 - title.get_width() // 2, 80))
-
-        for i, option in enumerate(self._OPTIONS):
-            is_sel = i == self.selection
-            disabled = self._is_disabled(i)
-            if disabled:
-                color = (64, 64, 64)
-            elif is_sel:
-                color = WHITE
-            else:
-                color = GRAY
-            prefix = "> " if is_sel else "  "
-            value = self._value_label(i)
-            text = f"{prefix}{option}" + (f" : {value}" if value else "")
-            surf = self.font.render(text, True, color)
-            screen.blit(surf, (SCREEN_WIDTH // 2 - surf.get_width() // 2, 160 + i * 48))
-
-        # Navigation instructions
-        instr = self.font.render(
-            "Flèches: Navigation | Entrée: Valider | Échap: Quitter", True, GRAY
-        )
-        screen.blit(
-            instr,
-            (SCREEN_WIDTH // 2 - instr.get_width() // 2, SCREEN_HEIGHT - 50),
-        )
