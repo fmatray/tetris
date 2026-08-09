@@ -1,4 +1,4 @@
-"""AI sub-menu: mode, speed, training submenu, stats, reset, back."""
+"""AI sub-menu: mode, speed, learning submenu, stats, reset, back."""
 
 from __future__ import annotations
 
@@ -17,10 +17,10 @@ AI_FILES = [MODEL_PATH, LOG_PATH]
 
 
 class AIMenuState(MenuBase):
-    """AI sub-menu: mode, speed, training submenu, stats, reset, back.
+    """AI sub-menu: mode, speed, learning submenu, stats, reset, back.
 
     Mode and speed are AI settings stored on the parent ``MenuState``.
-    Training submenu is disabled when Mode = Jeu (playing).
+    Learning submenu is disabled when Mode = Jeu (playing).
     """
 
     _OPTIONS = ("Mode", "Vitesse", "Apprentissage", "Statistiques", "Réinitialiser IA", "Retour")
@@ -69,9 +69,9 @@ class AIMenuState(MenuBase):
             self._toggle(-1)
             self._save()
         elif sel == 2:  # Apprentissage submenu
-            from tetris.states.training_menu import TrainingMenuState
+            from tetris.states.hyperparam_menu import HyperparamMenuState
 
-            return TrainingMenuState(self.screen, self.font, self.audio, self)
+            return HyperparamMenuState(self.screen, self.font, self.audio, self)
         elif sel == 3:  # Statistiques
             from tetris.states.stats import StatsState
 

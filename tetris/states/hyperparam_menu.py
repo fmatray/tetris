@@ -1,8 +1,9 @@
 """Hyperparameters sub-menu: DQN learning params, reset, back.
 
-Nested under the Training menu. Exposes the DQN hyperparameters that
-are configurable at runtime via left/right toggles.  Rendered as a
-multi-column table (param, current, min, max, step, explanation).
+Nested under the AI menu (Apprentissage entry). Exposes the DQN
+hyperparameters that are configurable at runtime via left/right
+toggles.  Rendered as a multi-column table (param, current, min,
+max, step, explanation).
 """
 
 from __future__ import annotations
@@ -24,7 +25,9 @@ from tetris.visuals.fonts import (
 
 
 class HyperparamMenuState(MenuBase):
-    """AI hyperparameters sub-menu: DQN learning params, reset, back."""
+    """AI learning sub-menu: DQN learning params, reset, back."""
+
+    _title = "Apprentissage"
 
     _OPTIONS = (
         "Epsilon decay",
@@ -62,14 +65,14 @@ class HyperparamMenuState(MenuBase):
         "ai_target_sync_steps": 500,
     }
 
-    def __init__(self, screen, font, audio, training_menu) -> None:
+    def __init__(self, screen, font, audio, ai_menu) -> None:
         super().__init__(screen, font, audio)
-        self.training_menu = training_menu
+        self.ai_menu = ai_menu
 
     @property
     def menu(self):
-        """Access the root MenuState through the training menu."""
-        return self.training_menu.menu
+        """Access the root MenuState through the AI menu."""
+        return self.ai_menu.menu
 
     # --- Hooks ----------------------------------------------------------
 
@@ -123,7 +126,7 @@ class HyperparamMenuState(MenuBase):
         self.menu.save_settings()
 
     def _on_back(self) -> State | None:
-        return self.training_menu
+        return self.ai_menu
 
     def _on_select(self) -> State | None:
         if self.selection == 7:  # Réinitialiser
@@ -132,7 +135,7 @@ class HyperparamMenuState(MenuBase):
             self.menu.save_settings()
             return None
         if self.selection == 8:  # Retour
-            return self.training_menu
+            return self.ai_menu
         return None
 
     # --- Custom table draw ------------------------------------------------

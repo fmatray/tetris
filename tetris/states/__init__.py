@@ -11,7 +11,6 @@ from tetris.states.menu import MenuState
 from tetris.states.menu_base import MenuBase
 from tetris.states.placeholder import PlaceholderState
 from tetris.states.stats import StatsState
-from tetris.states.training_menu import TrainingMenuState
 
 __all__ = [
     "AIState",
@@ -25,5 +24,4 @@ __all__ = [
     "MenuState",
     "PlaceholderState",
     "StatsState",
-    "TrainingMenuState",
 ]

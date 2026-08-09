@@ -14,8 +14,15 @@ Menu principal
 │   └── Mode                      [toggle ◄ ►]     Apprentissage ↔ Jeu
 │       Vitesse                   [toggle ◄ ►]     normal ↔ fast
 │       Apprentissage             [ENTER]          (grisé si Mode=Jeu)
-│       │   └── Stratégies        [ENTER]          → placeholder
-│       │       Hyperparamètres   [ENTER]          → Epsilon decay, Epsilon fin, LR, Gamma, Batch, Buffer, Target sync
+│       │   └── Epsilon decay     [toggle ◄ ►]     0.990–0.9999
+│       │       Epsilon fin       [toggle ◄ ►]     0.02–0.10
+│       │       Learning rate     [toggle ◄ ►]     1e-6–1e-2
+│       │       Gamma              [toggle ◄ ►]     0.80–0.99
+│       │       Batch size        [toggle ◄ ►]     8–256
+│       │       Buffer size       [toggle ◄ ►]     1000–200000
+│       │       Target sync       [toggle ◄ ►]     100–2000
+│       │       Réinitialiser     [ENTER]          reset to defaults
+│       │       Retour            [ENTER | ESC]
 │       Statistiques              [ENTER]          → stats + graph (une page)
 │       Réinitialiser IA          [ENTER ×2]       supprime modèle + log
 │       Retour                    [ENTER | ESC]
@@ -28,5 +35,4 @@ Menu principal
 
 - [x] **Touches** (Humain > Touches) — configurable keybindings for the human player
 - [x] **Statistiques** (Humain > Statistiques) — human player statistics page
-- [ ] **Stratégies** (IA > Apprentissage > Stratégies) — multiple learning strategies selection
-- [x] **Hyperparamètres** (IA > Apprentissage > Hyperparamètres) — Epsilon decay, Epsilon fin, Learning rate, Gamma, Batch size, Buffer size, Target sync steps (all configurable via ◄ ► toggles, persisted to settings.json)
+- [x] **Hyperparamètres** (IA > Apprentissage) — Epsilon decay, Epsilon fin, Learning rate, Gamma, Batch size, Buffer size, Target sync steps (all configurable via ◄ ► toggles, persisted to settings.json)
