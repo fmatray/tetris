@@ -405,9 +405,9 @@ class AIState(GameState):
         y = HUD_POSITIONS["ai_stats"][1]
         lh = LINE_HEIGHT_SMALL  # line height
 
-        # --- Training section ---
+        # --- Training section (3 columns) ---
         mode_label = "Apprentissage" if self.ai_mode == "learning" else "Jeu"
-        training_lines = [
+        training_items = [
             f"Mode: {mode_label}",
             f"Vitesse: {'Rapide' if self.speed == 'fast' else 'Normal'}",
             f"Episode: {self.episode}",
@@ -421,12 +421,16 @@ class AIState(GameState):
             f"Target sync: {self.agent.target_sync_steps}",
             f"Loss: {self.agent.last_loss:.4f}",
         ]
-        for line in training_lines:
-            surf = self.font.render(line, True, RED)
-            self.screen.blit(surf, (x0, y))
-            y += lh
+        col_w = (SCREEN_WIDTH - x0) // 3
+        for i, item in enumerate(training_items):
+            col = i % 3
+            row = i // 3
+            surf = self.font.render(item, True, RED)
+            self.screen.blit(surf, (x0 + col * col_w, y + row * lh))
+        y += (len(training_items) // 3 + (1 if len(training_items) % 3 else 0)) * lh
 
         y += 10  # gap between sections
+
 
         # --- Statistics table ---
         # Columns: [Tetromino, Lines, Score, Level] — right-aligned
