@@ -19,6 +19,7 @@ pygame.mixer.init()
 from tetris.audio import AudioManager
 from tetris.settings import MODEL_PATH, ensure_data_dir
 from tetris.states.ai import AIState
+from tetris.visuals.fonts import get_small_font
 from tetris.visuals.particles import ParticleSystem
 
 ensure_data_dir()
@@ -31,7 +32,7 @@ AI_INTERVAL = 80.0
 
 def run_training(n_episodes: int) -> None:
     screen = pygame.display.set_mode((800, 700))
-    font = pygame.font.SysFont("Arial", 32)
+    font = get_small_font()
     audio = AudioManager(False)
 
     state = AIState(screen, font, audio, 0, False)

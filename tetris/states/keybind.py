@@ -18,12 +18,18 @@ from tetris.settings import (
     GRAY,
     KEYBIND_LABELS,
     RED,
-    SCREEN_HEIGHT,
     SCREEN_WIDTH,
     WHITE,
     key_name,
 )
 from tetris.states.base import State
+from tetris.visuals.fonts import (
+    CONTENT_Y,
+    INSTRUCTIONS_Y,
+    LINE_HEIGHT_SMALL,
+    TITLE_Y,
+    get_large_font,
+)
 
 if TYPE_CHECKING:
     from tetris.states.human_menu import HumanMenuState
@@ -129,11 +135,11 @@ class KeybindState(State):
     def draw(self, screen: pygame.Surface, *, particles: ParticleSystem | None = None) -> None:
         screen.fill(BLACK)
 
-        title = self.font.render("Touches", True, WHITE)
-        screen.blit(title, (SCREEN_WIDTH // 2 - title.get_width() // 2, 60))
+        title = get_large_font().render("Touches", True, WHITE)
+        screen.blit(title, (SCREEN_WIDTH // 2 - title.get_width() // 2, TITLE_Y))
 
         keybinds = self._keybinds()
-        y = 140
+        y = CONTENT_Y
         for i, action in enumerate(_ACTIONS):
             is_sel = i == self.selection
             label = KEYBIND_LABELS[action]
@@ -149,6 +155,7 @@ class KeybindState(State):
 
             surf = self.font.render(text, True, color)
             screen.blit(surf, (SCREEN_WIDTH // 2 - surf.get_width() // 2, y))
+            y += LINE_HEIGHT_SMALL
 
         # Reset option
         is_reset_sel = self.selection == _RESET_INDEX
@@ -157,12 +164,11 @@ class KeybindState(State):
         reset_text = f"{reset_prefix}Réinitialiser"
         reset_surf = self.font.render(reset_text, True, reset_color)
         screen.blit(reset_surf, (SCREEN_WIDTH // 2 - reset_surf.get_width() // 2, y))
-        y += 48
 
         # Conflict message
         if self._conflict_msg:
             msg = self.font.render(self._conflict_msg, True, RED)
-            screen.blit(msg, (SCREEN_WIDTH // 2 - msg.get_width() // 2, y + 10))
+            screen.blit(msg, (SCREEN_WIDTH // 2 - msg.get_width() // 2, y + LINE_HEIGHT_SMALL))
 
         # Instructions
         if self._listening:
@@ -172,5 +178,5 @@ class KeybindState(State):
         instr = self.font.render(instr_text, True, GRAY)
         screen.blit(
             instr,
-            (SCREEN_WIDTH // 2 - instr.get_width() // 2, SCREEN_HEIGHT - 50),
+            (SCREEN_WIDTH // 2 - instr.get_width() // 2, INSTRUCTIONS_Y),
         )

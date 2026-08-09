@@ -14,9 +14,16 @@ if TYPE_CHECKING:
 
 import pygame
 
-from tetris.settings import BLACK, GRAY, SCREEN_HEIGHT, SCREEN_WIDTH, WHITE
+from tetris.settings import BLACK, GRAY, SCREEN_WIDTH, WHITE
 from tetris.states.base import State
 from tetris.storage import load_human_games
+from tetris.visuals.fonts import (
+    CONTENT_Y,
+    INSTRUCTIONS_Y,
+    LINE_HEIGHT_SMALL,
+    TITLE_Y,
+    get_large_font,
+)
 
 # Metrics: (label, key_in_record) — each shown as Total / Best / Average.
 _METRICS = [
@@ -62,8 +69,8 @@ class HumanStatsState(State):
         screen.fill(BLACK)
 
         # --- Title ---
-        title = self.font.render("Statistiques Humain", True, WHITE)
-        screen.blit(title, (SCREEN_WIDTH // 2 - title.get_width() // 2, 40))
+        title = get_large_font().render("Statistiques Humain", True, WHITE)
+        screen.blit(title, (SCREEN_WIDTH // 2 - title.get_width() // 2, TITLE_Y))
 
         if not self._games:
             empty = self.font.render(
@@ -79,14 +86,14 @@ class HumanStatsState(State):
         col_total = 260
         col_best = 370
         col_avg = 500
-        y = 110
+        y = CONTENT_Y
 
         # Header
         for text, cx in [("Total", col_total), ("Meilleur", col_best),
                          ("Moyenne", col_avg)]:
             h = self.font.render(text, True, GRAY)
             screen.blit(h, (cx, y))
-        y += 35
+        y += LINE_HEIGHT_SMALL
 
         for label, total, best, avg in self._aggregate():
             lbl = self.font.render(label, True, WHITE)
@@ -97,7 +104,7 @@ class HumanStatsState(State):
             screen.blit(b, (col_best, y))
             a = self.font.render(f"{avg:.1f}", True, GRAY)
             screen.blit(a, (col_avg, y))
-            y += 32
+            y += LINE_HEIGHT_SMALL
 
         y += 10
         games_played = self.font.render(
@@ -108,10 +115,10 @@ class HumanStatsState(State):
         # --- Recent games (right) ---
         # Fixed pixel columns — no format-string alignment, no overflow.
         rx = SCREEN_WIDTH - 600
-        ry = 110
+        ry = CONTENT_Y
         recent_header = self.font.render("Dernières parties", True, WHITE)
         screen.blit(recent_header, (rx, ry))
-        ry += 35
+        ry += LINE_HEIGHT_SMALL
 
         # Column positions relative to rx
         cols = [
@@ -125,7 +132,7 @@ class HumanStatsState(State):
         for text, dx in cols:
             h = self.font.render(text, True, GRAY)
             screen.blit(h, (rx + dx, ry))
-        ry += 28
+        ry += LINE_HEIGHT_SMALL
 
         for i, g in enumerate(self._games[-5:], 1):
             vals = [
@@ -139,7 +146,7 @@ class HumanStatsState(State):
             for text, dx in vals:
                 surf = self.font.render(text, True, WHITE)
                 screen.blit(surf, (rx + dx, ry))
-            ry += 26
+            ry += LINE_HEIGHT_SMALL
 
     def _draw_instructions(self, screen: pygame.Surface) -> None:
         instr = self.font.render(
@@ -147,7 +154,7 @@ class HumanStatsState(State):
         )
         screen.blit(
             instr,
-            (SCREEN_WIDTH // 2 - instr.get_width() // 2, SCREEN_HEIGHT - 50),
+            (SCREEN_WIDTH // 2 - instr.get_width() // 2, INSTRUCTIONS_Y),
         )
 
     # --- Input ----------------------------------------------------------

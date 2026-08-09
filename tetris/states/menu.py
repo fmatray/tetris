@@ -33,8 +33,7 @@ class MenuState(MenuBase):
     )
     _toggle_indices = frozenset({0, 1})  # Joueur, Son
     _title = "TETRIS"
-    _title_y = 80
-    _options_y = 160
+
     _instructions = "Flèches: Navigation | Entrée: Valider | Échap: Quitter"
 
     def __init__(self, screen, font, audio) -> None:

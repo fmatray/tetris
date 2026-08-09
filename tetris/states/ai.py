@@ -48,6 +48,7 @@ from tetris.settings import (
 )
 from tetris.states.base import State
 from tetris.states.game import GameState
+from tetris.visuals.fonts import LINE_HEIGHT_SMALL
 from tetris.visuals.particles import ParticleSystem
 
 # Macro-action space: 10 columns × 4 rotations = 40 actions.
@@ -392,7 +393,7 @@ class AIState(GameState):
         """Overlay training parameters and a statistics table on the game screen."""
         x0 = HUD_POSITIONS["ai_stats"][0]
         y = HUD_POSITIONS["ai_stats"][1]
-        lh = 30  # line height
+        lh = LINE_HEIGHT_SMALL  # line height
 
         # --- Training section ---
         mode_label = "Apprentissage" if self.ai_mode == "learning" else "Jeu"

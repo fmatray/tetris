@@ -33,6 +33,7 @@ from tetris.settings import (
     SCREEN_WIDTH,
     WHITE,
 )
+from tetris.visuals.fonts import get_large_font
 from tetris.visuals.particles import Particle, ParticleSystem
 
 if TYPE_CHECKING:
@@ -61,7 +62,7 @@ class Renderer:
         self._draw_text("NEXT:", HUD_POSITIONS["next"])
         self.draw_next_piece(game.next_piece)
         if game.paused:
-            pause_text = self.font.render("PAUSE", True, WHITE)
+            pause_text = get_large_font().render("PAUSE", True, WHITE)
             self.screen.blit(
                 pause_text,
                 (SCREEN_WIDTH // 2 - pause_text.get_width() // 2, SCREEN_HEIGHT // 2),
@@ -182,7 +183,7 @@ class Renderer:
             r = int(127 + 127 * math.sin(elapsed * 0.01))
             g = int(127 + 127 * math.sin(elapsed * 0.01 + 2 * math.pi / 3))
             b = int(127 + 127 * math.sin(elapsed * 0.01 + 4 * math.pi / 3))
-            txt = self.font.render("!!! GAME OVER !!!", True, (r, g, b))
+            txt = get_large_font().render("!!! GAME OVER !!!", True, (r, g, b))
             dx, dy = (
                 (random.randint(-10, 10), random.randint(-10, 10))
                 if elapsed < 2000

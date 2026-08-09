@@ -6,8 +6,15 @@ from typing import TYPE_CHECKING
 
 import pygame
 
-from tetris.settings import BLACK, GRAY, SCREEN_HEIGHT, SCREEN_WIDTH, WHITE
+from tetris.settings import BLACK, GRAY, SCREEN_WIDTH, WHITE
 from tetris.states.base import State
+from tetris.visuals.fonts import (
+    CONTENT_Y,
+    INSTRUCTIONS_Y,
+    LINE_HEIGHT_SMALL,
+    TITLE_Y,
+    get_large_font,
+)
 
 if TYPE_CHECKING:
     from tetris.visuals.particles import ParticleSystem
@@ -28,15 +35,13 @@ class MenuBase(State):
     - _on_navigate() -> None: called on up/down (default: pass)
     - _save() -> None: persist settings after a toggle
     - _option_text(i, is_sel) -> str: custom text for an option
-    - _option_color(i, is_sel, disabled) -> tuple: custom color
     """
-
     _OPTIONS: tuple[str, ...] = ()
     _title: str = ""
     _toggle_indices: frozenset[int] = frozenset()
-    _title_y: int = 60
-    _options_y: int = 140
-    _item_spacing: int = 48
+    _title_y: int = TITLE_Y
+    _options_y: int = CONTENT_Y
+    _item_spacing: int = LINE_HEIGHT_SMALL
     _instructions: str = "Flèches: Navigation | Entrée: Valider | Échap: Retour"
     _disabled_color: tuple[int, int, int] = (64, 64, 64)
 
@@ -88,12 +93,10 @@ class MenuBase(State):
             return self._on_back()
         return None
 
-    # --- Rendering (template method) ---------------------------------
-
     def draw(self, screen: pygame.Surface, *, particles: ParticleSystem | None = None) -> None:
         screen.fill(BLACK)
 
-        title = self.font.render(self._title, True, WHITE)
+        title = get_large_font().render(self._title, True, WHITE)
         screen.blit(title, (SCREEN_WIDTH // 2 - title.get_width() // 2, self._title_y))
 
         for i, option in enumerate(self._OPTIONS):
@@ -111,7 +114,7 @@ class MenuBase(State):
         instr = self.font.render(self._instructions, True, GRAY)
         screen.blit(
             instr,
-            (SCREEN_WIDTH // 2 - instr.get_width() // 2, SCREEN_HEIGHT - 50),
+            (SCREEN_WIDTH // 2 - instr.get_width() // 2, INSTRUCTIONS_Y),
         )
 
     # --- Hooks (subclasses override) ---------------------------------

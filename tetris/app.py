@@ -17,6 +17,7 @@ from tetris.audio import AudioManager
 from tetris.settings import SCREEN_HEIGHT, SCREEN_WIDTH, ensure_data_dir
 from tetris.states.base import State
 from tetris.states.menu import MenuState
+from tetris.visuals.fonts import get_small_font
 from tetris.visuals.particles import ParticleSystem
 
 
@@ -28,9 +29,9 @@ class TetrisApp:
         pygame.init()
         pygame.mixer.init()
         self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
-        pygame.display.set_caption("Tetris Python")
         self.clock = pygame.time.Clock()
-        self.font = pygame.font.SysFont("Arial", 32)
+        pygame.display.set_caption("Tetris Python")
+        self.font = get_small_font()
         self.audio = AudioManager(True)
         self.particles = ParticleSystem()
         self.state: State = MenuState(self.screen, self.font, self.audio)

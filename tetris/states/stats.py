@@ -15,8 +15,14 @@ if TYPE_CHECKING:
 import pygame
 
 from tetris.ai.trainer import TrainingLog
-from tetris.settings import BLACK, GRAY, LOG_PATH, SCREEN_HEIGHT, SCREEN_WIDTH, WHITE
+from tetris.settings import BLACK, GRAY, LOG_PATH, SCREEN_WIDTH, WHITE
 from tetris.states.base import State
+from tetris.visuals.fonts import (
+    INSTRUCTIONS_Y,
+    LINE_HEIGHT_SMALL,
+    TITLE_Y,
+    get_large_font,
+)
 from tetris.visuals.graph_view import render_score_graph
 
 _STAT_LABELS = [
@@ -75,24 +81,24 @@ class StatsState(State):
 
         # --- Stats on the left ---
         x = 60
-        y = 50
+        y = TITLE_Y
 
-        header = self.font.render("Statistiques", True, WHITE)
+        header = get_large_font().render("Statistiques", True, WHITE)
         screen.blit(header, (x, y))
-        y += 45
+        y += LINE_HEIGHT_SMALL + 10
 
         values = self._stat_values()
         for label, value in zip(_STAT_LABELS, values):
             line = f"{label} : {value}"
             surf = self.font.render(line, True, GRAY)
             screen.blit(surf, (x, y))
-            y += 35
+            y += LINE_HEIGHT_SMALL
 
         # --- Graph on the right ---
         if self._surface is not None:
             surf = self._surface
             gx = SCREEN_WIDTH - surf.get_width() - 60
-            gy = 80
+            gy = TITLE_Y
             screen.blit(surf, (gx, gy))
 
         # --- Navigation instructions ---
@@ -103,7 +109,7 @@ class StatsState(State):
         )
         screen.blit(
             instr,
-            (SCREEN_WIDTH // 2 - instr.get_width() // 2, SCREEN_HEIGHT - 50),
+            (SCREEN_WIDTH // 2 - instr.get_width() // 2, INSTRUCTIONS_Y),
         )
 
     # --- Input ----------------------------------------------------------

@@ -10,13 +10,19 @@ from typing import TYPE_CHECKING
 
 import pygame
 
-from tetris.settings import BLACK, GRAY, SCREEN_HEIGHT, SCREEN_WIDTH, WHITE
+from tetris.settings import BLACK, GRAY, SCREEN_WIDTH, WHITE
 from tetris.states.base import State
+from tetris.visuals.fonts import (
+    CONTENT_Y,
+    INSTRUCTIONS_Y,
+    LINE_HEIGHT_SMALL,
+    TITLE_Y,
+    get_large_font,
+)
 
 if TYPE_CHECKING:
     from tetris.states.base import State as StateType
     from tetris.visuals.particles import ParticleSystem
-
 
 class PlaceholderState(State):
     """Shows "À venir" for a future feature. Any key returns to parent."""
@@ -34,14 +40,14 @@ class PlaceholderState(State):
     def draw(self, screen: pygame.Surface, *, particles: ParticleSystem | None = None) -> None:
         screen.fill(BLACK)
 
-        title = self.font.render(self.title, True, WHITE)
-        screen.blit(title, (SCREEN_WIDTH // 2 - title.get_width() // 2, 200))
+        title = get_large_font().render(self.title, True, WHITE)
+        screen.blit(title, (SCREEN_WIDTH // 2 - title.get_width() // 2, TITLE_Y))
 
         msg = self.font.render("À venir", True, GRAY)
-        screen.blit(msg, (SCREEN_WIDTH // 2 - msg.get_width() // 2, 300))
+        screen.blit(msg, (SCREEN_WIDTH // 2 - msg.get_width() // 2, CONTENT_Y + LINE_HEIGHT_SMALL * 3))
 
         instr = self.font.render("Appuyez sur une touche pour revenir", True, GRAY)
         screen.blit(
             instr,
-            (SCREEN_WIDTH // 2 - instr.get_width() // 2, SCREEN_HEIGHT - 80),
+            (SCREEN_WIDTH // 2 - instr.get_width() // 2, INSTRUCTIONS_Y),
         )

@@ -15,6 +15,12 @@ from tetris.settings import BLACK, GRAY, MAX_NAME_LENGTH, SCREEN_WIDTH, WHITE
 from tetris.states.base import State
 from tetris.states.game import GameState
 from tetris.storage import save_human_game, save_score
+from tetris.visuals.fonts import (
+    CONTENT_Y,
+    LINE_HEIGHT_SMALL,
+    TITLE_Y,
+    get_large_font,
+)
 from tetris.visuals.leaderboard_view import draw_leaderboard
 from tetris.visuals.renderer import Renderer
 
@@ -90,11 +96,12 @@ class GameOverState(State):
 
     def _draw_name_entry(self, screen: pygame.Surface) -> None:
         screen.fill(BLACK)
-        prompt = self.font.render("GAME OVER!", True, WHITE)
-        screen.blit(prompt, (SCREEN_WIDTH // 2 - prompt.get_width() // 2, 150))
+        prompt = get_large_font().render("GAME OVER!", True, WHITE)
+        screen.blit(prompt, (SCREEN_WIDTH // 2 - prompt.get_width() // 2, TITLE_Y))
         instr = self.font.render("Enter your name and press ENTER:", True, GRAY)
-        screen.blit(instr, (SCREEN_WIDTH // 2 - instr.get_width() // 2, 200))
-        rect = pygame.Rect(SCREEN_WIDTH // 2 - 150, 250, 300, 50)
+        screen.blit(instr, (SCREEN_WIDTH // 2 - instr.get_width() // 2,
+                            TITLE_Y + LINE_HEIGHT_SMALL + 10))
+        rect = pygame.Rect(SCREEN_WIDTH // 2 - 150, CONTENT_Y + LINE_HEIGHT_SMALL * 2 + 10, 300, 50)
         pygame.draw.rect(screen, GRAY, rect, 2)
         txt = self.font.render(self.name, True, WHITE)
         screen.blit(txt, (rect.x + 10, rect.y + 10))
