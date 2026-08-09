@@ -1,5 +1,8 @@
 """Game constants and configuration."""
 
+import pygame
+
+
 # Screen dimensions
 SCREEN_WIDTH = 1500
 SCREEN_HEIGHT = 800
@@ -88,4 +91,56 @@ GAME_OVER_PARTICLE_COUNT = 400
 LEADERBOARD_SIZE = 10
 MAX_NAME_LENGTH = 15
 LEADERBOARD_PATH = "leaderboard.json"
+HUMAN_STATS_PATH = "human_stats.json"
 SETTINGS_PATH = "settings.json"
+
+# --- Keybindings --------------------------------------------------------
+# Human player keybindings: action name → pygame key constant.
+# Stored in settings.json as integer key codes.
+DEFAULT_KEYBINDS: dict[str, int] = {
+    "move_left": pygame.K_LEFT,
+    "move_right": pygame.K_RIGHT,
+    "rotate_cw": pygame.K_UP,
+    "rotate_ccw": pygame.K_s,
+    "soft_drop": pygame.K_DOWN,
+    "hard_drop": pygame.K_SPACE,
+    "pause": pygame.K_p,
+}
+
+# Display labels for each action (French).
+KEYBIND_LABELS: dict[str, str] = {
+    "move_left": "Gauche",
+    "move_right": "Droite",
+    "rotate_cw": "Rotation horaire",
+    "rotate_ccw": "Rotation anti-horaire",
+    "soft_drop": "Chute douce",
+    "hard_drop": "Chute rapide",
+    "pause": "Pause",
+}
+
+
+def key_name(key: int) -> str:
+    """Human-readable name for a pygame key constant (French where ambiguous)."""
+    _SPECIALS = {
+        pygame.K_LEFT: "←",
+        pygame.K_RIGHT: "→",
+        pygame.K_UP: "↑",
+        pygame.K_DOWN: "↓",
+        pygame.K_SPACE: "Espace",
+        pygame.K_RETURN: "Entrée",
+        pygame.K_ESCAPE: "Échap",
+        pygame.K_TAB: "Tab",
+        pygame.K_BACKSPACE: "Retour",
+        pygame.K_LSHIFT: "Maj G",
+        pygame.K_RSHIFT: "Maj D",
+        pygame.K_LCTRL: "Ctrl G",
+        pygame.K_RCTRL: "Ctrl D",
+        pygame.K_LALT: "Alt G",
+        pygame.K_RALT: "Alt D",
+    }
+    if key in _SPECIALS:
+        return _SPECIALS[key]
+    name = pygame.key.name(key)
+    if len(name) == 1:
+        return name.upper()
+    return name

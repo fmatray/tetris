@@ -54,13 +54,23 @@ class GameState(State):
         self.paused = False
         self.down_pressed = False
 
-        self.input_map = {
-            pygame.K_LEFT: self._move_left,
-            pygame.K_RIGHT: self._move_right,
-            pygame.K_UP: self._rotate_cw,
-            pygame.K_s: self._rotate_ccw,
-            pygame.K_DOWN: self._toggle_down_true,
+        self._setup_keybinds(menu)
+
+    def _setup_keybinds(self, menu: "MenuState | None") -> None:
+        """Build key → action map from the menu's keybindings (or defaults)."""
+        from tetris.settings import DEFAULT_KEYBINDS
+
+        kb = menu.keybinds if menu is not None else dict(DEFAULT_KEYBINDS)
+        self.input_map: dict[int, callable] = {
+            kb["move_left"]: self._move_left,
+            kb["move_right"]: self._move_right,
+            kb["rotate_cw"]: self._rotate_cw,
+            kb["rotate_ccw"]: self._rotate_ccw,
+            kb["soft_drop"]: self._toggle_down_true,
+            kb["hard_drop"]: self._hard_drop,
         }
+        self._pause_key: int = kb["pause"]
+        self._soft_drop_key: int = kb["soft_drop"]
 
     # --- Input handlers (SLAP: one operation each) ---------------------
 
@@ -124,14 +134,14 @@ class GameState(State):
 
     def handle_event(self, event: pygame.event.Event) -> Optional[State]:
         if event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_SPACE:
+            if event.key == self._pause_key:
                 self.paused = not self.paused
             elif event.key == pygame.K_ESCAPE:
                 self.pieces.save()
                 return self._return_to_menu()
             elif event.key in self.input_map:
                 self.input_map[event.key]()
-        elif event.type == pygame.KEYUP and event.key == pygame.K_DOWN:
+        elif event.type == pygame.KEYUP and event.key == self._soft_drop_key:
             self.down_pressed = False
         return None
 

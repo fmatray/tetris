@@ -68,6 +68,7 @@ class AIState(GameState):
         menu: "MenuState | None" = None,
         epsilon_decay: float = 0.999,
         epsilon_end: float = 0.1,
+        ai_mode: str = "learning",
     ) -> None:
         super().__init__(screen, font, audio, handicap, sound_enabled, piece_provider, menu)
         self.agent = DQNAgent(
@@ -77,7 +78,7 @@ class AIState(GameState):
         self.log = TrainingLog(LOG_PATH)
         self.episode = self.log.total_episodes
         self.speed = speed
-
+        self.ai_mode = ai_mode
         # Per-episode tracking
         self.episode_steps = 0
         self.episode_start_grid: np.ndarray = board_to_grid(self.board)
@@ -98,7 +99,9 @@ class AIState(GameState):
             except Exception as e:
                 print(f"Failed to load AI model: {e}")
 
-        # Capture initial state for first transition
+        # In playing mode: always greedy (no exploration, no learning)
+        if self.ai_mode == "playing":
+            self.agent.epsilon = 0.0
         self._current_state = extract_state(self.board, self.current_piece, self.next_piece)
 
     # --- Macro-action helpers -------------------------------------------
@@ -282,8 +285,8 @@ class AIState(GameState):
             self.board, self.current_piece, self.next_piece
         )
 
-        # Store transition: (prev_state, prev_action, reward, new_state, done)
-        if self._prev_state is not None and self._prev_action is not None:
+        # Store transition + learn (only in learning mode)
+        if self.ai_mode == "learning" and self._prev_state is not None and self._prev_action is not None:
             done = self.game_over
             self.agent.store(
                 self._prev_state,
@@ -340,25 +343,27 @@ class AIState(GameState):
         if not self.game_over:
             return None
 
-        # Record episode stats
-        self.log.record(
-            episode=self.episode,
-            score=self.stats.score,
-            lines=self.stats.total_lines,
-            level=self.stats.level,
-            steps=self.episode_steps,
-            epsilon=self.agent.epsilon,
-            loss=self.agent.last_loss,
-        )
-        # Decay epsilon once per episode (not per transition)
-        self.agent.decay_epsilon()
+        # Only log and learn in learning mode
+        if self.ai_mode == "learning":
+            # Record episode stats
+            self.log.record(
+                episode=self.episode,
+                score=self.stats.score,
+                lines=self.stats.total_lines,
+                level=self.stats.level,
+                steps=self.episode_steps,
+                epsilon=self.agent.epsilon,
+                loss=self.agent.last_loss,
+            )
+            # Decay epsilon once per episode (not per transition)
+            self.agent.decay_epsilon()
 
-        # Save model periodically (not every episode — too slow)
-        if self.episode % 50 == 0:
-            try:
-                self.agent.save(MODEL_PATH)
-            except Exception as e:
-                print(f"Failed to save AI model: {e}")
+            # Save model periodically (not every episode — too slow)
+            if self.episode % 50 == 0:
+                try:
+                    self.agent.save(MODEL_PATH)
+                except Exception as e:
+                    print(f"Failed to save AI model: {e}")
 
         # Start new episode (reset game state)
         self.episode = self.log.total_episodes
@@ -403,8 +408,9 @@ class AIState(GameState):
         lh = 30  # line height
 
         # --- Training section ---
+        mode_label = "Apprentissage" if self.ai_mode == "learning" else "Jeu"
         training_lines = [
-            "AI MODE",
+            f"Mode: {mode_label}",
             f"Vitesse: {'Rapide' if self.speed == 'fast' else 'Normal'}",
             f"Episode: {self.episode}",
             f"Epsilon: {self.agent.epsilon:.5f}",

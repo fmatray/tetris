@@ -15,7 +15,7 @@ from tetris.states.base import State
 from tetris.states.game import GameState
 from tetris.visuals.leaderboard_view import draw_leaderboard
 from tetris.visuals.renderer import Renderer
-from tetris.storage import save_score
+from tetris.storage import save_human_game, save_score
 
 
 class GameOverState(State):
@@ -66,6 +66,13 @@ class GameOverState(State):
                 self.game.stats.score,
                 self.game.stats.level,
                 self.game.stats.total_lines,
+            )
+            save_human_game(
+                self.name,
+                self.game.stats.score,
+                self.game.stats.level,
+                self.game.stats.total_lines,
+                self.game.stats.piece_count,
             )
             self.step = "LEADERBOARD"
         elif event.key == pygame.K_BACKSPACE:

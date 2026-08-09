@@ -219,7 +219,8 @@ tetris/
 │   └── trainer.py        # TrainingLog (per-episode JSON persistence)
 ├── states/
 │   ├── ai.py             # AIState (subclass of GameState)
-│   ├── ai_menu.py         # AI submenu (speed, ε decay, ε end, reset)
+│   ├── ai_menu.py         # AI submenu (speed, ε decay, ε end, graph, reset)
+│   ├── graph.py           # GraphState (score-vs-episode matplotlib view)
 │   └── menu.py           # MenuState (settings.json persistence)
 ```
 
@@ -273,7 +274,19 @@ The **Trend** row compares the last 100 episodes' average vs the
 previous 100 episodes' average (5% threshold). Shows ↑ (improving),
 ↓ (declining), or → (stable). Requires 200+ episodes.
 
-- `ESC` returns to menu (saves model + settings on exit).
+### 7.4 Learning Curve Graph
+
+The AI submenu includes a **Graphique** option that opens a full-screen
+score-vs-episode plot:
+
+- X axis: episode number
+- Y axis: episode score
+- Cyan line: raw score per episode
+- Yellow line: 20-episode moving average (learning trend)
+
+Rendered with matplotlib (Agg backend) to a `pygame.Surface`, cached on
+first draw. Any key returns to the AI submenu.
+
 - Two speeds: **Rapide** (no delay, fast training) and **Normal** (~80ms
   per action, human-like).
 
@@ -347,13 +360,15 @@ previous 100 episodes' average (5% threshold). Shows ↑ (improving),
 - [x] **Step 13**: Configurable ε decay/end in AI submenu
 - [x] **Step 14**: AI HUD statistics table with trend row
 - [x] **Step 15**: Settings persistence (`settings.json`)
-- [ ] **Step 16**: Compare DQN vs NEAT approaches
+- [x] **Step 16**: Score-vs-episode graph in AI submenu (matplotlib)
+- [ ] **Step 17**: Compare DQN vs NEAT approaches
 
 ## 12. Dependencies
 
 ```
 # requirements-ai.txt (optional)
 torch>=2.0
+matplotlib>=3.7.0
 ```
 
 Install with:

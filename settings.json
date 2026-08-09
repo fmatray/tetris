@@ -1,0 +1,19 @@
+{
+  "player": "Humain",
+  "mode": "Normal",
+  "handicap": 0,
+  "sound": true,
+  "ai_speed": "fast",
+  "ai_epsilon_decay": 0.9999,
+  "ai_epsilon_end": 0.08,
+  "ai_mode": "learning",
+  "keybinds": {
+    "move_left": 1073741904,
+    "move_right": 1073741903,
+    "rotate_cw": 1073741906,
+    "rotate_ccw": 115,
+    "soft_drop": 1073741905,
+    "hard_drop": 99,
+    "pause": 112
+  }
+}

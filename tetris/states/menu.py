@@ -1,39 +1,49 @@
-"""Menu state: player mode, handicap, sound, AI settings, start/leaderboard/quit."""
+"""Menu state: player, sound, human/AI submenus, start, leaderboard, quit."""
 
 from __future__ import annotations
 
 import json
 import sys
-from pathlib import Path
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 
 import pygame
 
-from tetris.settings import BLACK, GRAY, SCREEN_HEIGHT, SCREEN_WIDTH, SETTINGS_PATH, WHITE
+from tetris.settings import (
+    BLACK,
+    GRAY,
+    SCREEN_HEIGHT,
+    SCREEN_WIDTH,
+    SETTINGS_PATH,
+    WHITE,
+)
 from tetris.states.base import State
 
+if TYPE_CHECKING:
+    pass
+
 # Options that have a left/right-toggable value displayed inline.
-_TOGGLE_INDICES = {0, 1, 2, 3}
+_TOGGLE_INDICES = {0, 1}  # Joueur, Son
 
 
 class MenuState(State):
-    """Start menu with player, mode, handicap, sound, and navigation.
+    """Start menu with player, sound, human/AI submenus, and navigation.
 
-    All settings (player, mode, handicap, sound, AI speed, selection)
-    persist across game/leaderboard round-trips because child states
-    receive and return *this same* ``MenuState`` instance.
+    All settings persist across game/leaderboard round-trips because child
+    states receive and return *this same* ``MenuState`` instance.
     """
 
     _OPTIONS = [
         "Joueur",
-        "Mode",
-        "Handicap",
         "Son",
+        "Humain",
         "IA",
         "Démarrer le jeu",
         "Leaderboard",
         "Quitter",
     ]
+
+    # Indices that lead to a submenu (ENTER navigates, not toggles).
+    _SUBMENU_INDICES = {2, 3}
 
     def __init__(self, screen, font, audio) -> None:
         self.screen, self.font, self.audio = screen, font, audio
@@ -45,6 +55,10 @@ class MenuState(State):
         self.ai_speed = "normal"
         self.ai_epsilon_decay = 0.999
         self.ai_epsilon_end = 0.1
+        self.ai_mode = "learning"  # "learning" or "playing"
+        from tetris.settings import DEFAULT_KEYBINDS
+
+        self.keybinds: dict[str, int] = dict(DEFAULT_KEYBINDS)
         self.selection = 0
         self._load_settings()
 
@@ -59,29 +73,33 @@ class MenuState(State):
         "ai_speed": "ai_speed",
         "ai_epsilon_decay": "ai_epsilon_decay",
         "ai_epsilon_end": "ai_epsilon_end",
+        "ai_mode": "ai_mode",
     }
 
     def _load_settings(self) -> None:
         """Load menu options from the settings JSON file."""
-        path = Path(SETTINGS_PATH)
-        if not path.exists():
-            return
         try:
-            data = json.loads(path.read_text())
-        except (json.JSONDecodeError, OSError):
+            with open(SETTINGS_PATH) as f:
+                data = json.load(f)
+        except (OSError, json.JSONDecodeError):
             return
         for attr, key in self._SETTINGS_MAP.items():
             if key in data:
                 setattr(self, attr, data[key])
-            # Backward compat: old files used abbreviated keys
-            elif attr in ("h", "s") and attr in data:
-                setattr(self, attr, data[attr])
+        # Keybindings are a dict — merge saved values over defaults
+        # so new actions added in future versions get their default key.
+        if "keybinds" in data and isinstance(data["keybinds"], dict):
+            for action, key_code in data["keybinds"].items():
+                if action in self.keybinds:
+                    self.keybinds[action] = int(key_code)
 
     def save_settings(self) -> None:
         """Persist current menu options to the settings JSON file."""
         data = {key: getattr(self, attr) for attr, key in self._SETTINGS_MAP.items()}
+        data["keybinds"] = self.keybinds
         try:
-            Path(SETTINGS_PATH).write_text(json.dumps(data, indent=2))
+            with open(SETTINGS_PATH, "w") as f:
+                json.dump(data, f, indent=2)
         except OSError as e:
             print(f"Settings save error: {e}")
 
@@ -92,12 +110,16 @@ class MenuState(State):
         if i == 0:
             return self.player
         if i == 1:
-            return self.mode
-        if i == 2:
-            return str(self.h)
-        if i == 3:
             return "ON" if self.s else "OFF"
         return ""
+
+    def _is_disabled(self, i: int) -> bool:
+        """Greyed-out options that can't be selected."""
+        if i == 2 and self.player == "IA":
+            return True
+        if i == 3 and self.player == "Humain":
+            return True
+        return False
 
     # --- Input ----------------------------------------------------------
 
@@ -105,49 +127,65 @@ class MenuState(State):
         if self.selection == 0:
             self.player = "IA" if self.player == "Humain" else "Humain"
         elif self.selection == 1:
-            self.mode = "Replay" if self.mode == "Normal" else "Normal"
-        elif self.selection == 2:
-            self.h = max(0, self.h - 1)
-        elif self.selection == 3:
             self.s = not self.s
 
     def _toggle_right(self) -> None:
         if self.selection == 0:
             self.player = "IA" if self.player == "Humain" else "Humain"
         elif self.selection == 1:
-            self.mode = "Replay" if self.mode == "Normal" else "Normal"
-        elif self.selection == 2:
-            self.h = min(5, self.h + 1)
-        elif self.selection == 3:
             self.s = not self.s
 
     def handle_event(self, event: pygame.event.Event) -> Optional[State]:
         if event.type != pygame.KEYDOWN:
             return None
+        # Skip disabled options when navigating
         if event.key == pygame.K_UP:
-            self.selection = (self.selection - 1) % len(self._OPTIONS)
+            self.selection = self._prev_enabled(self.selection)
         elif event.key == pygame.K_DOWN:
-            self.selection = (self.selection + 1) % len(self._OPTIONS)
+            self.selection = self._next_enabled(self.selection)
         elif event.key == pygame.K_LEFT:
-            self._toggle_left()
-            self.save_settings()
+            if self.selection in _TOGGLE_INDICES:
+                self._toggle_left()
+                self.save_settings()
         elif event.key == pygame.K_RIGHT:
-            self._toggle_right()
-            self.save_settings()
+            if self.selection in _TOGGLE_INDICES:
+                self._toggle_right()
+                self.save_settings()
         elif event.key == pygame.K_RETURN:
-            return self._on_select()
+            if not self._is_disabled(self.selection):
+                return self._on_select()
         elif event.key == pygame.K_ESCAPE:
             pygame.quit()
             sys.exit()
         return None
 
+    def _prev_enabled(self, current: int) -> int:
+        n = len(self._OPTIONS)
+        for step in range(1, n + 1):
+            idx = (current - step) % n
+            if not self._is_disabled(idx):
+                return idx
+        return current
+
+    def _next_enabled(self, current: int) -> int:
+        n = len(self._OPTIONS)
+        for step in range(1, n + 1):
+            idx = (current + step) % n
+            if not self._is_disabled(idx):
+                return idx
+        return current
+
     def _on_select(self) -> Optional[State]:
         sel = self.selection
-        if sel == 4:  # IA sub-menu
+        if sel == 2:  # Humain sub-menu
+            from tetris.states.human_menu import HumanMenuState
+
+            return HumanMenuState(self.screen, self.font, self.audio, self)
+        if sel == 3:  # IA sub-menu
             from tetris.states.ai_menu import AIMenuState
 
             return AIMenuState(self.screen, self.font, self.audio, self)
-        if sel == 5:  # Start
+        if sel == 4:  # Start
             from tetris.states.game import GameState
             from tetris.game.piece_provider import PieceProvider
 
@@ -162,15 +200,16 @@ class MenuState(State):
                     provider, self.ai_speed, self,
                     epsilon_decay=self.ai_epsilon_decay,
                     epsilon_end=self.ai_epsilon_end,
+                    ai_mode=self.ai_mode,
                 )
             return GameState(
                 self.screen, self.font, self.audio, self.h, self.s, provider, self
             )
-        if sel == 6:  # Leaderboard
+        if sel == 5:  # Leaderboard
             from tetris.states.leaderboard import LeaderboardState
 
             return LeaderboardState(self.screen, self.font, self.audio, self)
-        if sel == 7:  # Quit
+        if sel == 6:  # Quit
             pygame.quit()
             sys.exit()
         return None
@@ -185,7 +224,13 @@ class MenuState(State):
 
         for i, option in enumerate(self._OPTIONS):
             is_sel = i == self.selection
-            color = WHITE if is_sel else GRAY
+            disabled = self._is_disabled(i)
+            if disabled:
+                color = (64, 64, 64)
+            elif is_sel:
+                color = WHITE
+            else:
+                color = GRAY
             prefix = "> " if is_sel else "  "
             value = self._value_label(i)
             text = f"{prefix}{option}" + (f" : {value}" if value else "")

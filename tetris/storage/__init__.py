@@ -5,7 +5,7 @@ import os
 from datetime import datetime
 from typing import Any
 
-from tetris.settings import LEADERBOARD_PATH, LEADERBOARD_SIZE
+from tetris.settings import HUMAN_STATS_PATH, LEADERBOARD_PATH, LEADERBOARD_SIZE
 
 
 def load_leaderboard() -> list[dict[str, Any]]:
@@ -53,3 +53,37 @@ def save_score(name: str, score: int, level: int, lines: int) -> None:
             json.dump(scores[:LEADERBOARD_SIZE], f, indent=4)
     except OSError as e:
         print(f"Save error: {e}")
+
+
+def load_human_games() -> list[dict[str, Any]]:
+    """Load all recorded human games. Returns an empty list on any error."""
+    if not os.path.exists(HUMAN_STATS_PATH):
+        return []
+    try:
+        with open(HUMAN_STATS_PATH) as f:
+            data = json.load(f)
+            return data if isinstance(data, list) else []
+    except (OSError, json.JSONDecodeError):
+        return []
+
+
+def save_human_game(
+    name: str, score: int, level: int, lines: int, tetrominos: int
+) -> None:
+    """Append a human game record to the stats log (unbounded)."""
+    games = load_human_games()
+    games.append(
+        {
+            "name": name,
+            "score": score,
+            "level": level,
+            "lines": lines,
+            "tetrominos": tetrominos,
+            "date": datetime.now().strftime("%Y-%m-%d %H:%M"),
+        }
+    )
+    try:
+        with open(HUMAN_STATS_PATH, "w") as f:
+            json.dump(games, f, indent=4)
+    except OSError as e:
+        print(f"Human stats save error: {e}")
