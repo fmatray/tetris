@@ -46,6 +46,11 @@ class MenuState(MenuBase):
         self.ai_speed = "normal"
         self.ai_epsilon_decay = 0.999
         self.ai_epsilon_end = 0.1
+        self.ai_lr = 1e-4
+        self.ai_gamma = 0.97
+        self.ai_batch_size = 64
+        self.ai_buffer_size = 50_000
+        self.ai_target_sync_steps = 500
         self.ai_mode = "learning"  # "learning" or "playing"
         from tetris.settings import DEFAULT_KEYBINDS
 
@@ -63,6 +68,11 @@ class MenuState(MenuBase):
         "ai_speed": "ai_speed",
         "ai_epsilon_decay": "ai_epsilon_decay",
         "ai_epsilon_end": "ai_epsilon_end",
+        "ai_lr": "ai_lr",
+        "ai_gamma": "ai_gamma",
+        "ai_batch_size": "ai_batch_size",
+        "ai_buffer_size": "ai_buffer_size",
+        "ai_target_sync_steps": "ai_target_sync_steps",
         "ai_mode": "ai_mode",
     }
 
@@ -143,6 +153,11 @@ class MenuState(MenuBase):
                     provider, self.ai_speed, self,
                     epsilon_decay=self.ai_epsilon_decay,
                     epsilon_end=self.ai_epsilon_end,
+                    lr=self.ai_lr,
+                    gamma=self.ai_gamma,
+                    batch_size=self.ai_batch_size,
+                    buffer_size=self.ai_buffer_size,
+                    target_sync_steps=self.ai_target_sync_steps,
                     ai_mode=self.ai_mode,
                 )
             return GameState(

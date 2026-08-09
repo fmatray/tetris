@@ -15,8 +15,7 @@ Menu principal
 │       Vitesse                   [toggle ◄ ►]     normal ↔ fast
 │       Apprentissage             [ENTER]          (grisé si Mode=Jeu)
 │       │   └── Stratégies        [ENTER]          → placeholder
-│       │       Hyperparamètres   [ENTER]          → Epsilon decay, Epsilon fin
-│       │       Retour            [ENTER | ESC]
+│       │       Hyperparamètres   [ENTER]          → Epsilon decay, Epsilon fin, LR, Gamma, Batch, Buffer, Target sync
 │       Statistiques              [ENTER]          → stats + graph (une page)
 │       Réinitialiser IA          [ENTER ×2]       supprime modèle + log
 │       Retour                    [ENTER | ESC]
@@ -30,4 +29,4 @@ Menu principal
 - [x] **Touches** (Humain > Touches) — configurable keybindings for the human player
 - [x] **Statistiques** (Humain > Statistiques) — human player statistics page
 - [ ] **Stratégies** (IA > Apprentissage > Stratégies) — multiple learning strategies selection
-- [ ] **Hyperparamètres** (IA > Apprentissage > Hyperparamètres) — currently only exposes Epsilon decay and Epsilon fin; expand to include learning rate, gamma, batch size, buffer size, etc.
+- [x] **Hyperparamètres** (IA > Apprentissage > Hyperparamètres) — Epsilon decay, Epsilon fin, Learning rate, Gamma, Batch size, Buffer size, Target sync steps (all configurable via ◄ ► toggles, persisted to settings.json)

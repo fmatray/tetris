@@ -81,12 +81,22 @@ class AIState(GameState):
         menu: MenuState | None = None,
         epsilon_decay: float = 0.999,
         epsilon_end: float = 0.1,
+        lr: float = 1e-4,
+        gamma: float = 0.97,
+        batch_size: int = 64,
+        buffer_size: int = 50_000,
+        target_sync_steps: int = 500,
         ai_mode: str = "learning",
     ) -> None:
         super().__init__(screen, font, audio, handicap, sound_enabled, piece_provider, menu)
         self.agent = DQNAgent(
             epsilon_decay=epsilon_decay,
             epsilon_end=epsilon_end,
+            lr=lr,
+            gamma=gamma,
+            batch_size=batch_size,
+            buffer_size=buffer_size,
+            target_sync_steps=target_sync_steps,
         )
         self.log = TrainingLog(LOG_PATH)
         self.episode = self.log.total_episodes
@@ -404,6 +414,11 @@ class AIState(GameState):
             f"Epsilon: {self.agent.epsilon:.5f}",
             f"Epsilon decay: {self.agent.epsilon_decay:.4f}",
             f"Epsilon end: {self.agent.epsilon_end:.2f}",
+            f"LR: {self.agent.optimizer.param_groups[0]['lr']:.1e}",
+            f"Gamma: {self.agent.gamma:.3f}",
+            f"Batch: {self.agent.batch_size}",
+            f"Buffer: {len(self.agent.buffer):,}/{self.agent.buffer.buffer.maxlen:,}",
+            f"Target sync: {self.agent.target_sync_steps}",
             f"Loss: {self.agent.last_loss:.4f}",
         ]
         for line in training_lines:
