@@ -70,6 +70,7 @@ class AIMenuState(State):
                     max(0.02, min(0.10, self.menu.ai_epsilon_end + direction * 0.01)),
                     2,
                 )
+            self.menu.save_settings()
         elif event.key == pygame.K_RETURN:
             return self._on_select()
         elif event.key == pygame.K_ESCAPE:

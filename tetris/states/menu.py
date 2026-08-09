@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+import json
 import sys
+from pathlib import Path
 from typing import Optional
 
 import pygame
 
-from tetris.settings import BLACK, GRAY, SCREEN_HEIGHT, SCREEN_WIDTH, WHITE
+from tetris.settings import BLACK, GRAY, SCREEN_HEIGHT, SCREEN_WIDTH, SETTINGS_PATH, WHITE
 from tetris.states.base import State
 
 # Options that have a left/right-toggable value displayed inline.
@@ -35,12 +37,42 @@ class MenuState(State):
 
     def __init__(self, screen, font, audio) -> None:
         self.screen, self.font, self.audio = screen, font, audio
+        # Defaults — overridden by _load_settings() if a file exists
         self.h = 0
         self.s = True
         self.player = "Humain"
         self.mode = "Normal"
         self.ai_speed = "normal"
         self.ai_epsilon_decay = 0.999
+        self.ai_epsilon_end = 0.1
+        self.selection = 0
+        self._load_settings()
+
+    # --- Settings persistence -------------------------------------------
+
+    _SETTINGS_KEYS = ("player", "mode", "h", "s", "ai_speed",
+                      "ai_epsilon_decay", "ai_epsilon_end")
+
+    def _load_settings(self) -> None:
+        """Load menu options from the settings JSON file."""
+        path = Path(SETTINGS_PATH)
+        if not path.exists():
+            return
+        try:
+            data = json.loads(path.read_text())
+        except (json.JSONDecodeError, OSError):
+            return
+        for key in self._SETTINGS_KEYS:
+            if key in data:
+                setattr(self, key, data[key])
+
+    def save_settings(self) -> None:
+        """Persist current menu options to the settings JSON file."""
+        data = {key: getattr(self, key) for key in self._SETTINGS_KEYS}
+        try:
+            Path(SETTINGS_PATH).write_text(json.dumps(data, indent=2))
+        except OSError as e:
+            print(f"Settings save error: {e}")
         self.ai_epsilon_end = 0.1
         self.selection = 0
 
@@ -89,8 +121,10 @@ class MenuState(State):
             self.selection = (self.selection + 1) % len(self._OPTIONS)
         elif event.key == pygame.K_LEFT:
             self._toggle_left()
+            self.save_settings()
         elif event.key == pygame.K_RIGHT:
             self._toggle_right()
+            self.save_settings()
         elif event.key == pygame.K_RETURN:
             return self._on_select()
         elif event.key == pygame.K_ESCAPE:

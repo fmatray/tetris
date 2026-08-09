@@ -36,6 +36,7 @@ ai_training_log.json
 # --- Tetris runtime data (regenerated per session) ---
 leaderboard.json
 replay_pieces.json
+settings.json
 
 # --- OS files ---
 .DS_Store
