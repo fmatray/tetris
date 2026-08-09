@@ -23,6 +23,7 @@ class HyperparamMenuState(MenuBase):
         "Target sync",
         "Retour",
     )
+    _toggle_indices = frozenset({0, 1, 2, 3, 4, 5, 6})
     # (default, step) shown next to each toggle option name.
     _PARAM_INFO = (
         "(default 0.9990, step: 0.0001)",   # Epsilon decay
