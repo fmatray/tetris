@@ -29,7 +29,7 @@ from tetris.ai.rewards import (
 )
 from tetris.ai.trainer import TrainingLog
 from tetris.audio import AudioManager
-from tetris.settings import BOARD_HEIGHT, BOARD_WIDTH, SHAPES, HUD_POSITIONS
+from tetris.settings import BOARD_HEIGHT, BOARD_WIDTH, MODEL_PATH, LOG_PATH, SHAPES, HUD_POSITIONS
 from tetris.game.piece_provider import PieceProvider
 from tetris.states.base import State
 from tetris.states.game import GameState
@@ -42,9 +42,6 @@ NUM_ACTIONS = NUM_ROTATIONS * BOARD_WIDTH  # 40
 
 # Gradient updates per piece placement (accelerates training)
 LEARN_PER_ACTION = 2
-
-MODEL_PATH = "ai_model.pt"
-LOG_PATH = "ai_training_log.json"
 
 
 class AIState(GameState):

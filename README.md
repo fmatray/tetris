@@ -170,11 +170,14 @@ tetris/
 │   │   ├── game_over.py         # GameOverState
 │   │   └── leaderboard.py       # LeaderboardState
 │   └── storage/                 # Persistance JSON
-│       └── __init__.py          # load_leaderboard, save_score
-├── leaderboard.json             # Sauvegarde des scores top 10 (JSON)
-├── settings.json                # Préférences du menu (généré)
-├── ai_model.pt                  # Poids du modèle DQN (généré)
-├── ai_training_log.json         # Journal d'entraînement (généré)
+│       └── __init__.py          # load_leaderboard, save_score, save_human_game
+├── data/                        # Données générées (settings, leaderboard, stats, IA)
+│   ├── settings.json            # Préférences du menu
+│   ├── leaderboard.json         # Scores top 10
+│   ├── human_stats.json         # Historique des parties humaines
+│   ├── ai_model.pt              # Poids du modèle DQN
+│   ├── ai_training_log.json     # Journal d'entraînement
+│   └── replay_pieces.json       # Séquences de pièces (mode replay)
 ├── requirements.txt             # Dépendances (pygame, numpy, torch)
 ├── AI.md                        # Document de conception : mode joueur IA (DQN)
 ├── MENU.md                      # Arborescence des menus et options à venir

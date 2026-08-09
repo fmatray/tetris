@@ -198,9 +198,9 @@ An episode runs from game start to game over. One macro-action per piece:
 
 | File | Purpose |
 | ------ | --------- |
-| `ai_model.pt` | Trained Q-network weights + optimizer state + ε |
-| `ai_training_log.json` | Per-episode stats (score, lines, level, steps, ε, loss) |
-| `settings.json` | Menu options + AI hyperparameters (ε decay, ε end, speed) |
+| `data/ai_model.pt` | Trained Q-network weights + optimizer state + ε |
+| `data/ai_training_log.json` | Per-episode stats (score, lines, level, steps, ε, loss) |
+| `data/settings.json` | Menu options + AI hyperparameters (ε decay, ε end, speed) |
 
 ---
 

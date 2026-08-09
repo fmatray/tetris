@@ -12,11 +12,9 @@ from typing import Optional
 import pygame
 
 from tetris.ai.trainer import TrainingLog
-from tetris.settings import BLACK, GRAY, SCREEN_HEIGHT, SCREEN_WIDTH, WHITE
+from tetris.settings import BLACK, GRAY, LOG_PATH, SCREEN_HEIGHT, SCREEN_WIDTH, WHITE
 from tetris.states.base import State
 from tetris.visuals.graph_view import render_score_graph
-
-LOG_PATH = "ai_training_log.json"
 
 _STAT_LABELS = [
     "Épisodes",

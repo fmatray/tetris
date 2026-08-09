@@ -17,6 +17,7 @@ pygame.init()
 pygame.mixer.init()
 
 from tetris.audio import AudioManager  # noqa: E402
+from tetris.settings import MODEL_PATH  # noqa: E402
 from tetris.states.ai import AIState  # noqa: E402
 from tetris.visuals.particles import ParticleSystem  # noqa: E402
 
@@ -51,7 +52,7 @@ def run_training(n_episodes: int) -> None:
 
     # Save model at end
     try:
-        state.agent.save("ai_model.pt")
+        state.agent.save(MODEL_PATH)
     except Exception as e:
         print(f"Failed to save model: {e}")
 

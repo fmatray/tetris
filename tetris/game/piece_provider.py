@@ -15,9 +15,7 @@ import json
 import random
 from pathlib import Path
 
-from tetris.settings import SHAPES
-
-REPLAY_PATH = Path("replay_pieces.json")
+from tetris.settings import REPLAY_PATH, SHAPES
 
 
 class PieceProvider:

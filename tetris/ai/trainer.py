@@ -11,7 +11,7 @@ import json
 import os
 from datetime import datetime
 
-LOG_PATH = "ai_training_log.json"
+from tetris.settings import LOG_PATH
 
 
 class TrainingLog:

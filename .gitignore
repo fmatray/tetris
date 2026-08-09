@@ -28,15 +28,8 @@ ENV/
 htmlcov/
 .pi/
 
-# --- AI artifacts (regenerable, large) ---
-*.pt
-*.pth
-*.onnx
-ai_training_log.json
-# --- Tetris runtime data (regenerated per session) ---
-leaderboard.json
-human_stats.json
-replay_pieces.json
+# --- Generated data (all runtime artifacts in data/) ---
+data/
 
 # --- OS files ---
 .DS_Store

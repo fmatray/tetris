@@ -1,6 +1,16 @@
 """Game constants and configuration."""
 
+import os
+
 import pygame
+
+
+# --- Data directory ----------------------------------------------------
+# All generated runtime data (settings, leaderboard, stats, AI model,
+# training log, replay sequences) lives under this directory so the repo
+# root stays clean. Created on import.
+DATA_DIR = "data"
+os.makedirs(DATA_DIR, exist_ok=True)
 
 
 # Screen dimensions
@@ -90,9 +100,12 @@ GAME_OVER_PARTICLE_COUNT = 400
 # Leaderboard
 LEADERBOARD_SIZE = 10
 MAX_NAME_LENGTH = 15
-LEADERBOARD_PATH = "leaderboard.json"
-HUMAN_STATS_PATH = "human_stats.json"
-SETTINGS_PATH = "settings.json"
+LEADERBOARD_PATH = os.path.join(DATA_DIR, "leaderboard.json")
+HUMAN_STATS_PATH = os.path.join(DATA_DIR, "human_stats.json")
+SETTINGS_PATH = os.path.join(DATA_DIR, "settings.json")
+MODEL_PATH = os.path.join(DATA_DIR, "ai_model.pt")
+LOG_PATH = os.path.join(DATA_DIR, "ai_training_log.json")
+REPLAY_PATH = os.path.join(DATA_DIR, "replay_pieces.json")
 
 # --- Keybindings --------------------------------------------------------
 # Human player keybindings: action name → pygame key constant.

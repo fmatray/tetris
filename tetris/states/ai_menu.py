@@ -7,11 +7,11 @@ from typing import Optional
 
 import pygame
 
-from tetris.settings import BLACK, GRAY, RED, SCREEN_HEIGHT, SCREEN_WIDTH, WHITE
+from tetris.settings import BLACK, GRAY, MODEL_PATH, LOG_PATH, RED, SCREEN_HEIGHT, SCREEN_WIDTH, WHITE
 from tetris.states.base import State
 
 # Files deleted on "Reset AI"
-AI_FILES = ["ai_model.pt", "ai_training_log.json"]
+AI_FILES = [MODEL_PATH, LOG_PATH]
 
 
 class AIMenuState(State):
