@@ -6,6 +6,8 @@ are configurable at runtime via left/right toggles.
 
 from __future__ import annotations
 
+from typing import ClassVar
+
 from tetris.states.base import State
 from tetris.states.menu_base import MenuBase
 
@@ -21,6 +23,7 @@ class HyperparamMenuState(MenuBase):
         "Batch size",
         "Buffer size",
         "Target sync",
+        "Réinitialiser",
         "Retour",
     )
     _toggle_indices = frozenset({0, 1, 2, 3, 4, 5, 6})
@@ -33,9 +36,19 @@ class HyperparamMenuState(MenuBase):
         "(default 64, step: 8)",             # Batch size
         "(default 50000, step: 5000)",      # Buffer size
         "(default 500, step: 100)",          # Target sync
+        "",                                    # Réinitialiser
         "",                                    # Retour
     )
 
+    _DEFAULTS: ClassVar[dict[str, float | int]] = {
+        "ai_epsilon_decay": 0.999,
+        "ai_epsilon_end": 0.10,
+        "ai_lr": 1e-4,
+        "ai_gamma": 0.97,
+        "ai_batch_size": 64,
+        "ai_buffer_size": 50_000,
+        "ai_target_sync_steps": 500,
+    }
     def __init__(self, screen, font, audio, training_menu) -> None:
         super().__init__(screen, font, audio)
         self.training_menu = training_menu
@@ -111,6 +124,11 @@ class HyperparamMenuState(MenuBase):
         return self.training_menu
 
     def _on_select(self) -> State | None:
-        if self.selection == 7:  # Retour
+        if self.selection == 7:  # Réinitialiser
+            for attr, val in self._DEFAULTS.items():
+                setattr(self.menu, attr, val)
+            self.menu.save_settings()
+            return None
+        if self.selection == 8:  # Retour
             return self.training_menu
         return None
