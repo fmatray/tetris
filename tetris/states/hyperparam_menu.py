@@ -41,13 +41,13 @@ class HyperparamMenuState(MenuBase):
 
     # Per-param metadata: (min, max, step, explanation)
     _PARAM_META: ClassVar[tuple[tuple[str, str, str, str, str], ...]] = (
-        ("0.990", "0.9999", "0.0001", "Taux de décroissance d'epsilon par épisode"),
-        ("0.02", "0.10", "0.01", "Valeur minimale d'epsilon (exploration résiduelle)"),
-        ("1e-6", "1e-2", "x10", "Taux d'apprentissage de l'optimiseur Adam"),
-        ("0.80", "0.99", "0.01", "Facteur d'actualisation des récompenses futures"),
-        ("8", "256", "8", "Taille du mini-batch pour chaque gradient update"),
-        ("1000", "200000", "5000", "Capacité du replay buffer"),
-        ("100", "2000", "100", "Pas entre synchronisations du target network"),
+        ("0.990", "0.9999", "0.0001", "Décroissance d'epsilon. ↑ = exploration plus longue, apprentissage plus lent"),
+        ("0.02", "0.10", "0.01", "Epsilon minimal. ↑ = plus d'exploration résiduelle, moins de convergence"),
+        ("1e-6", "1e-2", "x10", "Taux d'apprentissage Adam. ↑ = apprentissage plus rapide mais instable"),
+        ("0.80", "0.99", "0.01", "Actualisation récompenses futures. ↑ = long terme, ↓ = court terme"),
+        ("8", "256", "8", "Taille du mini-batch. ↑ = gradients plus stables mais plus de mémoire"),
+        ("1000", "200000", "5000", "Capacité du replay buffer. ↑ = plus de diversité, moins de corrélation"),
+        ("100", "2000", "100", "Sync du target network. ↑ = cible plus stable, ↓ = adaptation plus rapide"),
         ("", "", "", ""),  # Réinitialiser
         ("", "", "", ""),  # Retour
     )
@@ -152,9 +152,9 @@ class HyperparamMenuState(MenuBase):
         # Left-aligned: Param, Explanation. Right-aligned: Current, Min, Max, Step.
         headers = ("Paramètre", "Current", "Min", "Max", "Step", "Explication")
         margin = 40
-        left_w = 200     # Param
-        num_w = 110       # Current, Min, Max, Step (right-aligned)
-        gap = 20
+        left_w = 180     # Param
+        num_w = 80        # Current, Min, Max, Step (right-aligned)
+        gap = 15
         expl_w = SCREEN_WIDTH - margin * 2 - left_w - num_w * 4 - gap
 
         x_left = margin
