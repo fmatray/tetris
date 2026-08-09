@@ -1,19 +1,30 @@
-"""Hyperparameters sub-menu: epsilon decay, epsilon end, back.
+"""Hyperparameters sub-menu: DQN learning params, reset, back.
 
 Nested under the Training menu. Exposes the DQN hyperparameters that
-are configurable at runtime via left/right toggles.
+are configurable at runtime via left/right toggles.  Rendered as a
+multi-column table (param, current, min, max, step, explanation).
 """
 
 from __future__ import annotations
 
 from typing import ClassVar
 
+import pygame
+
+from tetris.settings import BLACK, GRAY, SCREEN_WIDTH, WHITE
 from tetris.states.base import State
 from tetris.states.menu_base import MenuBase
+from tetris.visuals.fonts import (
+    CONTENT_Y,
+    INSTRUCTIONS_Y,
+    LINE_HEIGHT_SMALL,
+    TITLE_Y,
+    get_large_font,
+)
 
 
 class HyperparamMenuState(MenuBase):
-    """AI hyperparameters sub-menu: DQN learning params, back."""
+    """AI hyperparameters sub-menu: DQN learning params, reset, back."""
 
     _OPTIONS = (
         "Epsilon decay",
@@ -27,17 +38,18 @@ class HyperparamMenuState(MenuBase):
         "Retour",
     )
     _toggle_indices = frozenset({0, 1, 2, 3, 4, 5, 6})
-    # (default, step) shown next to each toggle option name.
-    _PARAM_INFO = (
-        "(default 0.9990, step: 0.0001)",   # Epsilon decay
-        "(default 0.10, step: 0.01)",        # Epsilon fin
-        "(default 1e-4, step: x10)",          # Learning rate
-        "(default 0.97, step: 0.01)",        # Gamma
-        "(default 64, step: 8)",             # Batch size
-        "(default 50000, step: 5000)",      # Buffer size
-        "(default 500, step: 100)",          # Target sync
-        "",                                    # Réinitialiser
-        "",                                    # Retour
+
+    # Per-param metadata: (min, max, step, explanation)
+    _PARAM_META: ClassVar[tuple[tuple[str, str, str, str, str], ...]] = (
+        ("0.990", "0.9999", "0.0001", "Taux de décroissance d'epsilon par épisode"),
+        ("0.02", "0.10", "0.01", "Valeur minimale d'epsilon (exploration résiduelle)"),
+        ("1e-6", "1e-2", "x10", "Taux d'apprentissage de l'optimiseur Adam"),
+        ("0.80", "0.99", "0.01", "Facteur d'actualisation des récompenses futures"),
+        ("8", "256", "8", "Taille du mini-batch pour chaque gradient update"),
+        ("1000", "200000", "5000", "Capacité du replay buffer"),
+        ("100", "2000", "100", "Pas entre synchronisations du target network"),
+        ("", "", "", ""),  # Réinitialiser
+        ("", "", "", ""),  # Retour
     )
 
     _DEFAULTS: ClassVar[dict[str, float | int]] = {
@@ -49,6 +61,7 @@ class HyperparamMenuState(MenuBase):
         "ai_buffer_size": 50_000,
         "ai_target_sync_steps": 500,
     }
+
     def __init__(self, screen, font, audio, training_menu) -> None:
         super().__init__(screen, font, audio)
         self.training_menu = training_menu
@@ -77,17 +90,6 @@ class HyperparamMenuState(MenuBase):
         if i == 6:
             return str(m.ai_target_sync_steps)
         return ""
-
-    def _option_text(self, i: int, is_sel: bool) -> str:
-        prefix = "> " if is_sel else "  "
-        info = self._PARAM_INFO[i] if i < len(self._PARAM_INFO) else ""
-        value = self._value_label(i)
-        label = f"{prefix}{self._OPTIONS[i]}"
-        if info:
-            label += f" {info}"
-        if value:
-            label += f" : {value}"
-        return label
 
     def _toggle(self, direction: int) -> None:
         m = self.menu
@@ -132,3 +134,80 @@ class HyperparamMenuState(MenuBase):
         if self.selection == 8:  # Retour
             return self.training_menu
         return None
+
+    # --- Custom table draw ------------------------------------------------
+
+    def draw(self, screen: pygame.Surface, *, particles=None) -> None:
+        """Render hyperparameters as a multi-column table.
+
+        Columns: Param | Current | Min | Max | Step | Explanation
+        """
+        screen.fill(BLACK)
+
+        # --- Title ---
+        title = get_large_font().render(self._title, True, WHITE)
+        screen.blit(title, (SCREEN_WIDTH // 2 - title.get_width() // 2, TITLE_Y))
+
+        # --- Column layout ---
+        # Left-aligned: Param, Explanation. Right-aligned: Current, Min, Max, Step.
+        headers = ("Paramètre", "Current", "Min", "Max", "Step", "Explication")
+        margin = 40
+        left_w = 200     # Param
+        num_w = 110       # Current, Min, Max, Step (right-aligned)
+        gap = 20
+        expl_w = SCREEN_WIDTH - margin * 2 - left_w - num_w * 4 - gap
+
+        x_left = margin
+        x_num = [margin + left_w + c * num_w for c in range(4)]
+        x_expl = margin + left_w + num_w * 4 + gap
+
+        y = CONTENT_Y
+        lh = LINE_HEIGHT_SMALL
+
+        # --- Header row (bold via large font? no — use small, white) ---
+        for c in range(4):
+            surf = self.font.render(headers[c + 1], True, GRAY)
+            screen.blit(surf, (x_num[c] + num_w - surf.get_width(), y))
+        surf = self.font.render(headers[0], True, GRAY)
+        screen.blit(surf, (x_left, y))
+        surf = self.font.render(headers[5], True, GRAY)
+        screen.blit(surf, (x_expl, y))
+        y += lh
+
+        # --- Separator line ---
+        pygame.draw.line(screen, GRAY, (margin, y - 6), (SCREEN_WIDTH - margin, y - 6))
+
+        # --- Data rows ---
+        for i, option in enumerate(self._OPTIONS):
+            is_sel = i == self.selection
+            color = WHITE if is_sel else GRAY
+            meta = self._PARAM_META[i]
+
+            # Param name (left-aligned, prefixed with cursor)
+            prefix = "> " if is_sel else "  "
+            surf = self.font.render(f"{prefix}{option}", True, color)
+            screen.blit(surf, (x_left, y))
+
+            # Numeric columns: Current, Min, Max, Step
+            current = self._value_label(i)
+            values = [current, meta[0], meta[1], meta[2]]
+            for c, val in enumerate(values):
+                if val:
+                    surf = self.font.render(val, True, color)
+                    screen.blit(surf, (x_num[c] + num_w - surf.get_width(), y))
+
+            # Explanation (left-aligned)
+            if meta[3]:
+                surf = self.font.render(meta[3], True, color)
+                # Truncate if too wide
+                if surf.get_width() > expl_w:
+                    while surf.get_width() > expl_w - 10 and len(meta[3]) > 5:
+                        meta = (meta[0], meta[1], meta[2], meta[3][:-1])
+                        surf = self.font.render(meta[3] + "…", True, color)
+                screen.blit(surf, (x_expl, y))
+
+            y += lh
+
+        # --- Instructions ---
+        instr = self.font.render(self._instructions, True, GRAY)
+        screen.blit(instr, (SCREEN_WIDTH // 2 - instr.get_width() // 2, INSTRUCTIONS_Y))
