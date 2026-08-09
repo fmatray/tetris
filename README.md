@@ -32,7 +32,7 @@ Un jeu Tetris complet développé en Python avec Pygame, incluant des effets vis
 - ✅ Saisie du nom (15 caractères max) en fin de partie.
 - ✅ Leaderboard top 10 persistant (JSON).
 - ✅ Retour automatique au menu principal après le leaderboard.
-- ✅ **Joueur IA (DQN)** : Mode apprentissage par renforcement (Deep Q-Learning). L'IA apprend à jouer de manière autonome, à vitesse humaine, et affiche ses statistiques d'apprentissage en temps réel (épisodes, epsilon, pas de gradient, score moyen/meilleur, perte).
+- ✅ **Joueur IA (DQN)** : Mode apprentissage par renforcement (Deep Q-Learning). L'IA apprend à jouer de manière autonome, à vitesse humaine, et affiche ses statistiques d'apprentissage en temps réel : paramètres d'entraînement (vitesse, épisode, epsilon, decay, perte) et tableau de statistiques (pièces, lignes, score, niveau — courant, total, meilleur, moyenne, 100 derniers, tendance ↑/↓/→). Placement BFS avec minimisation des trous. Paramètres ε configurables (decay, fin) persistés dans `settings.json`.
 
 ## Installation
 
@@ -78,7 +78,7 @@ Le projet repose sur une architecture modulaire et extensible :
 - **Système de Particules** : Moteur d'effets visuels gérant la physique (gravité, friction) et le cycle de vie des particules pour des explosions dynamiques.
 - **Rendu Isolé** : Classe `Renderer` dédiée pour séparer la logique de mise à jour du moteur graphique.
 - **Persistance JSON** : Leaderboard stocké dans `leaderboard.json`, trié par score décroissant, incluant le nom, le score, le niveau, les lignes effacées et la date.
-- **Apprentissage par Renforcement (DQN)** : Agent Deep Q-Network implémenté avec PyTorch. L'IA apprend en jouant de manière autonome : exploration ε-greedy, experience replay (buffer 50 000), target network (sync toutes les 1 000 étapes). L'état du plateau est encodé en vecteur de 218 features (grille 200 + pièce courante 7 + pièce suivante 7 + orientation 4). La fonction de récompense pénalise les trous, la hauteur et l'irrégularité, et récompense les lignes effacées. Le modèle et les statistiques sont sauvegardés entre les sessions (`ai_model.pt`, `ai_training_log.json`).
+- **Apprentissage par Renforcement (Double DQN)** : Agent Deep Q-Network implémenté avec PyTorch. L'IA apprend en jouant de manière autonome : exploration ε-greedy (decay et fin configurables), experience replay (buffer 50 000), Double DQN (online sélectionne, target évalue), target network (sync toutes les 500 étapes). L'état du plateau est encodé en vecteur de 220 features (grille 200 + pièce courante 7 + pièce suivante 7 + orientation 4 + position 2). Les macro-actions (colonne × rotation) sont exécutées par BFS soft-drop avec minimisation des trous. La récompense pénalise les nouveaux trous (delta), la hauteur et l'irrégularité. Le modèle, les statistiques et les paramètres sont sauvegardés entre les sessions (`ai_model.pt`, `ai_training_log.json`, `settings.json`).
 
 
 ## Principes de conception
@@ -133,12 +133,12 @@ tetris/
 │   │   ├── board.py             # Grille, collisions, lignes, handicap, hard drop
 │   │   ├── scoring.py           # Règles de score (bonus multi-lignes)
 │   │   └── stats.py             # Score, lignes, niveau
-│   ├── ai/                      # Apprentissage par renforcement (DQN)
+│   ├── ai/                      # Apprentissage par renforcement (Double DQN)
 │   │   ├── __init__.py
-│   │   ├── network.py           # Réseau de neurones (218→256→128→64→6)
-│   │   ├── agent.py             # DQNAgent (ε-greedy, replay, target net)
+│   │   ├── network.py           # Réseau de neurones (220→256→128→64→40)
+│   │   ├── agent.py             # DQNAgent (ε-greedy, Double DQN, replay, target net)
 │   │   ├── replay_buffer.py     # Buffer d'experience replay (50 000)
-│   │   ├── rewards.py           # Récompense et extraction de features
+│   │   ├── rewards.py           # Récompense (delta trous) et extraction de features
 │   │   └── trainer.py           # Journal d'entraînement (JSON)
 │   ├── audio/                   # Audio procédural (NumPy)
 │   │   └── __init__.py          # AudioManager
@@ -150,18 +150,21 @@ tetris/
 │   ├── states/                  # États FSM (State Pattern)
 │   │   ├── __init__.py
 │   │   ├── base.py              # State (classe de base)
-│   │   ├── menu.py              # MenuState
-│   │   ├── ai.py                # AIState (DQN agent, HUD apprentissage)
+│   │   ├── menu.py              # MenuState (persistance settings.json)
+│   │   ├── ai.py                # AIState (DQN agent, HUD apprentissage + stats)
+│   │   ├── ai_menu.py           # AIMenuState (vitesse, ε decay/end, reset)
 │   │   ├── game_over.py         # GameOverState
 │   │   └── leaderboard.py       # LeaderboardState
 │   └── storage/                 # Persistance JSON
 │       └── __init__.py          # load_leaderboard, save_score
 ├── leaderboard.json             # Sauvegarde des scores top 10 (JSON)
+├── settings.json                # Préférences du menu (généré)
 ├── ai_model.pt                  # Poids du modèle DQN (généré)
 ├── ai_training_log.json         # Journal d'entraînement (généré)
 ├── requirements.txt             # Dépendances (pygame, numpy, torch)
 ├── AI.md                        # Document de conception : mode joueur IA (DQN)
 └── README.md                    # Documentation du projet
+```
 
 ## Personnalisation
 
@@ -178,7 +181,7 @@ tetris/
 
 ## Roadmap
 
-Un mode **Joueur IA** basé sur le Deep Q-Learning (DQN) est implémenté dans le package `tetris/ai/` et intégré via `AIState` (voir `AI.md` pour le design détaillé). L'IA apprend en jouant de manière autonome, à cadence humaine (~12 actions/sec), avec sauvegarde du modèle et des statistiques entre les sessions. Améliorations futures possibles : Double DQN, Prioritized Experience Replay, macro-actions, entraînement accéléré hors-ligne.
+Un mode **Joueur IA** basé sur le Double DQN est implémenté dans le package `tetris/ai/` et intégré via `AIState` (voir `AI.md` pour le design détaillé). L'IA apprend en jouant de manière autonome, à cadence humaine (~12 actions/sec), avec placement BFS (minimisation des trous), récompense delta-based, paramètres ε configurables, tableau de statistiques avec tendances, et sauvegarde du modèle, des statistiques et des préférences entre les sessions. Améliorations futures possibles : Prioritized Experience Replay, Curriculum Learning, MCTS.
 
 ## Crédits
 

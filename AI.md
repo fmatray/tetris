@@ -16,10 +16,10 @@ highest score possible.
 
 | Component | Choice | Reason |
 | ----------- | -------- | -------- |
-| Algorithm | Deep Q-Network (DQN) | Discrete action space, well-suited for board games |
+| Algorithm | Double DQN | Reduces overestimation bias; online net selects, target net evaluates |
 | Experience Replay | Yes (buffer size 50,000) | Stabilizes training by breaking correlation |
 | Target Network | Yes (sync every 500 steps) | Reduces moving-target instability |
-| Exploration | ε-greedy, decay 1.0 → 0.10 (0.999/episode) | Balances exploration vs exploitation |
+| Exploration | ε-greedy, decay 1.0 → ε_end (configurable) | Balances exploration vs exploitation |
 
 ### 1.2 Alternative: NEAT (Future)
 
@@ -60,6 +60,7 @@ One-hot encoded vector of size **4** (0°, 90°, 180°, 270°).
 ```
 State = [board_with_piece(200), current_piece(7), next_piece(7), orientation(4), piece_x_norm(1), piece_y_norm(1)]
 Total = 220 floats
+```
 
 ---
 
@@ -67,7 +68,8 @@ Total = 220 floats
 
 The AI uses **macro-actions**: one decision per piece, specifying the
 target column and rotation. The game then automatically rotates and
-moves the piece to the target position and hard-drops it.
+moves the piece to the target column, then **BFS soft-drop** to the
+best reachable position — allowing placement under overhangs.
 
 | Action ID | Rotation | Column |
 | ----------- | -------- | ------ |
@@ -81,38 +83,42 @@ doesn't fit at that column/rotation) are masked during action
 selection. Pieces with fewer rotations (e.g., O: 1, I/S/Z: 2) have
 fewer valid actions.
 
-```
-MacroAction = (column: int, rotation: int)
-```
+### 3.1 BFS Placement (Soft-Drop with Hole Minimization)
 
----
-
-## 4. Reward Function
-
-The reward shapes the AI's behavior. Every time a piece locks, the AI
-receives a reward:
+After the piece is rotated and moved to the target column, a BFS
+explores all reachable terminal positions (down, left, right from
+the current position). A position is terminal when the piece cannot
+move down further. Among all terminals, the BFS selects the one that
+**minimizes holes** after placement, with **depth as tie-breaker**
+(deepest first). This enables:
 
 ```
 reward = (
     +50.0  × lines_cleared
-    +5.0   × lines_cleared²          # bonus for multi-line clears
-    -0.5   × holes                   # absolute board holes penalty
-    -0.05  × aggregate_height        # absolute stack height penalty
-    -0.1   × bumpiness               # absolute surface unevenness penalty
-    -10.0  if game_over               # terminal penalty
-    +1.0   per piece placed           # strong survival incentive
+    +5.0   × lines_cleared²           # bonus for multi-line clears
+    -5.0   × holes_created             # delta: NEW holes only
+    -0.1   × new_holes                 # residual absolute holes penalty
+    -0.05  × aggregate_height           # stack height penalty
+    -0.1   × bumpiness                  # surface unevenness penalty
+    -10.0  if game_over                 # terminal penalty
+    +1.0   per piece placed             # survival incentive
 )
 ```
+
+The hole penalty is **delta-based** (`new_holes - old_holes`): the
+agent learns which actions create holes rather than inheriting a
+constant penalty for pre-existing holes. A small residual on absolute
+holes keeps the agent motivated to clear existing holes over time.
 
 ### 4.1 Feature Definitions
 
 | Feature | Formula |
 | --------- | --------- |
 | `lines_cleared` | Number of rows completed this placement |
+| `holes_created` | `max(0, new_holes - old_holes)` — new holes this placement |
 | `new_holes` | Empty cells with at least one filled cell above them |
 | `aggregate_height` | Sum of heights of all columns |
 | `bumpiness` | Σ ` | height[i] - height[i+1] | ` for adjacent columns |
-
 ---
 
 ## 5. Neural Network Architecture
@@ -156,25 +162,35 @@ optional dependency.
 ┌─────────────┐     ┌──────────────┐     ┌──────────────┐
 │  Phase 1    │────▶│   Phase 2    │────▶│   Phase 3    │
 │  Random     │     │  Training    │     │  Exploit     │
-│  Play       │     │  (ε decay)   │     │  (ε = 0.05)  │
+│  Play       │     │  (ε decay)   │     │  (ε = ε_end) │
 └─────────────┘     └──────────────┘     └──────────────┘
 ```
 
 1. **Random Play** — ε = 1.0, pure exploration. Fills replay buffer
-   with diverse experiences. (~10,000 steps)
-2. **Training** — ε decays from 1.0 to 0.05. Network learns Q-values
-   from replay buffer samples. (~500,000 steps)
-3. **Exploit** — ε = 0.05, mostly greedy. AI plays near-optimally.
+   with diverse experiences.
+2. **Training** — ε decays from 1.0 to ε_end. Network learns Q-values
+   from replay buffer samples.
+3. **Exploit** — ε = ε_end, mostly greedy. AI plays near-optimally.
    Continue learning but slowly.
 
-### 6.2 Episode = One Game
+### 6.2 Configurable Hyperparameters
+
+| Parameter | Default | Range | Step |
+| --------- | ------- | ----- | ---- |
+| `epsilon_decay` | 0.999 | 0.990–0.9999 | 0.0001 |
+| `epsilon_end` | 0.10 | 0.02–0.10 | 0.01 |
+
+These are configurable in the **AI submenu** and persisted to
+`settings.json`.
+
+### 6.3 Episode = One Game
 
 An episode runs from game start to game over. One macro-action per piece:
 
 1. Observe state `s` (board + current/next piece)
 2. Select action `a` via ε-greedy with action masking
-3. Execute `a`: rotate + move to target column, hard-drop
-4. Observe reward `r` (absolute board quality + line bonus) and next state `s'`
+3. Execute `a`: rotate + move to target column, BFS soft-drop
+4. Observe reward `r` (delta holes + line bonus + board quality) and next state `s'`
 5. Store `(s, a, r, s', done)` in replay buffer
 6. Run 2 Double DQN gradient updates via mini-batch sampling
 7. Periodically sync target network (every 500 steps)
@@ -182,74 +198,84 @@ An episode runs from game start to game over. One macro-action per piece:
 
 | File | Purpose |
 | ------ | --------- |
-| `ai_model.pt` | Trained Q-network weights |
-| `ai_replay_buffer.pkl` | Saved experience replay (for resuming training) |
-| `ai_training_log.json` | Per-episode stats (score, lines, epsilon) |
+| `ai_model.pt` | Trained Q-network weights + optimizer state + ε |
+| `ai_training_log.json` | Per-episode stats (score, lines, level, steps, ε, loss) |
+| `settings.json` | Menu options + AI hyperparameters (ε decay, ε end, speed) |
 
 ---
 
 ## 7. Integration with Existing Architecture
 
-### 7.1 New Files
+### 7.1 File Structure
 
 ```
 tetris/
 ├── ai/
 │   ├── __init__.py
-│   ├── agent.py          # DQN agent (select action, learn)
-│   ├── network.py        # PyTorch model definition
-│   ├── replay_buffer.py  # Experience replay buffer
-│   ├── rewards.py        # Reward function & board features
-│   └── trainer.py        # Training loop orchestration
-├── ai_model.pt           # Trained weights (generated)
-└── tetris/
-    └── states/
-        └── game.py       # Modified to support AI mode
+│   ├── agent.py          # DQNAgent (ε-greedy, Double DQN, replay, target net)
+│   ├── network.py        # DQNetwork (220→256→128→64→40)
+│   ├── replay_buffer.py  # Experience replay buffer (50,000)
+│   ├── rewards.py        # Reward function & board feature extraction
+│   └── trainer.py        # TrainingLog (per-episode JSON persistence)
+├── states/
+│   ├── ai.py             # AIState (subclass of GameState)
+│   ├── ai_menu.py         # AI submenu (speed, ε decay, ε end, reset)
+│   └── menu.py           # MenuState (settings.json persistence)
 ```
 
-### 7.2 FSM Changes
+### 7.2 FSM Architecture
 
 ```
 MenuState (Joueur: IA)
     ↓
-GameState (human_input=False)
+AIState (subclass of GameState)
     ↓
-  AI agent replaces keyboard input
-  AI calls state.board methods directly:
-    - board.move(dx)
-    - board.rotate(clockwise)
-    - board.drop()
-    - board.lock_piece()
-
-### 7.3 GameState Modifications
-
-`GameState` (in `tetris/states/game.py`) needs a flag `self.is_ai`:
-
-```python
-class GameState(State):
-    def __init__(self, screen, font, audio, handicap, is_ai=False):
-        ...
-        self.is_ai = is_ai
-        self.agent = AIAgent() if is_ai else None
+  AI agent selects macro-action (column + rotation)
+  AIState executes action:
+    - Rotate piece to target rotation
+    - Move to target column
+    - BFS soft-drop to best reachable position
+    - Lock piece → compute reward → store transition → learn
 ```
 
-In `GameState.update()`:
+`AIState` inherits all board, piece, stats, and rendering logic from
+`GameState`. It overrides:
 
-```python
-if self.is_ai and self.agent:
-    action = self.agent.select_action(self.get_state_vector())
-    self.execute_ai_action(action)
-else:
-    # normal human timing logic
-```
+- `update()` — AI macro-action selection and execution
+- `_lock_and_spawn()` — intercepts piece locking for reward + transition
+- `render()` — draws AI HUD overlay (training + statistics table)
+- `_on_episode_end()` — logs episode, saves model, auto-restarts
 
-### 7.4 Rendering AI Games
+### 7.3 AI HUD
 
-- Run AI games at **accelerated speed** (skip frame delays).
-- Display "AI MODE" overlay on screen.
-- Show current ε (epsilon) and episode count in HUD.
-- Allow `ESC` to return to menu during AI play.
-- Optional: render only every Nth frame for speed during training.
+The HUD overlay has two sections:
+
+**Training:**
+- Speed (Rapide/Normal)
+- Episode number
+- Epsilon (current exploration rate)
+- Epsilon decay (configurable)
+- Epsilon end (configurable)
+- Loss (last training loss)
+
+**Statistics table** (4 columns × 6 rows):
+
+| | Tetromino | Lines | Score | Level |
+|---|---|---|---|---|
+| Current | pieces in current episode | lines in episode | episode score | episode level |
+| Total | cumulative pieces | cumulative lines | cumulative score | — |
+| Best | best episode pieces | best episode lines | best episode score | best episode level |
+| Average | avg pieces/episode | avg lines/episode | avg score/episode | avg level/episode |
+| Last 100 | avg of last 100 | avg of last 100 | avg of last 100 | avg of last 100 |
+| Trend | ↑/↓/→ | ↑/↓/→ | ↑/↓/→ | ↑/↓/→ |
+
+The **Trend** row compares the last 100 episodes' average vs the
+previous 100 episodes' average (5% threshold). Shows ↑ (improving),
+↓ (declining), or → (stable). Requires 200+ episodes.
+
+- `ESC` returns to menu (saves model + settings on exit).
+- Two speeds: **Rapide** (no delay, fast training) and **Normal** (~80ms
+  per action, human-like).
 
 ---
 
@@ -291,7 +317,7 @@ else:
 
 ## 10. Future Enhancements
 
-- **Double DQN** — reduces overestimation bias in Q-values.
+- ~~**Double DQN**~~ — ✅ Implemented. Online net selects best action, target net evaluates it.
 - **Prioritized Experience Replay (PER)** — sample important transitions more.
 - **Curriculum Learning** — start with only I and O pieces, gradually
   add harder pieces.
@@ -315,8 +341,13 @@ else:
 - [x] **Step 7**: Add AI HUD overlay (epsilon, episode, score)
 - [x] **Step 8**: Evaluate on 1,000 games, tune hyperparameters
 - [x] **Step 9**: Introduce macro-actions for training speedup
-- [ ] **Step 10**: Compare DQN vs NEAT approaches
----
+- [x] **Step 10**: Implement Double DQN (online selects, target evaluates)
+- [x] **Step 11**: BFS soft-drop with hole minimization (overhang access)
+- [x] **Step 12**: Delta-based hole penalty in reward function
+- [x] **Step 13**: Configurable ε decay/end in AI submenu
+- [x] **Step 14**: AI HUD statistics table with trend row
+- [x] **Step 15**: Settings persistence (`settings.json`)
+- [ ] **Step 16**: Compare DQN vs NEAT approaches
 
 ## 12. Dependencies
 
@@ -343,26 +374,25 @@ The base game remains playable without PyTorch. If the user selects
 ```
 Human selects "Joueur : IA"
         ↓
-GameState launched with is_ai=True
+AIState launched (subclass of GameState)
         ↓
 AI agent observes board state (220 features)
         ↓
-ε-greedy selects action (move/rotate/drop)
+ε-greedy selects macro-action (column × rotation)
         ↓
-Action executed in game engine
+Action executed: rotate → move → BFS soft-drop
         ↓
-Reward computed (lines, holes, height, bumpiness)
+Reward computed (delta holes, lines, height, bumpiness)
         ↓
 Experience stored in replay buffer
         ↓
-Q-network updated from mini-batch
+Double DQN updates Q-network from mini-batch
         ↓
 Repeat until game over
         ↓
-Model saved, episode logged
+Model + settings saved, episode logged
         ↓
 Next episode begins (faster, smarter)
-```
 
 The AI starts knowing nothing. Through thousands of games, it discovers
 that clearing lines is good, creating holes is bad, and keeping the
