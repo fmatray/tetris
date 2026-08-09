@@ -25,14 +25,14 @@ class HyperparamMenuState(MenuBase):
     )
     # (default, step) shown next to each toggle option name.
     _PARAM_INFO = (
-        "(0.9990, 0.0001)",   # Epsilon decay
-        "(0.10, 0.01)",       # Epsilon fin
-        "(1e-4, x10)",        # Learning rate
-        "(0.97, 0.01)",       # Gamma
-        "(64, 8)",             # Batch size
-        "(50000, 5000)",      # Buffer size
-        "(500, 100)",         # Target sync
-        "",                    # Retour
+        "(default 0.9990, steps: 0.0001)",   # Epsilon decay
+        "(default 0.10, steps: 0.01)",        # Epsilon fin
+        "(default 1e-4, steps: x10)",          # Learning rate
+        "(default 0.97, steps: 0.01)",        # Gamma
+        "(default 64, steps: 8)",             # Batch size
+        "(default 50000, steps: 5000)",      # Buffer size
+        "(default 500, steps: 100)",          # Target sync
+        "",                                    # Retour
     )
 
     def __init__(self, screen, font, audio, training_menu) -> None:
