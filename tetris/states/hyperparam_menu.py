@@ -25,13 +25,13 @@ class HyperparamMenuState(MenuBase):
     )
     # (default, step) shown next to each toggle option name.
     _PARAM_INFO = (
-        "(default 0.9990, steps: 0.0001)",   # Epsilon decay
-        "(default 0.10, steps: 0.01)",        # Epsilon fin
-        "(default 1e-4, steps: x10)",          # Learning rate
-        "(default 0.97, steps: 0.01)",        # Gamma
-        "(default 64, steps: 8)",             # Batch size
-        "(default 50000, steps: 5000)",      # Buffer size
-        "(default 500, steps: 100)",          # Target sync
+        "(default 0.9990, step: 0.0001)",   # Epsilon decay
+        "(default 0.10, step: 0.01)",        # Epsilon fin
+        "(default 1e-4, step: x10)",          # Learning rate
+        "(default 0.97, step: 0.01)",        # Gamma
+        "(default 64, step: 8)",             # Batch size
+        "(default 50000, step: 5000)",      # Buffer size
+        "(default 500, step: 100)",          # Target sync
         "",                                    # Retour
     )
 
