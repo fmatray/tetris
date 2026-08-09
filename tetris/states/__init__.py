@@ -9,7 +9,6 @@ from tetris.states.hyperparam_menu import HyperparamMenuState
 from tetris.states.keybind import KeybindState
 from tetris.states.menu import MenuState
 from tetris.states.menu_base import MenuBase
-from tetris.states.placeholder import PlaceholderState
 from tetris.states.stats import StatsState
 
 __all__ = [
@@ -22,6 +21,5 @@ __all__ = [
     "KeybindState",
     "MenuBase",
     "MenuState",
-    "PlaceholderState",
     "StatsState",
 ]

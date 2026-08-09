@@ -29,8 +29,8 @@ Un jeu Tetris complet développé en Python avec Pygame, incluant des effets vis
 ### Expérience utilisateur
 
 - ✅ Menu de démarrage avec sélection du joueur (Humain/IA), du son, et sous-menus dédiés.
-- ✅ **Sous-menu Humain** : Mode (Normal/Replay), Handicap (0-5), Touches (touches configurables), Statistiques (à venir).
-- ✅ **Sous-menu IA** : Mode (Apprentissage/Jeu), Vitesse (normal/rapide), Apprentissage (stratégies à venir, hyperparamètres ε decay/fin), Statistiques (tableau + graphique score/épisode), Réinitialiser IA, Retour.
+- ✅ **Sous-menu Humain** : Mode (Normal/Replay), Handicap (0-5), Touches (touches configurables), Statistiques (page de statistiques du joueur humain).
+- ✅ **Sous-menu IA** : Mode (Apprentissage/Jeu), Vitesse (normal/rapide), Apprentissage (hyperparamètres DQN : Epsilon decay, Epsilon fin, Learning rate, Gamma, Batch size, Buffer size, Target sync — configurables via ◄ ►, persistés dans `settings.json`, reset aux valeurs par défaut), Statistiques (tableau + graphique score/épisode), Réinitialiser IA, Retour.
 - ✅ **Touches configurables** : 7 actions (gauche, droite, rotation horaire/anti-horaire, chute douce, chute rapide, pause) reconfigurables via le menu. Détection de conflits et touches réservées. Persistance dans `settings.json`.
 - ✅ Saisie du nom (15 caractères max) en fin de partie.
 - ✅ Leaderboard top 10 persistant (JSON).
@@ -80,7 +80,7 @@ Les touches sont configurables via le menu (**Humain > Touches**). Les valeurs p
 
 Le projet repose sur une architecture modulaire et extensible :
 
-- **Machine à États Finis (FSM)** : Utilisation du *State Pattern* pour gérer les transitions fluides entre `MenuState`, `HumanMenuState`, `KeybindState`, `GameState`, `AIState`, `AIMenuState`, `TrainingMenuState`, `HyperparamMenuState`, `StatsState`, `GameOverState`, `LeaderboardState` et `PlaceholderState`.
+- **Machine à États Finis (FSM)** : Utilisation du *State Pattern* pour gérer les transitions fluides entre `MenuState`, `HumanMenuState`, `KeybindState`, `GameState`, `AIState`, `AIMenuState`, `HyperparamMenuState`, `StatsState`, `GameOverState` et `LeaderboardState`.
 - **Audio Procédural** : Génération d'ondes sinusoïdales via NumPy pour créer des mélodies et effets sonores sans dépendances de fichiers externes.
 - **Système de Particules** : Moteur d'effets visuels gérant la physique (gravité, friction) et le cycle de vie des particules pour des explosions dynamiques.
 - **Rendu Isolé** : Classe `Renderer` dédiée pour séparer la logique de mise à jour du moteur graphique.
@@ -162,11 +162,9 @@ tetris/
 │   │   ├── keybind.py           # KeybindState (configuration des touches)
 │   │   ├── ai.py                # AIState (DQN agent, HUD apprentissage + stats)
 │   │   ├── ai_menu.py           # AIMenuState (mode, vitesse, apprentissage, stats, reset)
-│   │   ├── training_menu.py     # TrainingMenuState (stratégies, hyperparamètres)
-│   │   ├── hyperparam_menu.py   # HyperparamMenuState (ε decay, ε fin)
+│   │   ├── hyperparam_menu.py   # HyperparamMenuState (7 hyperparamètres DQN + reset)
 │   │   ├── stats.py             # StatsState (tableau stats + graphique)
 │   │   ├── graph.py             # GraphState (courbe score vs épisode)
-│   │   ├── placeholder.py       # PlaceholderState (fonctionnalités à venir)
 │   │   ├── game_over.py         # GameOverState
 │   │   └── leaderboard.py       # LeaderboardState
 │   └── storage/                 # Persistance JSON
@@ -180,7 +178,6 @@ tetris/
 │   └── replay_pieces.json       # Séquences de pièces (mode replay)
 ├── requirements.txt             # Dépendances (pygame, numpy, torch)
 ├── AI.md                        # Document de conception : mode joueur IA (DQN)
-├── MENU.md                      # Arborescence des menus et options à venir
 └── README.md                    # Documentation du projet
 ```
 
@@ -200,13 +197,46 @@ tetris/
 >
 > La vitesse de chute est calculée dans `tetris/states/game.py` (`DROP_BASE × DROP_DECAY^niveau`) et configurable via `tetris/settings.py` (`DROP_BASE`, `DROP_DECAY`, `SOFT_DROP_FACTOR`).
 
+## Arborescence des menus
+
+```
+Menu principal
+├── Joueur                        [toggle ◄ ►]     Humain ↔ IA
+├── Son                           [toggle ◄ ►]     ON ↔ OFF
+├── Humain                        [ENTER]          (grisé si Joueur=IA)
+│   └── Mode                      [toggle ◄ ►]     Normal ↔ Replay
+│       Handicap                  [toggle ◄ ►]     0–5
+│       Touches                   [ENTER]          → keybinding config
+│       Statistiques              [ENTER]          → human stats page
+│       Retour                    [ENTER | ESC]
+├── IA                            [ENTER]          (grisé si Joueur=Humain)
+│   └── Mode                      [toggle ◄ ►]     Apprentissage ↔ Jeu
+│       Vitesse                   [toggle ◄ ►]     normal ↔ fast
+│       Apprentissage             [ENTER]          (grisé si Mode=Jeu)
+│       │   └── Epsilon decay     [toggle ◄ ►]     0.990–0.9999
+│       │       Epsilon fin       [toggle ◄ ►]     0.02–0.10
+│       │       Learning rate     [toggle ◄ ►]     1e-6–1e-2
+│       │       Gamma              [toggle ◄ ►]     0.80–0.99
+│       │       Batch size        [toggle ◄ ►]     8–256
+│       │       Buffer size       [toggle ◄ ►]     1000–200000
+│       │       Target sync       [toggle ◄ ►]     100–2000
+│       │       Réinitialiser     [ENTER]          reset to defaults
+│       │       Retour            [ENTER | ESC]
+│       Statistiques              [ENTER]          → stats + graph (une page)
+│       Réinitialiser IA          [ENTER ×2]       supprime modèle + log
+│       Retour                    [ENTER | ESC]
+├── Démarrer le jeu               [ENTER]          → GameState | AIState
+├── Leaderboard                   [ENTER]          → LeaderboardState
+└── Quitter                       [ENTER | ESC]    exit
+```
+
 ## Roadmap
 
 Un mode **Joueur IA** basé sur le Double DQN est implémenté dans le package `tetris/ai/` et intégré via `AIState` (voir `AI.md` pour le design détaillé). L'IA dispose de deux modes : **Apprentissage** (exploration ε-greedy, sauvegarde du modèle et du journal) et **Jeu** (greedy, sans apprentissage). L'IA apprend en jouant de manière autonome, à cadence humaine (~12 actions/sec), avec placement BFS (minimisation des trous), récompense delta-based, paramètres ε configurables, tableau de statistiques avec tendances, et sauvegarde du modèle, des statistiques et des préférences entre les sessions.
 
-Le **menu** est structuré en arborescence (voir `MENU.md`) : sous-menu Humain (mode, handicap, touches configurables, statistiques) et sous-menu IA (mode, vitesse, apprentissage, statistiques, reset). Les touches du joueur humain sont entièrement reconfigurables avec détection de conflits et persistance.
+Le **menu** est structuré en arborescence (voir ci-dessus) : sous-menu Humain (mode, handicap, touches configurables, statistiques) et sous-menu IA (mode, vitesse, apprentissage, statistiques, reset). Les touches du joueur humain sont entièrement reconfigurables avec détection de conflits et persistance.
 
-Améliorations futures possibles : Statistiques humain, Stratégies d'apprentissage multiples, hyperparamètres étendus (lr, gamma, batch size), Prioritized Experience Replay, Curriculum Learning, MCTS.
+Améliorations futures possibles : Stratégies d'apprentissage multiples, Prioritized Experience Replay, Curriculum Learning, MCTS.
 
 ## Crédits
 
