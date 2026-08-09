@@ -23,8 +23,17 @@ class HyperparamMenuState(MenuBase):
         "Target sync",
         "Retour",
     )
-    _toggle_indices = frozenset({0, 1, 2, 3, 4, 5, 6})
-    _title = "Hyperparamètres"
+    # (default, step) shown next to each toggle option name.
+    _PARAM_INFO = (
+        "(0.9990, 0.0001)",   # Epsilon decay
+        "(0.10, 0.01)",       # Epsilon fin
+        "(1e-4, x10)",        # Learning rate
+        "(0.97, 0.01)",       # Gamma
+        "(64, 8)",             # Batch size
+        "(50000, 5000)",      # Buffer size
+        "(500, 100)",         # Target sync
+        "",                    # Retour
+    )
 
     def __init__(self, screen, font, audio, training_menu) -> None:
         super().__init__(screen, font, audio)
@@ -54,6 +63,17 @@ class HyperparamMenuState(MenuBase):
         if i == 6:
             return str(m.ai_target_sync_steps)
         return ""
+
+    def _option_text(self, i: int, is_sel: bool) -> str:
+        prefix = "> " if is_sel else "  "
+        info = self._PARAM_INFO[i] if i < len(self._PARAM_INFO) else ""
+        value = self._value_label(i)
+        label = f"{prefix}{self._OPTIONS[i]}"
+        if info:
+            label += f" {info}"
+        if value:
+            label += f" : {value}"
+        return label
 
     def _toggle(self, direction: int) -> None:
         m = self.menu
