@@ -50,8 +50,16 @@ class MenuState(State):
 
     # --- Settings persistence -------------------------------------------
 
-    _SETTINGS_KEYS = ("player", "mode", "h", "s", "ai_speed",
-                      "ai_epsilon_decay", "ai_epsilon_end")
+    # Maps internal attribute names to human-readable JSON keys.
+    _SETTINGS_MAP = {
+        "player": "player",
+        "mode": "mode",
+        "h": "handicap",
+        "s": "sound",
+        "ai_speed": "ai_speed",
+        "ai_epsilon_decay": "ai_epsilon_decay",
+        "ai_epsilon_end": "ai_epsilon_end",
+    }
 
     def _load_settings(self) -> None:
         """Load menu options from the settings JSON file."""
@@ -62,19 +70,20 @@ class MenuState(State):
             data = json.loads(path.read_text())
         except (json.JSONDecodeError, OSError):
             return
-        for key in self._SETTINGS_KEYS:
+        for attr, key in self._SETTINGS_MAP.items():
             if key in data:
-                setattr(self, key, data[key])
+                setattr(self, attr, data[key])
+            # Backward compat: old files used abbreviated keys
+            elif attr in ("h", "s") and attr in data:
+                setattr(self, attr, data[attr])
 
     def save_settings(self) -> None:
         """Persist current menu options to the settings JSON file."""
-        data = {key: getattr(self, key) for key in self._SETTINGS_KEYS}
+        data = {key: getattr(self, attr) for attr, key in self._SETTINGS_MAP.items()}
         try:
             Path(SETTINGS_PATH).write_text(json.dumps(data, indent=2))
         except OSError as e:
             print(f"Settings save error: {e}")
-        self.ai_epsilon_end = 0.1
-        self.selection = 0
 
     # --- Value helpers --------------------------------------------------
 
