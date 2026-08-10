@@ -79,7 +79,7 @@ class Renderer:
     def _draw_debug_bag(self, game: GameState) -> None:
         """Draw remaining 7-bag pieces as colored blocks right of the next-piece panel."""
         bag = game.pieces.bag_remaining
-        x = NEXT_PANEL_X + 4 * BLOCK_SIZE + 20
+        x = NEXT_PANEL_X + 7 * BLOCK_SIZE + 20
         y = NEXT_PANEL_Y
         self._draw_text("SAC:", (x, y))
         y += LINE_HEIGHT_SMALL
