@@ -1,5 +1,8 @@
 # AI Player Mode — Design Document
 
+(Updated: 2026-08-10)
+
+
 ## Overview
 
 When the player selects **Joueur : IA** in the start menu, the game launches
@@ -254,15 +257,13 @@ An episode runs from game start to game over. One macro-action per piece:
 tetris/
 ├── ai/
 │   ├── __init__.py
-│   ├── agent.py          # DQNAgent (per-candidate eval, V-function Bellman, replay, target net)
-│   ├── network.py        # DQNetwork (17→64→32→1 V-network)
+│   ├── network.py        # DQNetwork (17→128→64→1 V-network)
 │   ├── replay_buffer.py  # Experience replay buffer (50,000)
 │   ├── rewards.py        # DT-20 features, Dellacherie value, PBRS reward, simulation helpers
 │   └── trainer.py        # TrainingLog (per-episode JSON persistence)
 ├── states/
 │   ├── ai.py             # AIState (subclass of GameState)
 │   ├── ai_menu.py         # AI submenu (speed, ε decay, ε end, graph, reset)
-│   ├── graph.py           # GraphState (score-vs-episode matplotlib view)
 │   └── menu.py           # MenuState (settings.json persistence)
 ```
 
@@ -467,3 +468,21 @@ The AI starts knowing nothing. Through thousands of games, it discovers
 that clearing lines is good, creating holes is bad, and keeping the
 surface flat leads to higher scores. The result is an agent that plays
 Tetris as well as — or better than — a skilled human.
+
+---
+
+## Limitations de l'IA
+
+L'IA utilise un espace d'actions basé sur le **soft-drop BFS** : pour chaque pièce, elle énumère toutes les positions atteignables via BFS (déplacement latéral, chute douce, rotation avec SRS wall kicks), simule le placement, et évalue le plateau résultant via la V-function. Cette approche couvre les surplombs et les T-Spins.
+
+### Surplombs et placements en glissé
+
+✅ **Implémenté** — Le soft-drop BFS énumère les placements sous les surplombs. La pièce peut glisser horizontalement pendant la descente pour se loger sous une structure.
+
+### T-Spins
+
+✅ **Partiellement implémenté** — Les wall kicks SRS sont intégrés dans le simulateur (`SRS_KICKS_JLSTZ`, `SRS_KICKS_I`), permettant les rotations dans des espaces restreints. La détection explicite de T-Spin (3 coins occupés) et le bonus de score ne sont pas implémentés.
+
+### Wall kicks (SRS)
+
+✅ **Implémenté** — Les tables de wall kicks SRS sont utilisées dans le BFS de candidate generation.

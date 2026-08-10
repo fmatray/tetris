@@ -75,185 +75,17 @@ Les touches sont configurables via le menu (**Humain > Touches**). Les valeurs p
 | Échap | Retour au menu (sans sauvegarde du score) | Retour / Quitter |
 | Entrée | - | Valider l'action |
 
+## Documentation Technique
 
-## Architecture Technique
+La documentation détaillée se trouve dans le dossier `docs/` :
 
-Le projet repose sur une architecture modulaire et extensible :
-
-- **Machine à États Finis (FSM)** : Utilisation du *State Pattern* pour gérer les transitions fluides entre `MenuState`, `HumanMenuState`, `KeybindState`, `GameState`, `AIState`, `AIMenuState`, `HyperparamMenuState`, `StatsState`, `GameOverState` et `LeaderboardState`.
-- **Audio Procédural** : Génération d'ondes sinusoïdales via NumPy pour créer des mélodies et effets sonores sans dépendances de fichiers externes.
-- **Système de Particules** : Moteur d'effets visuels gérant la physique (gravité, friction) et le cycle de vie des particules pour des explosions dynamiques.
-- **Rendu Isolé** : Classe `Renderer` dédiée pour séparer la logique de mise à jour du moteur graphique.
-- **Persistance JSON** : Leaderboard stocké dans `leaderboard.json`, trié par score décroissant, incluant le nom, le score, le niveau, les lignes effacées et la date.
-- **Apprentissage par Renforcement (V-network DQN)** : Agent V-network DQN implémenté avec PyTorch. L'IA apprend en jouant de manière autonome : évaluation par candidat (V-function, features DT-20 17-dim normalisées), exploration ε-greedy (decay et fin configurables), Prioritized Experience Replay (PER Schaul et al. 2015, avec importance sampling), n-step returns (3-step), target network (Polyak τ=0.005, Bellman). La récompense pénalise les nouveaux trous (delta), la hauteur, l'irrégularité et les puits, avec PBRS (Dellacherie, scale 0.1). Soft-drop BFS avec SRS wall kicks pour les surplombs et T-Spins. Look-ahead 2 pièces. Le modèle, les statistiques et les paramètres sont sauvegardés entre les sessions (`ai_model.pt`, `ai_training_log.json`, `settings.json`).
-
-
-## Principes de conception
-
-Le codebase suit un ensemble de principes de génie logiciel pour rester lisible, testable et extensible.
-
-### Packages plutôt qu'un fichier monolithique
-
-Le code est organisé en packages (`game/`, `audio/`, `visuals/`, `states/`, `storage/`) plutôt qu'un seul fichier. Chaque package a une responsabilité claire, et `main.py` se réduit à un point d'entrée de 10 lignes qui appelle `tetris.run()`.
-
-### DRY (Don't Repeat Yourself)
-
-- `draw_leaderboard()` dans `visuals/leaderboard_view.py` centralise le rendu du tableau des scores, partagé par `LeaderboardState` et `GameOverState` (auparavant dupliqué).
-- Le tableau des bonus de score (`LINE_BONUS`) est défini une fois dans `settings.py` et utilisé par `ScoreEngine` — pas de logique de score dupliquée.
-
-### KISS (Keep It Simple)
-
-Chaque module est petit et fait une seule chose. `main.py` ne contient que l'appel à `tetris.run()`. La boucle principale vit dans `TetrisApp._frame()`, qui se lit en une dizaine de lignes.
-
-### SOLID
-
-| Principe | Application |
+| Document | Description |
 | -------- | -------- |
-| **S** — Single Responsibility | `Board` (grille), `Tetromino` (pièce), `GameStats` (score/niveau), `ScoreEngine` (règles), `AudioManager` (son), `Renderer` (affichage), `ParticleSystem` (effets), `TetrisApp` (boucle) — une classe, un rôle. |
-| **O** — Open/Closed | `State` est une classe de base ; ajouter un état se fait par sous-classe sans modifier `TetrisApp`. Les bonus de score s'ajoutent via `LINE_BONUS` (donnée) sans modifier `ScoreEngine`. |
-| **L** — Liskov Substitution | Tous les états héritent de `State` avec la même signature `handle_event` / `update` / `draw`. `TetrisApp` les dispatche polymorphiquement. |
-| **I** — Interface Segregation | Les `__init__.py` de chaque package n'exposent que le strict nécessaire (ex. `game/` exporte `Board`, `Tetromino`, `GameStats`, `ScoreEngine`). |
-| **D** — Dependency Inversion | Les états reçoivent `AudioManager` et `Board` par injection de dépendances (constructeur), jamais par construction interne. `Renderer` lit l'état du jeu sans le muter. |
-
-### SLAP (Single Layer of Abstraction)
-
-Chaque fonction opère à un seul niveau d'abstraction :
-
-- `TetrisApp._frame()` — niveau *dispatch FSM* (events, update, draw).
-- `GameState._tick()` — niveau *chute de pièce* (verrouillage, lignes, spawn).
-- `Board.clear_lines()` — niveau *ligne de grille* (détection, suppression, compactage).
-
-Aucune fonction mélange plusieurs niveaux, ce qui garde chaque méthode courte et focalisée.
-
-## Structure du projet
-
-```
-tetris/
-├── main.py                      # Point d'entrée (lance tetris.run())
-├── tetris/                      # Package principal
-│   ├── __init__.py              # API publique (run)
-│   ├── app.py                   # TetrisApp : boucle principale et FSM
-│   ├── settings.py              # Constantes et configurations
-│   ├── game/                    # Logique métier (sans pygame)
-│   │   ├── __init__.py
-│   │   ├── tetromino.py         # Modèle de pièce
-│   │   ├── board.py             # Grille, collisions, lignes, handicap, hard drop
-│   │   ├── scoring.py           # Règles de score (bonus multi-lignes)
-│   │   └── stats.py             # Score, lignes, niveau
-│   ├── ai/                      # Apprentissage par renforcement (V-network DQN)
-│   │   ├── __init__.py
-│   │   ├── network.py           # Réseau de neurones (17→128→64→1)
-│   │   ├── agent.py             # DQNAgent (ε-greedy, per-candidate eval, replay, target net)
-│   │   ├── replay_buffer.py     # Prioritized Experience Replay (PER, 50 000)
-│   │   ├── rewards.py           # Récompense (delta trous + PBRS scale 0.1), features DT-20 normalisées, simulation soft-drop BFS + SRS
-│   │   └── trainer.py           # Journal d'entraînement (JSON)
-│   ├── audio/                   # Audio procédural (NumPy)
-│   │   └── __init__.py          # AudioManager
-│   ├── visuals/                 # Rendu et effets visuels
-│   │   ├── __init__.py
-│   │   ├── particles.py         # Particle, ParticleSystem
-│   │   ├── renderer.py          # Renderer (grille, HUD, animation Game Over)
-│   │   └── graph_view.py        # Rendu du graphique score/épisode (matplotlib)
-│   ├── states/                  # États FSM (State Pattern)
-│   │   ├── __init__.py
-│   │   ├── base.py              # State (classe de base)
-│   │   ├── menu.py              # MenuState (persistance settings.json)
-│   │   ├── human_menu.py        # HumanMenuState (mode, handicap, touches, stats)
-│   │   ├── keybind.py           # KeybindState (configuration des touches)
-│   │   ├── ai.py                # AIState (DQN agent, HUD apprentissage + stats)
-│   │   ├── ai_menu.py           # AIMenuState (mode, vitesse, apprentissage, stats, reset)
-│   │   ├── hyperparam_menu.py   # HyperparamMenuState (13 hyperparamètres DQN + reset)
-│   │   ├── stats.py             # StatsState (tableau stats + graphique)
-│   │   ├── graph.py             # GraphState (courbe score vs épisode)
-│   │   ├── game_over.py         # GameOverState
-│   │   └── leaderboard.py       # LeaderboardState
-│   └── storage/                 # Persistance JSON
-│       └── __init__.py          # load_leaderboard, save_score, save_human_game
-├── data/                        # Données générées (settings, leaderboard, stats, IA)
-│   ├── settings.json            # Préférences du menu
-│   ├── leaderboard.json         # Scores top 10
-│   ├── human_stats.json         # Historique des parties humaines
-│   ├── ai_model.pt              # Poids du modèle DQN
-│   ├── ai_training_log.json     # Journal d'entraînement
-│   └── replay_pieces.json       # Séquences de pièces (mode replay)
-├── requirements.txt             # Dépendances (pygame, numpy, torch)
-├── AI.md                        # Document de conception : mode joueur IA (DQN)
-└── README.md                    # Documentation du projet
-```
-
-## Personnalisation
-
-### Modifier les paramètres
-
-Éditez `tetris/settings.py` pour changer :
-
-- Dimensions de la grille (`BOARD_WIDTH`, `BOARD_HEIGHT`)
-- Taille des blocs (`BLOCK_SIZE`)
-- Dimensions de l'écran (`SCREEN_WIDTH`, `SCREEN_HEIGHT`)
-- Couleurs des pièces (`SHAPES_COLORS`)
-- Touches par défaut (`DEFAULT_KEYBINDS`, `KEYBIND_LABELS`)
-
-> Les touches sont reconfigurables via le menu (**Humain > Touches**) et persistées dans `settings.json`. Les valeurs par défaut sont définies dans `tetris/settings.py` (`DEFAULT_KEYBINDS`).
->
-> La vitesse de chute est calculée dans `tetris/states/game.py` (`DROP_BASE × DROP_DECAY^niveau`) et configurable via `tetris/settings.py` (`DROP_BASE`, `DROP_DECAY`, `SOFT_DROP_FACTOR`).
-
-## Arborescence des menus
-
-```
-Menu principal
-├── Joueur                        [toggle ◄ ►]     Humain ↔ IA
-├── Son                           [toggle ◄ ►]     ON ↔ OFF
-├── Humain                        [ENTER]          (grisé si Joueur=IA)
-│   └── Mode                      [toggle ◄ ►]     Normal ↔ Replay
-│       Handicap                  [toggle ◄ ►]     0–5
-│       Touches                   [ENTER]          → keybinding config
-│       Statistiques              [ENTER]          → human stats page
-│       Retour                    [ENTER | ESC]
-├── IA                            [ENTER]          (grisé si Joueur=Humain)
-│   └── Mode                      [toggle ◄ ►]     Apprentissage ↔ Jeu
-│       Vitesse                   [toggle ◄ ►]     normal ↔ fast
-│       Apprentissage             [ENTER]          (grisé si Mode=Jeu)
-│       │   └── Epsilon decay     [toggle ◄ ►]     0.990–0.9999
-│       │       Epsilon fin       [toggle ◄ ►]     0.02–0.10
-│       │       Learning rate     [toggle ◄ ►]     1e-6–1e-2
-│       │       Gamma             [toggle ◄ ►]     0.80–0.99
-│       │       Batch size        [toggle ◄ ►]     8–256
-│       │       Buffer size       [toggle ◄ ►]     1000–200000
-│       │       Curriculum        [toggle ◄ ►]     OFF ↔ ON
-│       │       Fréq. curriculum  [toggle ◄ ►]     10–500
-│       │       Epsilon curr.     [toggle ◄ ►]     reset/boost/decay
-│       │       Warm-start        [toggle ◄ ►]     OFF ↔ ON
-│       │       Maj. par pièce    [toggle ◄ ►]     1–8
-│       │       Look-ahead        [toggle ◄ ►]     OFF ↔ ON
-│       │       Soft-drop         [toggle ◄ ►]     OFF ↔ ON
-│       │       Réinitialiser     [ENTER]          reset to defaults
-│       │       Retour            [ENTER | ESC]
-│       Statistiques              [ENTER]          → stats + graph (une page)
-│       Réinitialiser IA          [ENTER ×2]       supprime modèle + log
-│       Retour                    [ENTER | ESC]
-## Limitations de l'IA
-
-L'IA utilise un espace d'actions basé sur le **soft-drop BFS** : pour chaque pièce, elle énumère toutes les positions atteignables via BFS (déplacement latéral, chute douce, rotation avec SRS wall kicks), simule le placement, et évalue le plateau résultant via la V-function. Cette approche couvre les surplombs et les T-Spins.
-
-### Surplombs et placements en glissé
-
-✅ **Implémenté** — Le soft-drop BFS énumère les placements sous les surplombs. La pièce peut glisser horizontalement pendant la descente pour se loger sous une structure.
-
-### T-Spins
-
-✅ **Partiellement implémenté** — Les wall kicks SRS sont intégrés dans le simulateur (`SRS_KICKS_JLSTZ`, `SRS_KICKS_I`), permettant les rotations dans des espaces restreints. La détection explicite de T-Spin (3 coins occupés) et le bonus de score ne sont pas implémentés.
-
-### Wall kicks (SRS)
-
-✅ **Implémenté** — Les tables de wall kicks SRS sont utilisées dans le BFS de candidate generation.
-
-## Roadmap
-
-Un mode **Joueur IA** basé sur le V-network DQN est implémenté dans le package `tetris/ai/` et intégré via `AIState` (voir `AI.md` pour le design détaillé). L'IA dispose de deux modes : **Apprentissage** (exploration ε-greedy, sauvegarde du modèle et du journal) et **Jeu** (greedy, sans apprentissage). L'IA apprend en jouant de manière autonome, à cadence humaine (~12 actions/sec), avec évaluation par candidat (soft-drop BFS + SRS wall kicks), features DT-20 normalisées, PBRS Dellacherie (scale 0.1), Prioritized Experience Replay, n-step returns (3-step), 2-piece look-ahead, récompense delta-based, paramètres ε configurables, tableau de statistiques avec tendances, et sauvegarde du modèle, des statistiques et des préférences entre les sessions.
-
-Le **menu** est structuré en arborescence (voir ci-dessus) : sous-menu Humain (mode, handicap, touches configurables, statistiques) et sous-menu IA (mode, vitesse, apprentissage, statistiques, reset). Les touches du joueur humain sont entièrement reconfigurables avec détection de conflits et persistance.
-
-Améliorations futures possibles : Stratégies d'apprentissage multiples, MCTS, Self-Play Tournament, Human Replay (imitation learning).
+| [Architecture](docs/architecture.md) | Architecture technique, structure du projet et principes de conception |
+| [IA](docs/ai.md) | Design document du mode joueur IA (V-network DQN) |
+| [Menus](docs/menus.md) | Arborescence complète des menus |
+| [Personnalisation](docs/customization.md) | Paramètres configurables |
+| [Roadmap](docs/roadmap.md) | État d'avancement et améliorations futures |
 
 ## Crédits
 
@@ -263,3 +95,10 @@ Musique et effets sonores générés procéduralement avec NumPy.
 ## Licence
 
 MIT License - Libre d'utilisation et de modification
+
+## Références
+
+- [Tetris Wiki](https://tetris.wiki) — Guide exhaustif sur mécaniques, SRS et histoire du jeu.
+- [Pygame CE](https://pygame-ce.org) — Documentation de l'extension Community Edition de Pygame.
+- [PyTorch Documentation](https://pytorch.org/docs/) — Référence pour l'implémentation du réseau de neurones DQN.
+- [Deep Q-Learning (Nature)](https://www.nature.com/articles/nature14236) — Article fondateur sur les réseaux DQN.
