@@ -90,3 +90,55 @@ def test_replay_mode_no_allowed_types_serves_all(tmp_path):
     provider = PieceProvider(mode="replay", path=path)
     served = [provider.next_type() for _ in range(3)]
     assert served == saved
+
+
+def test_7bag_deals_all_seven_pieces(tmp_path):
+    """7-bag: each piece appears exactly once per 7 draws."""
+    provider = PieceProvider(mode="normal", path=tmp_path / "bag.json", generator="7bag")
+    bag = [provider.next_type() for _ in range(7)]
+    assert sorted(bag) == sorted(SHAPES.keys())
+
+
+def test_7bag_respects_allowed_types(tmp_path):
+    """7-bag with allowed_types=["O"] deals only O pieces."""
+    provider = PieceProvider(
+        mode="normal", path=tmp_path / "bag.json", generator="7bag", allowed_types=["O"]
+    )
+    for _ in range(50):
+        assert provider.next_type() == "O"
+
+
+def test_7bag_allowed_types_subset(tmp_path):
+    """7-bag with a subset deals each subset piece once per bag."""
+    provider = PieceProvider(
+        mode="normal", path=tmp_path / "bag.json", generator="7bag", allowed_types=["O", "I", "T"]
+    )
+    bag = [provider.next_type() for _ in range(3)]
+    assert sorted(bag) == ["I", "O", "T"]
+
+
+def test_7bag_set_allowed_types_resets_bag(tmp_path):
+    """set_allowed_types invalidates the bag so the new pool takes effect immediately."""
+    provider = PieceProvider(mode="normal", path=tmp_path / "bag.json", generator="7bag")
+    provider.next_type()
+    provider.next_type()
+    provider.set_allowed_types(["O"])
+    assert provider.next_type() == "O"
+    assert provider.next_type() == "O"
+
+
+def test_default_generator_is_random(tmp_path):
+    """Without the generator param, default is 'random'."""
+    provider = PieceProvider(mode="normal", path=tmp_path / "bag.json")
+    assert provider.generator == "random"
+    for _ in range(20):
+        assert provider.next_type() in SHAPES
+
+
+def test_bag_remaining_shows_current_bag(tmp_path):
+    """bag_remaining returns the 6 pieces left after popping one from a fresh 7-bag."""
+    provider = PieceProvider(mode="normal", path=tmp_path / "b.json", generator="7bag")
+    provider.next_type()  # pops one, bag has 6 left
+    remaining = provider.bag_remaining
+    assert len(remaining) == 6
+    assert all(t in SHAPES for t in remaining)

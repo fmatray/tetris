@@ -177,3 +177,29 @@ class TestWarmStart:
         # Restore default
         m2.ai_warm_start = True
         m2.save_settings()
+
+
+class TestCurriculum7Bag:
+    def test_curriculum_7bag_restricts_initial_pieces(self, audio):
+        """7-bag generator with curriculum restriction deals only O initially."""
+        provider = PieceProvider(
+            mode="normal", path="/tmp/_test_curr_7bag.json", generator="7bag"
+        )
+        ai = AIState(
+            _screen,
+            _font,
+            audio,
+            handicap=0,
+            sound_enabled=False,
+            piece_provider=provider,
+            speed="fast",
+            menu=None,
+            ai_mode="learning",
+            curriculum=True,
+            curriculum_freq=2,
+            curriculum_epsilon="reset",
+        )
+        assert ai.pieces.generator == "7bag"
+        assert ai.pieces.allowed_types == ["O"]
+        for _ in range(50):
+            assert ai.pieces.next_type() == "O"

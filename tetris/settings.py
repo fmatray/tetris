@@ -118,6 +118,7 @@ SETTINGS_PATH = os.path.join(DATA_DIR, "settings.json")
 MODEL_PATH = os.path.join(DATA_DIR, "ai_model.pt")
 LOG_PATH = os.path.join(DATA_DIR, "ai_training_log.json")
 REPLAY_PATH = os.path.join(DATA_DIR, "replay_pieces.json")
+DEBUG_LOG_PATH = os.path.join(DATA_DIR, "debug.log")
 
 # --- Keybindings --------------------------------------------------------
 # Human player keybindings: action name → pygame key constant.

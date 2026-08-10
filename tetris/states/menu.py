@@ -8,6 +8,7 @@ from typing import ClassVar
 
 import pygame
 
+from tetris.logger import configure_logging, get_logger
 from tetris.settings import (
     SETTINGS_PATH,
 )
@@ -23,15 +24,17 @@ class MenuState(MenuBase):
     """
 
     _OPTIONS = (
-        "Joueur",
-        "Son",
-        "Humain",
-        "IA",
-        "Démarrer le jeu",
-        "Leaderboard",
-        "Quitter",
+        "Joueur",          # 0
+        "Son",             # 1
+        "Générateur",      # 2
+        "Débogage",        # 3
+        "Humain",          # 4
+        "IA",              # 5
+        "Démarrer le jeu", # 6
+        "Leaderboard",     # 7
+        "Quitter",         # 8
     )
-    _toggle_indices = frozenset({0, 1})  # Joueur, Son
+    _toggle_indices = frozenset({0, 1, 2, 3})  # Joueur, Son, Générateur, Débogage
     _title = "TETRIS"
 
     _instructions = "Flèches: Navigation | Entrée: Valider | Échap: Quitter"
@@ -43,7 +46,8 @@ class MenuState(MenuBase):
         self.sound_enabled = True
         self.player = "Humain"
         self.mode = "Normal"
-        self.ai_speed = "normal"
+        self.piece_generator = "7bag"
+        self.debug = False
         self.ai_epsilon_decay = 0.999
         self.ai_epsilon_end = 0.1
         self.ai_lr = 1e-4
@@ -62,6 +66,7 @@ class MenuState(MenuBase):
 
         self.keybinds: dict[str, int] = dict(DEFAULT_KEYBINDS)
         self._load_settings()
+        configure_logging(self.debug)
 
     # --- Settings persistence -------------------------------------------
 
@@ -86,6 +91,8 @@ class MenuState(MenuBase):
         "ai_learn_per_action": "ai_learn_per_action",
         "ai_lookahead": "ai_lookahead",
         "ai_soft_drop": "ai_soft_drop",
+        "piece_generator": "piece_generator",
+        "debug": "debug",
     }
 
     def _load_settings(self) -> None:
@@ -113,7 +120,8 @@ class MenuState(MenuBase):
             with open(SETTINGS_PATH, "w") as f:
                 json.dump(data, f, indent=2)
         except OSError as e:
-            print(f"Settings save error: {e}")
+            logger = get_logger("menu")
+            logger.error("Settings save error: %s", e)
 
     # --- Hooks ----------------------------------------------------------
 
@@ -122,16 +130,25 @@ class MenuState(MenuBase):
             return self.player
         if i == 1:
             return "ON" if self.sound_enabled else "OFF"
+        if i == 2:
+            return "7-bag" if self.piece_generator == "7bag" else "Aléatoire"
+        if i == 3:
+            return "ON" if self.debug else "OFF"
         return ""
 
     def _is_disabled(self, i: int) -> bool:
-        return bool(i == 3 and self.player == "Humain" or i == 2 and self.player == "IA")
+        return bool(i == 5 and self.player == "Humain" or i == 4 and self.player == "IA")
 
     def _toggle(self, direction: int) -> None:
         if self.selection == 0:  # Joueur
             self.player = "IA" if self.player == "Humain" else "Humain"
         elif self.selection == 1:  # Son
             self.sound_enabled = not self.sound_enabled
+        elif self.selection == 2:  # Générateur
+            self.piece_generator = "7bag" if self.piece_generator == "random" else "random"
+        elif self.selection == 3:  # Débogage
+            self.debug = not self.debug
+            configure_logging(self.debug)
 
     def _save(self) -> None:
         self.save_settings()
@@ -142,27 +159,26 @@ class MenuState(MenuBase):
 
     def _on_select(self) -> State | None:
         sel = self.selection
-        if sel == 2:  # Humain sub-menu
+        if sel == 4:  # Humain sub-menu
             from tetris.states.human_menu import HumanMenuState
 
             return HumanMenuState(self.screen, self.font, self.audio, self)
-        if sel == 3:  # IA sub-menu
+        if sel == 5:  # IA sub-menu
             from tetris.states.ai_menu import AIMenuState
 
             return AIMenuState(self.screen, self.font, self.audio, self)
-        if sel == 4:  # Start
+        if sel == 6:  # Start
             from tetris.game.piece_provider import PieceProvider
             from tetris.states.game import GameState
 
             provider = PieceProvider(
-                mode="replay" if self.mode == "Replay" else "normal"
+                mode="replay" if self.mode == "Replay" else "normal",
+                generator=self.piece_generator,
             )
             if self.player == "IA":
                 from tetris.states.ai import AIState
 
-                # AI learning always uses normal mode — replay would feed
-                # a fixed piece sequence, defeating stochastic training.
-                ai_provider = PieceProvider(mode="normal")
+                ai_provider = PieceProvider(mode="normal", generator=self.piece_generator)
                 return AIState(
                     self.screen, self.font, self.audio, self.handicap, self.sound_enabled,
                     ai_provider, self.ai_speed, self,
@@ -180,15 +196,17 @@ class MenuState(MenuBase):
                     learn_per_action=self.ai_learn_per_action,
                     lookahead=self.ai_lookahead,
                     soft_drop=self.ai_soft_drop,
+                    debug=self.debug,
                 )
             return GameState(
-                self.screen, self.font, self.audio, self.handicap, self.sound_enabled, provider, self
+                self.screen, self.font, self.audio, self.handicap, self.sound_enabled, provider, self,
+                debug=self.debug,
             )
-        if sel == 5:  # Leaderboard
+        if sel == 7:  # Leaderboard
             from tetris.states.leaderboard import LeaderboardState
 
             return LeaderboardState(self.screen, self.font, self.audio, self)
-        if sel == 6:  # Quit
+        if sel == 8:  # Quit
             pygame.quit()
             sys.exit()
         return None

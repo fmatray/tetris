@@ -9,11 +9,11 @@ audio, particles) into states and drives ``handle_event`` / ``update``
 from __future__ import annotations
 
 import sys
-import traceback
 
 import pygame
 
 from tetris.audio import AudioManager
+from tetris.logger import configure_logging, get_logger
 from tetris.settings import SCREEN_HEIGHT, SCREEN_WIDTH, ensure_data_dir
 from tetris.states.base import State
 from tetris.states.menu import MenuState
@@ -26,6 +26,7 @@ class TetrisApp:
 
     def __init__(self) -> None:
         ensure_data_dir()
+        configure_logging(False)
         pygame.init()
         pygame.mixer.init()
         self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
@@ -37,14 +38,13 @@ class TetrisApp:
         self.state: State = MenuState(self.screen, self.font, self.audio)
 
     def run(self) -> None:
-        print("Starting Tetris... Please wait.")
-        print("Game window should be open now.")
+        logger = get_logger("app")
+        logger.info("Starting Tetris...")
         while True:
             try:
                 self._frame()
-            except Exception as e:  # noqa: BLE001  # top-level safety net
-                print(f"Runtime error in main loop: {e}")
-                traceback.print_exc()
+            except Exception:  # top-level safety net
+                logger.exception("Runtime error in main loop")
                 break
 
     def _frame(self) -> None:

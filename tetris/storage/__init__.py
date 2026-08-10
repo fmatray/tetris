@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from tetris.logger import get_logger
 from tetris.settings import HUMAN_STATS_PATH, LEADERBOARD_PATH, LEADERBOARD_SIZE
 
 
@@ -51,7 +52,7 @@ def save_score(name: str, score: int, level: int, lines: int) -> None:
     try:
         Path(LEADERBOARD_PATH).write_text(json.dumps(scores[:LEADERBOARD_SIZE], indent=4))
     except OSError as e:
-        print(f"Save error: {e}")
+        get_logger("storage").error("Save error: %s", e)
 
 
 def load_human_games() -> list[dict[str, Any]]:
@@ -84,4 +85,4 @@ def save_human_game(
     try:
         Path(HUMAN_STATS_PATH).write_text(json.dumps(games, indent=4))
     except OSError as e:
-        print(f"Human stats save error: {e}")
+        get_logger("storage").error("Human stats save error: %s", e)

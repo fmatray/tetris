@@ -15,8 +15,10 @@ import json
 import random
 from pathlib import Path
 
+from tetris.logger import get_logger
 from tetris.settings import REPLAY_PATH, SHAPES
 
+_logger = get_logger("piece_provider")
 
 class PieceProvider:
     """Controls tetromino spawning: random, recorded, or replayed.
@@ -35,10 +37,13 @@ class PieceProvider:
         mode: str = "normal",
         path: Path | str = REPLAY_PATH,
         allowed_types: list[str] | None = None,
+        generator: str = "random",  # "random" or "7bag"
     ) -> None:
         self.mode = mode
         self.path = Path(path)
         self.allowed_types: list[str] | None = allowed_types
+        self.generator = generator
+        self._bag: list[str] = []
         self._recorded: list[str] = []
         self._replay_queue: list[str] = []
         self._replay_idx = 0
@@ -58,14 +63,27 @@ class PieceProvider:
             self._recorded.append(piece_type)
             return piece_type
 
-        # Normal mode, or replay exhausted → random
+        # Normal mode, or replay exhausted → generator-based spawn
         pool = self.allowed_types if self.allowed_types is not None else list(SHAPES.keys())
-        piece_type = random.choice(pool)
+        if self.generator == "7bag":
+            piece_type = self._bag_next()
+        else:
+            piece_type = random.choice(pool)
         self._recorded.append(piece_type)
+        _logger.debug("Spawned %s | bag=%s", piece_type, self._bag)
         return piece_type
 
     def set_allowed_types(self, types: list[str]) -> None:
         self.allowed_types = types
+        self._bag = []  # force refill with new pool
+
+
+    def _bag_next(self) -> str:
+        pool = self.allowed_types if self.allowed_types is not None else list(SHAPES.keys())
+        if not self._bag:
+            self._bag = pool[:]
+            random.shuffle(self._bag)
+        return self._bag.pop()
 
     def save(self) -> None:
         """Persist the recorded piece sequence to disk."""
@@ -79,6 +97,11 @@ class PieceProvider:
         if self.mode != "replay":
             return 0
         return max(0, len(self._replay_queue) - self._replay_idx)
+
+    @property
+    def bag_remaining(self) -> list[str]:
+        """Remaining pieces in the current 7-bag (empty if random or bag exhausted)."""
+        return self._bag[:]
 
     # --- Internal -----------------------------------------------------
 

@@ -36,6 +36,7 @@ from tetris.audio import AudioManager
 from tetris.game.board import Board
 from tetris.game.piece_provider import PieceProvider
 from tetris.game.tetromino import Tetromino
+from tetris.logger import get_logger
 from tetris.settings import (
     AI_ACTION_DELAY_MS,
     AI_MODEL_SAVE_INTERVAL,
@@ -56,6 +57,8 @@ from tetris.visuals.fonts import LINE_HEIGHT_SMALL
 from tetris.visuals.particles import ParticleSystem
 
 NUM_ROTATIONS = 4
+
+logger = get_logger("ai")
 
 
 class AIState(GameState):
@@ -92,11 +95,12 @@ class AIState(GameState):
         learn_per_action: int = LEARN_PER_ACTION,
         lookahead: bool = True,
         soft_drop: bool = True,
+        debug: bool = False,
     ) -> None:
         # Curriculum: restrict piece pool BEFORE super().__init__() spawns pieces
         if curriculum and ai_mode == "learning" and piece_provider is not None:
             piece_provider.set_allowed_types(["O"])
-        super().__init__(screen, font, audio, handicap, sound_enabled, piece_provider, menu)
+        super().__init__(screen, font, audio, handicap, sound_enabled, piece_provider, menu, debug=debug)
         self.agent = DQNAgent(
             epsilon_decay=epsilon_decay,
             epsilon_end=epsilon_end,
@@ -133,7 +137,7 @@ class AIState(GameState):
             try:
                 self.agent.load(MODEL_PATH)
             except (OSError, RuntimeError, KeyError) as e:
-                print(f"Failed to load AI model: {e}")
+                logger.error("Failed to load AI model: %s", e)
 
         # In playing mode: always greedy (no exploration, no learning)
         if self.ai_mode == "playing":
@@ -396,6 +400,7 @@ class AIState(GameState):
                 epsilon=self.agent.epsilon,
                 loss=self.agent.last_loss,
             )
+            logger.debug("Episode %d ended | score=%d, eps=%.4f", self.episode, self.stats.score, self.agent.epsilon)
             # Decay epsilon once per episode (not per transition)
             self.agent.decay_epsilon()
 
@@ -406,7 +411,7 @@ class AIState(GameState):
                 try:
                     self.agent.save(MODEL_PATH)
                 except (OSError, RuntimeError) as e:
-                    print(f"Failed to save AI model: {e}")
+                    logger.error("Failed to save AI model: %s", e)
             # Flush remaining n-step transitions before new episode
             self.agent.flush_n_step()
 
@@ -443,6 +448,7 @@ class AIState(GameState):
             self._curriculum_level += 1
             self._curriculum_types = CURRICULUM_ORDER[: 1 + self._curriculum_level]
             self.pieces.set_allowed_types(self._curriculum_types)
+            logger.debug("Curriculum level %d, pieces=%s", self._curriculum_level, self._curriculum_types)
             return True
         return False
 
@@ -568,7 +574,7 @@ class AIState(GameState):
             try:
                 self.agent.save(MODEL_PATH)
             except (OSError, RuntimeError) as e:
-                print(f"Failed to save AI model: {e}")
+                logger.error("Failed to save AI model: %s", e)
             return self._return_to_menu()
         # Ignore other key input — AI controls the game
         return None

@@ -25,7 +25,7 @@ tetris/
 │   │   ├── __init__.py
 │   │   ├── tetromino.py         # Modèle de pièce
 │   │   ├── board.py             # Grille, collisions, lignes, handicap, hard drop
-│   │   ├── piece_provider.py    # Fournisseur de pièces (aléatoire / replay)
+│   │   ├── piece_provider.py    # Fournisseur de pièces (Aléatoire / 7-Bag / Replay)
 │   │   ├── scoring.py           # Règles de score (bonus multi-lignes)
 │   │   └── stats.py             # Score, lignes, niveau
 │   ├── ai/                      # Apprentissage par renforcement (V-network DQN)

@@ -15,6 +15,7 @@ from tetris.game.board import Board
 from tetris.game.piece_provider import PieceProvider
 from tetris.game.stats import GameStats
 from tetris.game.tetromino import Tetromino
+from tetris.logger import get_logger
 from tetris.settings import (
     BLOCK_SIZE,
     BOARD_OFFSET_X,
@@ -27,6 +28,7 @@ from tetris.states.base import State
 from tetris.visuals.particles import ParticleSystem
 from tetris.visuals.renderer import Renderer
 
+_logger = get_logger("game")
 
 class GameState(State):
     """Active gameplay: spawns pieces, processes input, advances the board."""
@@ -40,10 +42,12 @@ class GameState(State):
         sound_enabled: bool = True,
         piece_provider: PieceProvider | None = None,
         menu: MenuState | None = None,
+        debug: bool = False,
     ) -> None:
         self.screen, self.font, self.audio = screen, font, audio
         self.audio.enabled = sound_enabled
         self.menu = menu
+        self.debug = debug
         self.renderer = Renderer(screen, font)
         self.board = Board()
         self.board.apply_handicap(handicap)
@@ -111,6 +115,7 @@ class GameState(State):
     def _lock_and_spawn(self) -> tuple[int, list]:
         """Lock current piece, update stats, spawn next. Returns (cleared, rows_data)."""
         cleared, rows_data = self.board.lock_tetromino(self.current_piece)
+        locked_type = self.current_piece.type
         self.stats.on_piece_locked(cleared)
         if cleared > 0:
             self.audio.play(f"clear_{cleared}")
@@ -122,6 +127,7 @@ class GameState(State):
         self.down_pressed = False
         if not self.board.is_valid_move(self.current_piece):
             self.game_over = True
+        _logger.debug("Locked %s, cleared %d", locked_type, cleared)
         return cleared, rows_data
 
     # --- Event / update / render ----------------------------------------
@@ -160,6 +166,7 @@ class GameState(State):
             self._tick(particles)
             self.drop_time = 0
         if self.game_over:
+            _logger.debug("Game over | score=%d, lines=%d, level=%d", self.stats.score, self.stats.total_lines, self.stats.level)
             self.pieces.save()
             from tetris.states.game_over import GameOverState
 

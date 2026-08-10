@@ -31,9 +31,10 @@ from tetris.settings import (
     NEXT_PANEL_Y,
     SCREEN_HEIGHT,
     SCREEN_WIDTH,
+    SHAPES_COLORS,
     WHITE,
 )
-from tetris.visuals.fonts import get_large_font
+from tetris.visuals.fonts import LINE_HEIGHT_SMALL, get_large_font
 from tetris.visuals.particles import Particle, ParticleSystem
 
 if TYPE_CHECKING:
@@ -61,6 +62,8 @@ class Renderer:
         self._draw_text(f"LEVEL: {game.stats.level}", HUD_POSITIONS["level"])
         self._draw_text("NEXT:", HUD_POSITIONS["next"])
         self.draw_next_piece(game.next_piece)
+        if game.debug and game.pieces.generator == "7bag":
+            self._draw_debug_bag(game)
         if game.paused:
             pause_text = get_large_font().render("PAUSE", True, WHITE)
             self.screen.blit(
@@ -72,6 +75,21 @@ class Renderer:
     def _draw_text(self, text: str, pos: tuple[int, int]) -> None:
         surf = self.font.render(text, True, WHITE)
         self.screen.blit(surf, pos)
+
+    def _draw_debug_bag(self, game: GameState) -> None:
+        """Draw remaining 7-bag pieces as colored blocks right of the next-piece panel."""
+        bag = game.pieces.bag_remaining
+        x = NEXT_PANEL_X + 4 * BLOCK_SIZE + 20
+        y = NEXT_PANEL_Y
+        self._draw_text("SAC:", (x, y))
+        y += LINE_HEIGHT_SMALL
+        for piece_type in bag:
+            color = SHAPES_COLORS[piece_type]
+            rect = pygame.Rect(x, y, BLOCK_SIZE, BLOCK_SIZE)
+            pygame.draw.rect(self.screen, color, rect)
+            letter = self.font.render(piece_type, True, WHITE)
+            self.screen.blit(letter, (x + 2, y + 2))
+            y += BLOCK_SIZE + 2
 
     def draw_grid(self, board: Board) -> None:
         for y in range(BOARD_HEIGHT):

@@ -225,6 +225,7 @@ optional dependency.
 | `ai_lookahead` | ON | ON/OFF | toggle |
 | `ai_soft_drop` | ON | ON/OFF | toggle |
 
+
 These are configurable in the **AI submenu** and persisted to
 `settings.json`.
 

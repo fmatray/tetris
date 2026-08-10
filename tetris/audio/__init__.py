@@ -3,6 +3,8 @@
 import numpy as np
 import pygame
 
+from tetris.logger import get_logger
+
 
 class AudioManager:
     """Generates and plays short procedural sounds.
@@ -77,7 +79,7 @@ class AudioManager:
             combined = np.concatenate(buffers, axis=0)
             return pygame.sndarray.make_sound(combined)
         except (ValueError, pygame.error) as e:
-            print(f"Audio error: {e}")
+            get_logger("audio").error("Audio error: %s", e)
             return pygame.mixer.Sound(
                 buffer=np.zeros((self._SAMPLE_RATE, 2), dtype=np.int16)
             )

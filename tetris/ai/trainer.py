@@ -11,6 +11,7 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 
+from tetris.logger import get_logger
 from tetris.settings import LOG_PATH
 
 
@@ -72,7 +73,7 @@ class TrainingLog:
         try:
             Path(self.path).write_text(json.dumps(self.episodes, indent=2))
         except OSError as e:
-            print(f"Training log save error: {e}")
+            get_logger("trainer").error("Training log save error: %s", e)
 
     # --- Summary stats ---------------------------------------------------
 

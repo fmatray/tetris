@@ -99,6 +99,7 @@ MIT License - Libre d'utilisation et de modification
 ## Références
 
 - [Tetris Wiki](https://tetris.wiki) — Guide exhaustif sur mécaniques, SRS et histoire du jeu.
+- [Harddrop tetris wiki](https://harddrop.com/wiki/Tetris_Wiki) - Un autre wiki sur tetris 
 - [Pygame CE](https://pygame-ce.org) — Documentation de l'extension Community Edition de Pygame.
 - [PyTorch Documentation](https://pytorch.org/docs/) — Référence pour l'implémentation du réseau de neurones DQN.
 - [Deep Q-Learning (Nature)](https://www.nature.com/articles/nature14236) — Article fondateur sur les réseaux DQN.
