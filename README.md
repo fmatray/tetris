@@ -26,9 +26,12 @@ Un jeu Tetris complet développé en Python avec Pygame, incluant des effets vis
 - ✅ **Séquence Finale** : Mélodie dramatique descendante et effets sonores de glitch lors du Game Over.
 - ✅ Option pour activer/désactiver le son.
 
-### Expérience utilisateur
+### Débogage
 
-- ✅ Menu de démarrage avec sélection du joueur (Humain/IA), du son, et sous-menus dédiés.
+- ✅ **Mode Débogage** : Option activable dans le menu principal (Débogage ON/OFF). Journalise les événements de jeu (apparition de pièces, verrouillage, fin de partie, épisodes IA, curriculum) dans `data/debug.log` via Python `logging`. Visualise le contenu restant du sac 7-bag (pièces colorées avec lettres) à droite de l'aperçu de la prochaine pièce.
+
+### Expérience utilisateur
+- ✅ Menu de démarrage avec sélection du joueur (Humain/IA), du son, du générateur (Aléatoire/7-bag), du débogage (ON/OFF), et sous-menus dédiés.
 - ✅ **Sous-menu Humain** : Mode (Normal/Replay), Handicap (0-5), Touches (touches configurables), Statistiques (page de statistiques du joueur humain).
 - ✅ **Sous-menu IA** : Mode (Apprentissage/Jeu), Vitesse (normal/rapide), Apprentissage (13 hyperparamètres DQN : Epsilon decay, Epsilon fin, Learning rate, Gamma, Batch size, Buffer size, Curriculum, Fréq. curriculum, Epsilon curr., Warm-start, Maj. par pièce, Look-ahead, Soft-drop — configurables via ◄ ►, persistés dans `settings.json`, reset aux valeurs par défaut), Statistiques (tableau + graphique score/épisode), Réinitialiser IA, Retour.
 - ✅ **Touches configurables** : 7 actions (gauche, droite, rotation horaire/anti-horaire, chute douce, chute rapide, pause) reconfigurables via le menu. Détection de conflits et touches réservées. Persistance dans `settings.json`.

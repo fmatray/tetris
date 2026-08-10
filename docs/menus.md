@@ -7,6 +7,7 @@ Menu principal
 ├── Joueur                        [toggle ◄ ►]     Humain ↔ IA
 ├── Son                           [toggle ◄ ►]     ON ↔ OFF
 ├── Générateur                    [toggle ◄ ►]     Aléatoire ↔ 7-bag
+├── Débogage                      [toggle ◄ ►]     ON ↔ OFF
 ├── Humain                        [ENTER]          (grisé si Joueur=IA)
 │   └── Mode                      [toggle ◄ ►]     Normal ↔ Replay
 │       Handicap                  [toggle ◄ ►]     0–5

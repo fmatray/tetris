@@ -51,6 +51,7 @@ MenuState (root, owns settings)
 | `tetris/visuals/` | `Renderer`, `ParticleSystem`, leaderboard/graph views |
 | `tetris/audio/` | `AudioManager` — procedural NumPy sine-wave synthesis |
 | `tetris/storage/` | JSON load/save for leaderboard and human game history |
+| `tetris/logger.py` | Central logging module — `configure_logging()`, `get_logger()` |
 | `tests/` | Pytest suite for game logic and AI components |
 | `docs/` | Technical documentation (AI design, Architecture, etc.) |
 | `data/` | All runtime-generated files (gitignored) |
@@ -88,6 +89,8 @@ python -m tetris.verify_training
 - **AI exclusion from human stats**: `save_human_game()` is only called in `GameOverState._handle_name_event()`. `AIState` has its own `_on_episode_end()` and never creates `GameOverState` — architectural guarantee that AI games never pollute human stats.
 - **AI gameplay**: `AIState` inherits `GameState`, replaces keyboard input with per-candidate V-function evaluation. Candidate generation: soft-drop BFS (with SRS wall kicks) or hard-drop; 2-piece look-ahead simulates best next-piece placement. `DQNAgent.select_action(candidate_states)` evaluates V per valid placement, picks max. Learning mode does `learn_per_action` (default 2) gradient updates per locked piece; playing mode sets epsilon=0 (greedy), skips transition storage/learning/episode logging.
 - **Rendering**: `Renderer` is pure presentation — takes game state, draws to surface. `ParticleSystem` handles physics-based effects. Fonts are proportional (Arial), so use explicit pixel-positioned columns, not format-string alignment (`f"{x:<10}"` won't align).
+- **Logging**: Use `from tetris.logger import get_logger` and `logger = get_logger(__name__)` at module level. `logger.debug()` calls are no-ops when debug is OFF (level=WARNING); they write to `data/debug.log` when debug is ON (level=DEBUG). `logger.error()` always writes. Never use `print()` in game modules — only in CLI scripts (`verify_training.py`).
+- **Debug mode**: Toggled via the "Débogage" menu option (index 3 in `MenuState._OPTIONS`). When ON, `configure_logging(True)` sets DEBUG level and `GameState.debug=True` enables 7-bag visualization in the renderer. The `debug` flag is read at construction time, not live from menu.
 - **Naming**: `PascalCase` classes, `snake_case` functions/variables, `UPPER_CASE` constants in `settings.py`.
 
 ## Important Files
@@ -106,6 +109,7 @@ python -m tetris.verify_training
 | `tetris/ai/network.py` | `DQNetwork` — 17→128→64→1 V-network MLP |
 | `tetris/verify_training.py` | Headless training validation script |
 | `data/settings.json` | Persisted menu settings + keybinds |
+| `tetris/logger.py` | Central logging — `configure_logging(debug)`, `get_logger(name)` |
 | `requirements.txt` | Dependencies: pygame>=2.5.0, numpy>=1.24.0, torch>=2.0, matplotlib>=3.7.0 |
 
 ## Runtime/Tooling Preferences
@@ -152,14 +156,15 @@ All in `data/` (gitignored via blanket `data/` rule):
 
 | File | Path constant | Format | Purpose |
 |---|---|---|---|
-| `settings.json` | `SETTINGS_PATH` | JSON | Menu prefs, AI hyperparams, keybinds |
+| `settings.json` | `SETTINGS_PATH` | JSON | Menu prefs, AI hyperparams, keybinds, debug flag |
 | `leaderboard.json` | `LEADERBOARD_PATH` | JSON | Top 10 scores (capped) |
 | `human_stats.json` | `HUMAN_STATS_PATH` | JSON | Unbounded human game history |
 | `ai_model.pt` | `MODEL_PATH` | PyTorch | DQN weights + optimizer + epsilon |
 | `ai_training_log.json` | `LOG_PATH` | JSON | Per-episode training metrics |
 | `replay_pieces.json` | `REPLAY_PATH` | JSON | Stored piece sequences for Replay mode |
+| `debug.log` | `DEBUG_LOG_PATH` | Text | Debug logging output (when debug ON) |
 
-**`settings.json` schema**: `player` ("Humain"/"IA"), `mode` ("Normal"/"Replay"), `handicap` (0-5), `sound` (bool), `ai_speed` ("normal"/"fast"), `ai_epsilon_decay` (float), `ai_epsilon_end` (float), `ai_lr` (float), `ai_gamma` (float), `ai_batch_size` (int), `ai_buffer_size` (int), `ai_mode` ("learning"/"playing"), `ai_curriculum` (bool), `ai_curriculum_freq` (int), `ai_curriculum_epsilon` (str), `ai_warm_start` (bool), `ai_learn_per_action` (int), `ai_lookahead` (bool), `ai_soft_drop` (bool), `keybinds` (dict: action→pygame keycode).
+**`settings.json` schema**: `player` ("Humain"/"IA"), `mode` ("Normal"/"Replay"), `handicap` (0-5), `sound` (bool), `debug` (bool), `ai_speed` ("normal"/"fast"), `ai_epsilon_decay` (float), `ai_epsilon_end` (float), `ai_lr` (float), `ai_gamma` (float), `ai_batch_size` (int), `ai_buffer_size` (int), `ai_mode` ("learning"/"playing"), `ai_curriculum` (bool), `ai_curriculum_freq` (int), `ai_curriculum_epsilon` (str), `ai_warm_start` (bool), `ai_learn_per_action` (int), `ai_lookahead` (bool), `ai_soft_drop` (bool), `keybinds` (dict: action→pygame keycode).
 
 ## DQN AI Specifics
 

@@ -20,6 +20,7 @@ tetris/
 │   ├── __init__.py              # API publique (run)
 │   ├── app.py                   # TetrisApp : boucle principale et FSM
 │   ├── settings.py              # Constantes et configurations
+│   ├── logger.py               # Logging central (configure_logging, get_logger)
 │   ├── verify_training.py       # Validation headless de l'entraînement IA
 │   ├── game/                    # Logique métier (sans pygame)
 │   │   ├── __init__.py
@@ -78,6 +79,7 @@ tetris/
 │   ├── human_stats.json         # Historique des parties humaines
 │   ├── ai_model.pt              # Poids du modèle DQN
 │   ├── ai_training_log.json     # Journal d'entraînement
+│   ├── debug.log                # Journal de débogage (mode débogage ON)
 │   └── replay_pieces.json       # Séquences de pièces (mode replay)
 ├── requirements.txt             # Dépendances (pygame, numpy, torch)
 └── README.md                    # Documentation du projet
@@ -109,6 +111,14 @@ Chaque module est petit et fait une seule chose. `main.py` ne contient que l'app
 | **L** — Liskov Substitution | Tous les états héritent de `State` avec la même signature `handle_event` / `update` / `draw`. `TetrisApp` les dispatche polymorphiquement. |
 | **I** — Interface Segregation | Les `__init__.py` de chaque package n'exposent que le strict nécessaire (ex. `game/` exporte `Board`, `Tetromino`, `GameStats`, `ScoreEngine`). |
 | **D** — Dependency Inversion | Les états reçoivent `AudioManager` et `Board` par injection de dépendances (constructeur), jamais par construction interne. `Renderer` lit l'état du jeu sans le muter. |
+
+### Logging et mode débogage
+
+Le module `tetris/logger.py` centralise la journalisation via Python `logging`. `configure_logging(debug)` configure le logger racine `tetris` :
+- **Debug OFF** (défaut) : niveau WARNING — seul les erreurs sont écrites dans `data/debug.log`.
+- **Debug ON** : niveau DEBUG — tous les messages (apparition de pièces, verrouillage, fin de partie, épisodes IA, curriculum) sont journalisés.
+
+Le mode débogage est activable depuis le menu principal (option Débogage ON/OFF). Il active également la visualisation du sac 7-bag (pièces restantes) à droite de l'aperçu de la prochaine pièce.
 
 ### SLAP (Single Layer of Abstraction)
 
