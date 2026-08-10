@@ -56,6 +56,7 @@ class GameState(State):
         self.next_piece = Tetromino(self.pieces.next_type())
         self.stats = GameStats()
         self.drop_time = 0
+        self.current_speed = DROP_BASE
         self.game_over = False
         self.paused = False
         self.down_pressed = False
@@ -162,6 +163,7 @@ class GameState(State):
             if self.down_pressed
             else DROP_BASE * (DROP_DECAY ** self.stats.level)
         )
+        self.current_speed = speed
         if self.drop_time / 1000 >= speed:
             self._tick(particles)
             self.drop_time = 0

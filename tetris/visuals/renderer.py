@@ -57,13 +57,20 @@ class Renderer:
         self.screen.fill(BLACK)
         self.draw_grid(game.board)
         self.draw_tetromino(game.current_piece)
-        self._draw_text(f"SCORE: {game.stats.score}", HUD_POSITIONS["score"])
+        self._draw_text(f"TETROMINOS: {game.stats.piece_count}", HUD_POSITIONS["tetrominos"])
         self._draw_text(f"LINES: {game.stats.total_lines}", HUD_POSITIONS["lines"])
         self._draw_text(f"LEVEL: {game.stats.level}", HUD_POSITIONS["level"])
+        if game.debug:
+            self._draw_text(f"SPEED: {int(game.current_speed * 1000)}ms", HUD_POSITIONS["speed"])
         self._draw_text("NEXT:", HUD_POSITIONS["next"])
         self.draw_next_piece(game.next_piece)
         if game.debug and game.pieces.generator == "7bag":
             self._draw_debug_bag(game)
+        # Bottom-left: mode and generator
+        mode = game.menu.mode if game.menu else "Normal"
+        gen = "7-bag" if game.pieces.generator == "7bag" else "Aléatoire"
+        self._draw_text(f"MODE: {mode}", HUD_POSITIONS["mode"])
+        self._draw_text(f"GÉNÉRATEUR: {gen}", HUD_POSITIONS["generator"])
         if game.paused:
             pause_text = get_large_font().render("PAUSE", True, WHITE)
             self.screen.blit(
@@ -82,8 +89,8 @@ class Renderer:
         x = NEXT_PANEL_X + 7 * BLOCK_SIZE + 20
         y = HUD_POSITIONS["next"][1]
         self._draw_text(f"SAC ({len(bag)}):", (x, y))
-        x += 60
-        for piece_type in bag:
+        y += 60
+        for piece_type in bag[::-1]:
             color = SHAPES_COLORS[piece_type]
             rect = pygame.Rect(x, y, BLOCK_SIZE, BLOCK_SIZE)
             pygame.draw.rect(self.screen, color, rect)

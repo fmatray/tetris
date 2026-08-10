@@ -89,11 +89,14 @@ NEXT_PANEL_Y = 100
 
 # HUD text positions
 HUD_POSITIONS = {
-    "score": (20, 20),
+    "tetrominos": (20, 20),
     "lines": (20, 60),
     "level": (20, 100),
+    "speed": (20, 140),
     "next": (570, 50),
-    "ai_stats": (570, 180), 
+    "ai_stats": (570, 180),
+    "mode": (20, 700),
+    "generator": (20, 740),
 }
 
 # Game-over animation
