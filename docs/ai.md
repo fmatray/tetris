@@ -417,26 +417,6 @@ first draw. Any key returns to the AI submenu.
 - [x] **Step 18**: DT-20 feature set (17-dim engineered features replace 220-dim raw board)
 - [x] **Step 19**: PBRS with Dellacherie board value potential
 - [ ] **Step 20**: Compare DQN vs NEAT approaches
-
-## 12. Dependencies
-
-```
-# requirements-ai.txt (optional)
-torch>=2.0
-matplotlib>=3.7.0
-```
-
-Install with:
-
-```bash
-pip install -r requirements-ai.txt
-```
-
-The base game remains playable without PyTorch. If the user selects
-**Joueur : IA** without PyTorch installed, display a message:
-
-> *"IA nécessite PyTorch. Installez avec `pip install torch`."*
-
 ---
 
 ## Summary
