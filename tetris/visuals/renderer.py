@@ -81,7 +81,7 @@ class Renderer:
         bag = game.pieces.bag_remaining
         x = NEXT_PANEL_X + 7 * BLOCK_SIZE + 20
         y = NEXT_PANEL_Y
-        self._draw_text("SAC:", (x, y))
+        self._draw_text(f"SAC ({len(bag)}):", (x, y))
         y += LINE_HEIGHT_SMALL
         for piece_type in bag:
             color = SHAPES_COLORS[piece_type]
