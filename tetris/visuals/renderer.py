@@ -34,7 +34,7 @@ from tetris.settings import (
     SHAPES_COLORS,
     WHITE,
 )
-from tetris.visuals.fonts import LINE_HEIGHT_SMALL, get_large_font
+from tetris.visuals.fonts import get_large_font
 from tetris.visuals.particles import Particle, ParticleSystem
 
 if TYPE_CHECKING:
@@ -82,14 +82,14 @@ class Renderer:
         x = NEXT_PANEL_X + 7 * BLOCK_SIZE + 20
         y = NEXT_PANEL_Y
         self._draw_text(f"SAC ({len(bag)}):", (x, y))
-        y += LINE_HEIGHT_SMALL
+        x += 60
         for piece_type in bag:
             color = SHAPES_COLORS[piece_type]
             rect = pygame.Rect(x, y, BLOCK_SIZE, BLOCK_SIZE)
             pygame.draw.rect(self.screen, color, rect)
             letter = self.font.render(piece_type, True, WHITE)
             self.screen.blit(letter, (x + 2, y + 2))
-            y += BLOCK_SIZE + 2
+            x += BLOCK_SIZE + 2
 
     def draw_grid(self, board: Board) -> None:
         for y in range(BOARD_HEIGHT):
