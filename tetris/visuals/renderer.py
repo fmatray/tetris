@@ -80,7 +80,7 @@ class Renderer:
         """Draw remaining 7-bag pieces as colored blocks right of the next-piece panel."""
         bag = game.pieces.bag_remaining
         x = NEXT_PANEL_X + 7 * BLOCK_SIZE + 20
-        y = NEXT_PANEL_Y
+        y = HUD_POSITIONS["next"][1]
         self._draw_text(f"SAC ({len(bag)}):", (x, y))
         x += 60
         for piece_type in bag:
