@@ -30,9 +30,15 @@ class PieceProvider:
         File path for the recorded/replayed piece sequence.
     """
 
-    def __init__(self, mode: str = "normal", path: Path | str = REPLAY_PATH) -> None:
+    def __init__(
+        self,
+        mode: str = "normal",
+        path: Path | str = REPLAY_PATH,
+        allowed_types: list[str] | None = None,
+    ) -> None:
         self.mode = mode
         self.path = Path(path)
+        self.allowed_types: list[str] | None = allowed_types
         self._recorded: list[str] = []
         self._replay_queue: list[str] = []
         self._replay_idx = 0
@@ -43,17 +49,23 @@ class PieceProvider:
     # --- Public API ----------------------------------------------------
 
     def next_type(self) -> str:
-        """Return the next piece type to spawn."""
         if self.mode == "replay" and self._replay_idx < len(self._replay_queue):
             piece_type = self._replay_queue[self._replay_idx]
             self._replay_idx += 1
+            # Curriculum: skip pieces outside allowed_types
+            if self.allowed_types is not None and piece_type not in self.allowed_types:
+                return self.next_type()
             self._recorded.append(piece_type)
             return piece_type
 
         # Normal mode, or replay exhausted → random
-        piece_type = random.choice(list(SHAPES.keys()))
+        pool = self.allowed_types if self.allowed_types is not None else list(SHAPES.keys())
+        piece_type = random.choice(pool)
         self._recorded.append(piece_type)
         return piece_type
+
+    def set_allowed_types(self, types: list[str]) -> None:
+        self.allowed_types = types
 
     def save(self) -> None:
         """Persist the recorded piece sequence to disk."""

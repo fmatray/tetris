@@ -50,8 +50,14 @@ class MenuState(MenuBase):
         self.ai_gamma = 0.97
         self.ai_batch_size = 64
         self.ai_buffer_size = 50_000
-        self.ai_target_sync_steps = 500
         self.ai_mode = "learning"  # "learning" or "playing"
+        self.ai_curriculum = False
+        self.ai_curriculum_freq = 50
+        self.ai_curriculum_epsilon = "reset"
+        self.ai_warm_start = True
+        self.ai_learn_per_action = 2
+        self.ai_lookahead = True
+        self.ai_soft_drop = True
         from tetris.settings import DEFAULT_KEYBINDS
 
         self.keybinds: dict[str, int] = dict(DEFAULT_KEYBINDS)
@@ -72,8 +78,14 @@ class MenuState(MenuBase):
         "ai_gamma": "ai_gamma",
         "ai_batch_size": "ai_batch_size",
         "ai_buffer_size": "ai_buffer_size",
-        "ai_target_sync_steps": "ai_target_sync_steps",
         "ai_mode": "ai_mode",
+        "ai_curriculum": "ai_curriculum",
+        "ai_curriculum_freq": "ai_curriculum_freq",
+        "ai_curriculum_epsilon": "ai_curriculum_epsilon",
+        "ai_warm_start": "ai_warm_start",
+        "ai_learn_per_action": "ai_learn_per_action",
+        "ai_lookahead": "ai_lookahead",
+        "ai_soft_drop": "ai_soft_drop",
     }
 
     def _load_settings(self) -> None:
@@ -148,17 +160,26 @@ class MenuState(MenuBase):
             if self.player == "IA":
                 from tetris.states.ai import AIState
 
+                # AI learning always uses normal mode — replay would feed
+                # a fixed piece sequence, defeating stochastic training.
+                ai_provider = PieceProvider(mode="normal")
                 return AIState(
                     self.screen, self.font, self.audio, self.handicap, self.sound_enabled,
-                    provider, self.ai_speed, self,
+                    ai_provider, self.ai_speed, self,
                     epsilon_decay=self.ai_epsilon_decay,
                     epsilon_end=self.ai_epsilon_end,
                     lr=self.ai_lr,
                     gamma=self.ai_gamma,
                     batch_size=self.ai_batch_size,
                     buffer_size=self.ai_buffer_size,
-                    target_sync_steps=self.ai_target_sync_steps,
                     ai_mode=self.ai_mode,
+                    curriculum=self.ai_curriculum,
+                    curriculum_freq=self.ai_curriculum_freq,
+                    curriculum_epsilon=self.ai_curriculum_epsilon,
+                    warm_start=self.ai_warm_start,
+                    learn_per_action=self.ai_learn_per_action,
+                    lookahead=self.ai_lookahead,
+                    soft_drop=self.ai_soft_drop,
                 )
             return GameState(
                 self.screen, self.font, self.audio, self.handicap, self.sound_enabled, provider, self

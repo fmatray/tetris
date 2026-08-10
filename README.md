@@ -30,12 +30,12 @@ Un jeu Tetris complet développé en Python avec Pygame, incluant des effets vis
 
 - ✅ Menu de démarrage avec sélection du joueur (Humain/IA), du son, et sous-menus dédiés.
 - ✅ **Sous-menu Humain** : Mode (Normal/Replay), Handicap (0-5), Touches (touches configurables), Statistiques (page de statistiques du joueur humain).
-- ✅ **Sous-menu IA** : Mode (Apprentissage/Jeu), Vitesse (normal/rapide), Apprentissage (hyperparamètres DQN : Epsilon decay, Epsilon fin, Learning rate, Gamma, Batch size, Buffer size, Target sync — configurables via ◄ ►, persistés dans `settings.json`, reset aux valeurs par défaut), Statistiques (tableau + graphique score/épisode), Réinitialiser IA, Retour.
+- ✅ **Sous-menu IA** : Mode (Apprentissage/Jeu), Vitesse (normal/rapide), Apprentissage (13 hyperparamètres DQN : Epsilon decay, Epsilon fin, Learning rate, Gamma, Batch size, Buffer size, Curriculum, Fréq. curriculum, Epsilon curr., Warm-start, Maj. par pièce, Look-ahead, Soft-drop — configurables via ◄ ►, persistés dans `settings.json`, reset aux valeurs par défaut), Statistiques (tableau + graphique score/épisode), Réinitialiser IA, Retour.
 - ✅ **Touches configurables** : 7 actions (gauche, droite, rotation horaire/anti-horaire, chute douce, chute rapide, pause) reconfigurables via le menu. Détection de conflits et touches réservées. Persistance dans `settings.json`.
 - ✅ Saisie du nom (15 caractères max) en fin de partie.
 - ✅ Leaderboard top 10 persistant (JSON).
 - ✅ Retour automatique au menu principal après le leaderboard.
-- ✅ **Joueur IA (DQN)** : Mode apprentissage par renforcement (Deep Q-Learning). L'IA apprend à jouer de manière autonome, à vitesse humaine, et affiche ses statistiques d'apprentissage en temps réel : paramètres d'entraînement (mode, vitesse, épisode, epsilon, decay, perte) et tableau de statistiques (pièces, lignes, score, niveau — courant, total, meilleur, moyenne, 100 derniers, tendance ↑/↓/→). Placement BFS avec minimisation des trous. Paramètres ε configurables (decay, fin) persistés dans `settings.json`. Mode Jeu (greedy, sans apprentissage) ou Apprentissage (exploration ε-greedy).
+- ✅ **Joueur IA (V-network DQN)** : Mode apprentissage par renforcement (Deep Q-Learning). L'IA apprend à jouer de manière autonome, à vitesse humaine, et affiche ses statistiques d'apprentissage en temps réel : paramètres d'entraînement (mode, vitesse, épisode, epsilon, decay, perte, look-ahead, soft-drop, maj/pièce) et tableau de statistiques (pièces, lignes, score, niveau — courant, total, meilleur, moyenne, 100 derniers, tendance ↑/↓/→). Évaluation par candidat (V-function) avec features DT-20 normalisées, PBRS (Dellacherie, scale 0.1), Prioritized Experience Replay, n-step returns (3-step), soft-drop BFS avec SRS wall kicks, 2-piece look-ahead. Paramètres ε configurables (decay, fin) persistés dans `settings.json`. Mode Jeu (greedy, sans apprentissage) ou Apprentissage (exploration ε-greedy).
 
 ## Installation
 
@@ -85,7 +85,7 @@ Le projet repose sur une architecture modulaire et extensible :
 - **Système de Particules** : Moteur d'effets visuels gérant la physique (gravité, friction) et le cycle de vie des particules pour des explosions dynamiques.
 - **Rendu Isolé** : Classe `Renderer` dédiée pour séparer la logique de mise à jour du moteur graphique.
 - **Persistance JSON** : Leaderboard stocké dans `leaderboard.json`, trié par score décroissant, incluant le nom, le score, le niveau, les lignes effacées et la date.
-- **Apprentissage par Renforcement (Double DQN)** : Agent Deep Q-Network implémenté avec PyTorch. L'IA apprend en jouant de manière autonome : exploration ε-greedy (decay et fin configurables), experience replay (buffer 50 000), Double DQN (online sélectionne, target évalue), target network (sync toutes les 500 étapes). L'état du plateau est encodé en vecteur de 220 features (grille 200 + pièce courante 7 + pièce suivante 7 + orientation 4 + position 2). Les macro-actions (colonne × rotation) sont exécutées par BFS soft-drop avec minimisation des trous. La récompense pénalise les nouveaux trous (delta), la hauteur et l'irrégularité. Le modèle, les statistiques et les paramètres sont sauvegardés entre les sessions (`ai_model.pt`, `ai_training_log.json`, `settings.json`).
+- **Apprentissage par Renforcement (V-network DQN)** : Agent V-network DQN implémenté avec PyTorch. L'IA apprend en jouant de manière autonome : évaluation par candidat (V-function, features DT-20 17-dim normalisées), exploration ε-greedy (decay et fin configurables), Prioritized Experience Replay (PER Schaul et al. 2015, avec importance sampling), n-step returns (3-step), target network (Polyak τ=0.005, Bellman). La récompense pénalise les nouveaux trous (delta), la hauteur, l'irrégularité et les puits, avec PBRS (Dellacherie, scale 0.1). Soft-drop BFS avec SRS wall kicks pour les surplombs et T-Spins. Look-ahead 2 pièces. Le modèle, les statistiques et les paramètres sont sauvegardés entre les sessions (`ai_model.pt`, `ai_training_log.json`, `settings.json`).
 
 
 ## Principes de conception
@@ -140,12 +140,12 @@ tetris/
 │   │   ├── board.py             # Grille, collisions, lignes, handicap, hard drop
 │   │   ├── scoring.py           # Règles de score (bonus multi-lignes)
 │   │   └── stats.py             # Score, lignes, niveau
-│   ├── ai/                      # Apprentissage par renforcement (Double DQN)
+│   ├── ai/                      # Apprentissage par renforcement (V-network DQN)
 │   │   ├── __init__.py
-│   │   ├── network.py           # Réseau de neurones (220→256→128→64→40)
-│   │   ├── agent.py             # DQNAgent (ε-greedy, Double DQN, replay, target net)
-│   │   ├── replay_buffer.py     # Buffer d'experience replay (50 000)
-│   │   ├── rewards.py           # Récompense (delta trous) et extraction de features
+│   │   ├── network.py           # Réseau de neurones (17→128→64→1)
+│   │   ├── agent.py             # DQNAgent (ε-greedy, per-candidate eval, replay, target net)
+│   │   ├── replay_buffer.py     # Prioritized Experience Replay (PER, 50 000)
+│   │   ├── rewards.py           # Récompense (delta trous + PBRS scale 0.1), features DT-20 normalisées, simulation soft-drop BFS + SRS
 │   │   └── trainer.py           # Journal d'entraînement (JSON)
 │   ├── audio/                   # Audio procédural (NumPy)
 │   │   └── __init__.py          # AudioManager
@@ -162,7 +162,7 @@ tetris/
 │   │   ├── keybind.py           # KeybindState (configuration des touches)
 │   │   ├── ai.py                # AIState (DQN agent, HUD apprentissage + stats)
 │   │   ├── ai_menu.py           # AIMenuState (mode, vitesse, apprentissage, stats, reset)
-│   │   ├── hyperparam_menu.py   # HyperparamMenuState (7 hyperparamètres DQN + reset)
+│   │   ├── hyperparam_menu.py   # HyperparamMenuState (13 hyperparamètres DQN + reset)
 │   │   ├── stats.py             # StatsState (tableau stats + graphique)
 │   │   ├── graph.py             # GraphState (courbe score vs épisode)
 │   │   ├── game_over.py         # GameOverState
@@ -216,27 +216,44 @@ Menu principal
 │       │   └── Epsilon decay     [toggle ◄ ►]     0.990–0.9999
 │       │       Epsilon fin       [toggle ◄ ►]     0.02–0.10
 │       │       Learning rate     [toggle ◄ ►]     1e-6–1e-2
-│       │       Gamma              [toggle ◄ ►]     0.80–0.99
+│       │       Gamma             [toggle ◄ ►]     0.80–0.99
 │       │       Batch size        [toggle ◄ ►]     8–256
 │       │       Buffer size       [toggle ◄ ►]     1000–200000
-│       │       Target sync       [toggle ◄ ►]     100–2000
+│       │       Curriculum        [toggle ◄ ►]     OFF ↔ ON
+│       │       Fréq. curriculum  [toggle ◄ ►]     10–500
+│       │       Epsilon curr.     [toggle ◄ ►]     reset/boost/decay
+│       │       Warm-start        [toggle ◄ ►]     OFF ↔ ON
+│       │       Maj. par pièce    [toggle ◄ ►]     1–8
+│       │       Look-ahead        [toggle ◄ ►]     OFF ↔ ON
+│       │       Soft-drop         [toggle ◄ ►]     OFF ↔ ON
 │       │       Réinitialiser     [ENTER]          reset to defaults
 │       │       Retour            [ENTER | ESC]
 │       Statistiques              [ENTER]          → stats + graph (une page)
 │       Réinitialiser IA          [ENTER ×2]       supprime modèle + log
 │       Retour                    [ENTER | ESC]
-├── Démarrer le jeu               [ENTER]          → GameState | AIState
-├── Leaderboard                   [ENTER]          → LeaderboardState
-└── Quitter                       [ENTER | ESC]    exit
-```
+## Limitations de l'IA
+
+L'IA utilise un espace d'actions basé sur le **soft-drop BFS** : pour chaque pièce, elle énumère toutes les positions atteignables via BFS (déplacement latéral, chute douce, rotation avec SRS wall kicks), simule le placement, et évalue le plateau résultant via la V-function. Cette approche couvre les surplombs et les T-Spins.
+
+### Surplombs et placements en glissé
+
+✅ **Implémenté** — Le soft-drop BFS énumère les placements sous les surplombs. La pièce peut glisser horizontalement pendant la descente pour se loger sous une structure.
+
+### T-Spins
+
+✅ **Partiellement implémenté** — Les wall kicks SRS sont intégrés dans le simulateur (`SRS_KICKS_JLSTZ`, `SRS_KICKS_I`), permettant les rotations dans des espaces restreints. La détection explicite de T-Spin (3 coins occupés) et le bonus de score ne sont pas implémentés.
+
+### Wall kicks (SRS)
+
+✅ **Implémenté** — Les tables de wall kicks SRS sont utilisées dans le BFS de candidate generation.
 
 ## Roadmap
 
-Un mode **Joueur IA** basé sur le Double DQN est implémenté dans le package `tetris/ai/` et intégré via `AIState` (voir `AI.md` pour le design détaillé). L'IA dispose de deux modes : **Apprentissage** (exploration ε-greedy, sauvegarde du modèle et du journal) et **Jeu** (greedy, sans apprentissage). L'IA apprend en jouant de manière autonome, à cadence humaine (~12 actions/sec), avec placement BFS (minimisation des trous), récompense delta-based, paramètres ε configurables, tableau de statistiques avec tendances, et sauvegarde du modèle, des statistiques et des préférences entre les sessions.
+Un mode **Joueur IA** basé sur le V-network DQN est implémenté dans le package `tetris/ai/` et intégré via `AIState` (voir `AI.md` pour le design détaillé). L'IA dispose de deux modes : **Apprentissage** (exploration ε-greedy, sauvegarde du modèle et du journal) et **Jeu** (greedy, sans apprentissage). L'IA apprend en jouant de manière autonome, à cadence humaine (~12 actions/sec), avec évaluation par candidat (soft-drop BFS + SRS wall kicks), features DT-20 normalisées, PBRS Dellacherie (scale 0.1), Prioritized Experience Replay, n-step returns (3-step), 2-piece look-ahead, récompense delta-based, paramètres ε configurables, tableau de statistiques avec tendances, et sauvegarde du modèle, des statistiques et des préférences entre les sessions.
 
 Le **menu** est structuré en arborescence (voir ci-dessus) : sous-menu Humain (mode, handicap, touches configurables, statistiques) et sous-menu IA (mode, vitesse, apprentissage, statistiques, reset). Les touches du joueur humain sont entièrement reconfigurables avec détection de conflits et persistance.
 
-Améliorations futures possibles : Stratégies d'apprentissage multiples, Prioritized Experience Replay, Curriculum Learning, MCTS.
+Améliorations futures possibles : Stratégies d'apprentissage multiples, MCTS, Self-Play Tournament, Human Replay (imitation learning).
 
 ## Crédits
 

@@ -48,3 +48,45 @@ def test_save_persists_to_file(tmp_path):
     provider.save()
     saved = json.loads(path.read_text())
     assert saved == pieces
+
+
+def test_allowed_types_restricts_pool(tmp_path):
+    provider = PieceProvider(mode="normal", path=tmp_path / "c.json", allowed_types=["I", "O"])
+    for _ in range(20):
+        assert provider.next_type() in ("I", "O")
+
+
+def test_set_allowed_types_updates_pool(tmp_path):
+    provider = PieceProvider(mode="normal", path=tmp_path / "c.json", allowed_types=["I"])
+    assert provider.next_type() == "I"
+    provider.set_allowed_types(["I", "O", "T"])
+    for _ in range(20):
+        assert provider.next_type() in ("I", "O", "T")
+
+
+def test_no_allowed_types_uses_all(tmp_path):
+    provider = PieceProvider(mode="normal", path=tmp_path / "c.json")
+    seen = set()
+    for _ in range(200):
+        seen.add(provider.next_type())
+    assert seen == set(SHAPES.keys())
+
+
+def test_replay_mode_filters_by_allowed_types(tmp_path):
+    """Replay mode skips queue pieces not in allowed_types (curriculum support)."""
+    path = tmp_path / "replay.json"
+    saved = ["I", "O", "T", "S", "Z", "L", "J", "I", "O", "T"]
+    path.write_text(json.dumps(saved))
+    provider = PieceProvider(mode="replay", path=path, allowed_types=["I", "O"])
+    for _ in range(20):
+        assert provider.next_type() in ("I", "O")
+
+
+def test_replay_mode_no_allowed_types_serves_all(tmp_path):
+    """Replay mode without allowed_types serves from queue as before."""
+    path = tmp_path / "replay.json"
+    saved = ["I", "O", "T"]
+    path.write_text(json.dumps(saved))
+    provider = PieceProvider(mode="replay", path=path)
+    served = [provider.next_type() for _ in range(3)]
+    assert served == saved

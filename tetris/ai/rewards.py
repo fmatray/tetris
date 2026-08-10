@@ -13,6 +13,55 @@ from tetris.settings import BOARD_HEIGHT, BOARD_WIDTH, SHAPES
 
 PIECE_TYPES = list(SHAPES.keys())  # ["I", "O", "T", "S", "Z", "J", "L"]
 
+# Number of features in the DT-20 state vector (10 board + 7 next-piece one-hot).
+FEATURE_SIZE = 17
+
+# Normalization constants for DT-20 features (empirical mean/std).
+# Indices: [lines_cleared, holes, aggregate_height, bumpiness, max_height,
+#           row_transitions, column_transitions, wells, hole_depth,
+#           rows_with_holes, *one_hot_piece(7)]
+FEATURE_MEANS = np.array([
+    0.5,   # lines_cleared: 0-4
+    5.0,   # holes: 0-50
+    50.0,  # aggregate_height: 0-200
+    5.0,   # bumpiness: 0-40
+    10.0,  # max_height: 0-20
+    30.0,  # row_transitions: 0-40
+    20.0,  # column_transitions: 0-40
+    5.0,   # wells: 0-40
+    5.0,   # hole_depth: 0-20
+    5.0,   # rows_with_holes: 0-20
+    0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,  # one_hot: 7 entries, already 0/1
+], dtype=np.float32)
+
+FEATURE_STDS = np.array([
+    1.0,   # lines_cleared
+    10.0,  # holes
+    40.0,  # aggregate_height
+    5.0,   # bumpiness
+    5.0,   # max_height
+    10.0,  # row_transitions
+    10.0,  # column_transitions
+    5.0,   # wells
+    5.0,   # hole_depth
+    5.0,   # rows_with_holes
+    1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0,  # one_hot: 7 entries, keep binary
+], dtype=np.float32)
+
+# PBRS scaling: cap potential-based reward shaping contribution.
+PBRS_SCALE = 0.1
+
+# Dellacherie feature weights for PBRS potential function (AI.md §4).
+# Excludes landing_height/eroded_cells (placement-specific, not board-state).
+DELLACHERIE_WEIGHTS: dict[str, float] = {
+    "row_transitions": -3.418893,
+    "column_transitions": -9.336683,
+    "holes": -7.899265,
+    "wells": -3.385597,
+    "hole_depth": -0.192486,
+    "rows_with_holes": -0.106548,
+}
+
 
 def board_to_grid(board) -> np.ndarray:
     """Convert a ``Board`` instance into a 0/1 numpy array (H×W)."""
@@ -24,15 +73,6 @@ def board_to_grid(board) -> np.ndarray:
     return grid
 
 
-def board_to_grid_with_piece(board, piece) -> np.ndarray:
-    """Convert a ``Board`` into a 0/1 grid including the falling piece's cells."""
-    grid = board_to_grid(board)
-    for bx, by in piece.get_blocks():
-        if 0 <= by < BOARD_HEIGHT and 0 <= bx < BOARD_WIDTH:
-            grid[by][bx] = 1.0
-    return grid
-
-
 def one_hot_piece(piece_type: str) -> np.ndarray:
     """7-element one-hot encoding of a piece type."""
     vec = np.zeros(len(PIECE_TYPES), dtype=np.float32)
@@ -40,32 +80,22 @@ def one_hot_piece(piece_type: str) -> np.ndarray:
     return vec
 
 
-def one_hot_rotation(piece_type: str, rotation: int) -> np.ndarray:
-    """4-element one-hot encoding of rotation index."""
-    n_rotations = len(SHAPES[piece_type])
-    idx = rotation % n_rotations
-    vec = np.zeros(4, dtype=np.float32)
-    vec[idx] = 1.0
-    return vec
-
-
-def extract_state(
-    board, current_piece, next_piece
-) -> np.ndarray:
-    """Build the full 220-dim state vector (AI.md §2.5).
-
-    Layout: [board_with_piece(200), current_piece(7), next_piece(7),
-             orientation(4), piece_x_norm(1), piece_y_norm(1)]
-    """
-    grid = board_to_grid_with_piece(board, current_piece).flatten()  # 200
-    cur = one_hot_piece(current_piece.type)  # 7
-    nxt = one_hot_piece(next_piece.type)  # 7
-    rot = one_hot_rotation(current_piece.type, current_piece.rotation)  # 4
-    pos = np.array([current_piece.x / BOARD_WIDTH, current_piece.y / BOARD_HEIGHT], dtype=np.float32)  # 2
-    return np.concatenate([grid, cur, nxt, rot, pos])  # 220
-
-
 # --- Board heuristics (AI.md §4.1) -----------------------------------
+
+
+def column_heights(grid: np.ndarray) -> np.ndarray:
+    """Height of each column (topmost filled cell per column).
+
+    Returns a (BOARD_WIDTH,) int array. Empty column → 0.
+    """
+    mask = grid > 0
+    first_row = np.argmax(mask, axis=0)  # first True row per column (0 if none)
+    return (BOARD_HEIGHT - first_row) * mask.any(axis=0)
+
+
+def max_height(grid: np.ndarray) -> int:
+    """Height of the tallest column."""
+    return int(column_heights(grid).max())
 
 
 def count_holes(grid: np.ndarray) -> int:
@@ -84,28 +114,173 @@ def count_holes(grid: np.ndarray) -> int:
 
 def aggregate_height(grid: np.ndarray) -> int:
     """Sum of column heights (topmost filled cell per column)."""
-    total = 0
-    for x in range(BOARD_WIDTH):
-        col = grid[:, x]
-        for y in range(BOARD_HEIGHT):
-            if col[y] > 0:
-                total += BOARD_HEIGHT - y
-                break
-    return total
+    return int(column_heights(grid).sum())
 
 
 def bumpiness(grid: np.ndarray) -> int:
     """Sum of absolute height differences between adjacent columns."""
-    heights = []
+    heights = column_heights(grid)
+    return int(np.abs(np.diff(heights)).sum())
+
+
+def row_transitions(grid: np.ndarray) -> int:
+    """Count horizontal filled↔empty transitions per row.
+
+    Walls (left/right edges) treated as filled.
+    """
+    binary = (grid > 0).astype(np.int8)
+    padded = np.pad(binary, ((0, 0), (1, 1)), constant_values=1)
+    return int(np.abs(np.diff(padded, axis=1)).sum())
+
+
+def column_transitions(grid: np.ndarray) -> int:
+    """Count vertical filled↔empty transitions per column.
+
+    Floor (bottom) treated as filled.
+    """
+    binary = (grid > 0).astype(np.int8)
+    padded = np.pad(binary, ((0, 1), (0, 0)), constant_values=1)
+    return int(np.abs(np.diff(padded, axis=0)).sum())
+
+
+def wells(grid: np.ndarray) -> int:
+    """Cumulative well depth: Σ depth*(depth+1)//2 per column.
+
+    A well is a column lower than both neighbors. Edge columns treat
+    the wall as BOARD_HEIGHT (infinite height).
+    """
+    heights = column_heights(grid)
+    total = 0
+    for i in range(BOARD_WIDTH):
+        left = heights[i - 1] if i > 0 else BOARD_HEIGHT
+        right = heights[i + 1] if i < BOARD_WIDTH - 1 else BOARD_HEIGHT
+        depth = max(0, int(min(left, right) - heights[i]))
+        total += depth * (depth + 1) // 2
+    return total
+
+
+def hole_depth(grid: np.ndarray) -> int:
+    """Max holes in any single column below the first filled cell."""
+    mask = grid > 0
+    max_depth = 0
     for x in range(BOARD_WIDTH):
-        col = grid[:, x]
-        h = 0
-        for y in range(BOARD_HEIGHT):
-            if col[y] > 0:
-                h = BOARD_HEIGHT - y
-                break
-        heights.append(h)
-    return sum(abs(heights[i] - heights[i + 1]) for i in range(len(heights) - 1))
+        col_mask = mask[:, x]
+        if not col_mask.any():
+            continue
+        top = np.argmax(col_mask)  # first filled row
+        depth = int((~col_mask[top:]).sum())  # empty cells below first filled
+        max_depth = max(max_depth, depth)
+    return max_depth
+
+
+def rows_with_holes(grid: np.ndarray) -> int:
+    """Count rows containing at least one hole cell."""
+    mask = grid > 0
+    holes_per_col = np.zeros_like(mask)
+    for x in range(BOARD_WIDTH):
+        col_mask = mask[:, x]
+        if not col_mask.any():
+            continue
+        top = np.argmax(col_mask)
+        holes_per_col[top:, x] = ~col_mask[top:]
+    return int(np.any(holes_per_col, axis=1).sum())
+
+
+def normalize_features(features: np.ndarray) -> np.ndarray:
+    """Standardize DT-20 features: (features - FEATURE_MEANS) / FEATURE_STDS."""
+    return ((features - FEATURE_MEANS) / FEATURE_STDS).astype(np.float32)
+
+
+
+
+def extract_features(
+    grid: np.ndarray, lines_cleared: int, next_piece_type: str
+) -> np.ndarray:
+    """Build the 17-dim DT-20 feature vector (AI.md §2).
+
+    Layout: [lines_cleared, holes, aggregate_height, bumpiness, max_height,
+             row_transitions, column_transitions, wells, hole_depth,
+             rows_with_holes, *one_hot_piece(next_piece_type)]
+    """
+    features = np.array([
+        lines_cleared,
+        count_holes(grid),
+        aggregate_height(grid),
+        bumpiness(grid),
+        max_height(grid),
+        row_transitions(grid),
+        column_transitions(grid),
+        wells(grid),
+        hole_depth(grid),
+        rows_with_holes(grid),
+    ], dtype=np.float32)
+    return normalize_features(np.concatenate([features, one_hot_piece(next_piece_type)]))
+
+
+def dellacherie_value(grid: np.ndarray) -> float:
+    """Weighted sum of board features using Dellacherie weights (AI.md §4).
+
+    Excludes landing_height/eroded_cells (placement-specific, not
+    board-state). Empty grid → 0.0.
+    """
+    if not (grid > 0).any():
+        return 0.0
+    return (
+        DELLACHERIE_WEIGHTS["row_transitions"] * row_transitions(grid)
+        + DELLACHERIE_WEIGHTS["column_transitions"] * column_transitions(grid)
+        + DELLACHERIE_WEIGHTS["holes"] * count_holes(grid)
+        + DELLACHERIE_WEIGHTS["wells"] * wells(grid)
+        + DELLACHERIE_WEIGHTS["hole_depth"] * hole_depth(grid)
+        + DELLACHERIE_WEIGHTS["rows_with_holes"] * rows_with_holes(grid)
+    )
+
+
+# --- Simulation helpers (AI.md §3) -----------------------------------
+
+
+def hard_drop_y(grid: np.ndarray, shape: list[tuple[int, int]], px: int) -> int:
+    """Find the lowest y where *shape* fits at column *px* on *grid*.
+
+    Hard-drop logic: start at y=0, increment y until collision.
+    Returns the y coordinate for placement.
+    """
+    py = 0
+    while True:
+        for bx, by in shape:
+            x, y = px + bx, py + by
+            if x < 0 or x >= BOARD_WIDTH or y >= BOARD_HEIGHT:
+                return py - 1 if py > 0 else 0
+            if y >= 0 and grid[y][x] > 0:
+                return py - 1 if py > 0 else 0
+        py += 1
+
+
+def place_and_clear(
+    grid: np.ndarray, shape: list[tuple[int, int]], px: int, py: int
+) -> tuple[np.ndarray, int]:
+    """Place shape cells on a copy of grid, clear full lines.
+
+    Returns (new_grid, lines_cleared).
+    """
+    new_grid = grid.copy()
+    for bx, by in shape:
+        x, y = px + bx, py + by
+        if 0 <= x < BOARD_WIDTH and 0 <= y < BOARD_HEIGHT:
+            new_grid[y][x] = 1.0
+
+    lines_cleared = 0
+    full_rows = [y for y in range(BOARD_HEIGHT) if (new_grid[y] > 0).all()]
+    if full_rows:
+        lines_cleared = len(full_rows)
+        keep = [y for y in range(BOARD_HEIGHT) if y not in full_rows]
+        new_grid = np.vstack([
+            np.zeros((lines_cleared, BOARD_WIDTH), dtype=grid.dtype),
+            new_grid[keep],
+        ])
+    return new_grid, lines_cleared
+
+
+# --- Reward (AI.md §4) -----------------------------------------------
 
 
 def compute_reward(
@@ -114,6 +289,7 @@ def compute_reward(
     new_grid: np.ndarray,
     game_over: bool,
     step_survived: bool,
+    gamma: float = 0.97,
 ) -> float:
     """Reward shaping per AI.md §4.
 
@@ -121,9 +297,16 @@ def compute_reward(
     feedback. Hole penalty is delta-based (new holes minus old holes) so
     the agent learns which actions create holes rather than inheriting
     a constant penalty for pre-existing holes.
+
+    PBRS term: γ·Φ(new) - Φ(prev) where Φ is the Dellacherie board value.
+    Applied to ALL transitions (including game_over). For empty grids
+    Φ=0 so PBRS=0 — existing tests pass unchanged.
     """
     if game_over:
-        return -10.0
+        # PBRS applies even on game_over
+        phi_prev = dellacherie_value(prev_grid)
+        phi_new = dellacherie_value(new_grid)
+        return -50.0 + PBRS_SCALE * (gamma * phi_new - phi_prev)
 
     reward = 0.0
     reward += 50.0 * lines_cleared
@@ -142,9 +325,125 @@ def compute_reward(
     height = aggregate_height(new_grid)
     bumps = bumpiness(new_grid)
 
-    reward -= 0.05 * height
-    reward -= 0.1 * bumps
-
+    reward -= 0.5 * height
+    reward -= 0.3 * bumps
+    reward -= 0.5 * wells(new_grid)
     if step_survived:
         reward += 1.0
+
+    # PBRS shaping term
+    phi_prev = dellacherie_value(prev_grid)
+    phi_new = dellacherie_value(new_grid)
+    reward += PBRS_SCALE * (gamma * phi_new - phi_prev)
+
     return reward
+
+
+# --- SRS wall kick data (https://tetris.wiki/Super_Rotation_System) ---
+# Format: {(from_state, to_state): [(dx, dy), ...]}
+# States: 0=spawn, 1=CW, 2=180, 3=CCW. Positive y = up (screen y inverted).
+
+SRS_KICKS_JLSTZ: dict[tuple[int, int], list[tuple[int, int]]] = {
+    (0, 1): [(0, 0), (-1, 0), (-1, 1), (0, -2), (-1, -2)],
+    (1, 0): [(0, 0), (1, 0), (1, -1), (0, 2), (1, 2)],
+    (1, 2): [(0, 0), (1, 0), (1, -1), (0, 2), (1, 2)],
+    (2, 1): [(0, 0), (-1, 0), (-1, 1), (0, -2), (-1, -2)],
+    (2, 3): [(0, 0), (1, 0), (1, 1), (0, -2), (1, -2)],
+    (3, 2): [(0, 0), (-1, 0), (-1, -1), (0, 2), (-1, 2)],
+    (3, 0): [(0, 0), (-1, 0), (-1, -1), (0, 2), (-1, 2)],
+    (0, 3): [(0, 0), (1, 0), (1, 1), (0, -2), (1, -2)],
+}
+
+SRS_KICKS_I: dict[tuple[int, int], list[tuple[int, int]]] = {
+    (0, 1): [(0, 0), (-2, 0), (1, 0), (-2, -1), (1, 2)],
+    (1, 0): [(0, 0), (2, 0), (-1, 0), (2, 1), (-1, -2)],
+    (1, 2): [(0, 0), (-1, 0), (2, 0), (-1, 2), (2, -1)],
+    (2, 1): [(0, 0), (1, 0), (-2, 0), (1, -2), (-2, 1)],
+    (2, 3): [(0, 0), (2, 0), (-1, 0), (2, 1), (-1, -2)],
+    (3, 2): [(0, 0), (1, 0), (-2, 0), (1, 2), (-2, -1)],
+    (3, 0): [(0, 0), (1, 0), (-2, 0), (1, -2), (-2, 1)],
+    (0, 3): [(0, 0), (-1, 0), (2, 0), (-1, 2), (2, -1)],
+}
+
+
+def _shape_fits(grid: np.ndarray, shape: list[tuple[int, int]], px: int, py: int) -> bool:
+    """Check if shape fits at (px, py) on grid without collision."""
+    for bx, by in shape:
+        x, y = px + bx, py + by
+        if x < 0 or x >= BOARD_WIDTH or y >= BOARD_HEIGHT:
+            return False
+        if y >= 0 and grid[y][x] > 0:
+            return False
+    return True
+
+
+def _try_rotation(
+    grid: np.ndarray, piece_type: str, from_rot: int, to_rot: int, x: int, y: int
+) -> tuple[int, int] | None:
+    """Try SRS wall kicks for rotation. Returns (x, y) of first valid kick, or None."""
+    if piece_type == "O":
+        return (x, y) if _shape_fits(grid, SHAPES[piece_type][to_rot], x, y) else None
+    kicks = SRS_KICKS_I if piece_type == "I" else SRS_KICKS_JLSTZ
+    key = (from_rot % 4, to_rot % 4)
+    for dx, dy in kicks.get(key, [(0, 0)]):
+        nx, ny = x + dx, y - dy  # screen y inverted: positive kick_dy = up
+        if _shape_fits(grid, SHAPES[piece_type][to_rot], nx, ny):
+            return (nx, ny)
+    return None
+
+
+def soft_drop_placements(
+    grid: np.ndarray, piece_type: str
+) -> list[tuple[list[tuple[int, int]], int, int, int]]:
+    """Enumerate ALL reachable placements via BFS over (x, y, rotation).
+
+    Returns list of (shape, px, py, rotation) tuples — every position the
+    piece can reach by moving left/right, soft-dropping, and rotating (with
+    SRS wall kicks). This includes placements under overhangs that hard-drop
+    cannot reach.
+    """
+    num_rots = len(SHAPES[piece_type])
+    spawn_x = BOARD_WIDTH // 2 - 2
+    spawn_y = 0
+    # ponytail: BFS frontier — state = (x, y, rot). O(W*H*4) states.
+    visited: set[tuple[int, int, int]] = set()
+    frontier: list[tuple[int, int, int]] = [(spawn_x, spawn_y, 0)]
+    visited.add((spawn_x, spawn_y, 0))
+    placements: list[tuple[list[tuple[int, int]], int, int, int]] = []
+    seen_placements: set[tuple[int, int, int]] = set()
+
+    while frontier:
+        x, y, rot = frontier.pop()
+        shape = SHAPES[piece_type][rot]
+
+        # Try left
+        if _shape_fits(grid, shape, x - 1, y) and (x - 1, y, rot) not in visited:
+            visited.add((x - 1, y, rot))
+            frontier.append((x - 1, y, rot))
+
+        # Try right
+        if _shape_fits(grid, shape, x + 1, y) and (x + 1, y, rot) not in visited:
+            visited.add((x + 1, y, rot))
+            frontier.append((x + 1, y, rot))
+
+        # Try soft drop (y+1)
+        if _shape_fits(grid, shape, x, y + 1):
+            if (x, y + 1, rot) not in visited:
+                visited.add((x, y + 1, rot))
+                frontier.append((x, y + 1, rot))
+        else:
+            # Can't drop further — this is a landing position
+            key = (x, y, rot)
+            if key not in seen_placements:
+                seen_placements.add(key)
+                placements.append((shape, x, y, rot))
+
+        # Try rotations CW and CCW
+        for direction in (1, -1):
+            to_rot = (rot + direction) % num_rots
+            result = _try_rotation(grid, piece_type, rot, to_rot, x, y)
+            if result and (*result, to_rot) not in visited:
+                visited.add((*result, to_rot))
+                frontier.append((*result, to_rot))
+
+    return placements

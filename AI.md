@@ -16,10 +16,11 @@ highest score possible.
 
 | Component | Choice | Reason |
 | ----------- | -------- | -------- |
-| Algorithm | Double DQN | Reduces overestimation bias; online net selects, target net evaluates |
+| Algorithm | V-network DQN | Per-candidate board value evaluation; picks max-V placement |
 | Experience Replay | Yes (buffer size 50,000) | Stabilizes training by breaking correlation |
-| Target Network | Yes (sync every 500 steps) | Reduces moving-target instability |
+| Target Network | Yes (Polyak averaging τ=0.005, every step) | Reduces moving-target instability |
 | Exploration | ε-greedy, decay 1.0 → ε_end (configurable) | Balances exploration vs exploitation |
+| Reward Shaping | PBRS (Dellacherie potential) | Speeds convergence without reward hacking (Ng et al. 1999) |
 
 ### 1.2 Alternative: NEAT (Future)
 
@@ -28,69 +29,80 @@ Evolution of Augmenting Topologies) can evolve a population of neural
 networks over many games. This is lighter on memory and easier to visualize.
 
 ---
-
 ## 2. State Representation
 
-The AI perceives the board as a **feature vector**, not raw pixels. This
-keeps the input dimensionality low and training fast.
+The AI perceives the board as a **DT-20 feature vector** (10 board
+features + 7-dim next-piece one-hot = **17 dimensions**). Engineered
+features provide inductive bias, keeping the network small and
+training fast.
 
-### 2.1 Board Encoding
-
-The board is a `BOARD_HEIGHT × BOARD_WIDTH` grid (20×10). Each cell is:
-
-- `0` — empty
-- `1` — occupied
-
-Flattened into a 1D tensor of size **200**.
-
-### 2.2 Current Piece
-
-One-hot encoded vector of size **7** (I, O, T, S, Z, J, L).
-
-### 2.3 Next Piece
-
-One-hot encoded vector of size **7** (enables planning ahead).
-
-### 2.4 Piece Orientation
-
-One-hot encoded vector of size **4** (0°, 90°, 180°, 270°).
-
-### 2.5 Full State Vector
+### 2.1 Feature Vector
 
 ```
-State = [board_with_piece(200), current_piece(7), next_piece(7), orientation(4), piece_x_norm(1), piece_y_norm(1)]
-Total = 220 floats
+State = [lines_cleared, holes, aggregate_height, bumpiness, max_height,
+         row_transitions, column_transitions, wells, hole_depth,
+         rows_with_holes, *one_hot_piece(next_piece_type)]
+Total = 17 floats (normalized: (x - mean) / std before network input)
 ```
+
+### 2.2 Feature Definitions
+
+| Feature | Formula |
+| --------- | --------- |
+| `lines_cleared` | Number of rows completed this placement |
+| `holes` | Empty cells with at least one filled cell above them |
+| `aggregate_height` | Sum of heights of all columns |
+| `bumpiness` | Σ ` | height[i] - height[i+1] | ` for adjacent columns |
+| `max_height` | Height of the tallest column |
+| `row_transitions` | Horizontal filled↔empty transitions per row (walls = filled) |
+| `column_transitions` | Vertical filled↔empty transitions per column (floor = filled) |
+| `wells` | Σ `depth*(depth+1)//2` per column lower than both neighbors |
+| `hole_depth` | Max holes in any single column below the first filled cell |
+| `rows_with_holes` | Count of rows containing ≥1 hole cell |
+| `next_piece_one_hot` | 7-dim one-hot encoding of next piece type (I, O, T, S, Z, J, L) |
 
 ---
 
 ## 3. Action Space
 
-The AI uses **macro-actions**: one decision per piece, specifying the
-target column and rotation. The game then automatically rotates and
-moves the piece to the target column, then **BFS soft-drop** to the
-best reachable position — allowing placement under overhangs.
+The AI uses **per-candidate evaluation**: for each valid placement,
+the agent simulates the placement, computes the resulting board
+features, and evaluates V(resulting_board) via the V-network. The
+candidate with the highest V-value is selected.
 
-| Action ID | Rotation | Column |
-| ----------- | -------- | ------ |
-| 0–9 | 0 | 0–9 |
-| 10–19 | 1 | 0–9 |
-| 20–29 | 2 | 0–9 |
-| 30–39 | 3 | 0–9 |
+### 3.1 Candidate Generation
 
-Action ID = `rotation × 10 + column`. Invalid placements (piece
-doesn't fit at that column/rotation) are masked during action
-selection. Pieces with fewer rotations (e.g., O: 1, I/S/Z: 2) have
-fewer valid actions.
+Two modes:
 
-### 3.1 BFS Placement (Soft-Drop with Hole Minimization)
+**Hard-drop** (default when soft-drop is OFF): for each valid
+(rotation, column) combination, simulate hard-drop + line clear.
 
-After the piece is rotated and moved to the target column, a BFS
-explores all reachable terminal positions (down, left, right from
-the current position). A position is terminal when the piece cannot
-move down further. Among all terminals, the BFS selects the one that
-**minimizes holes** after placement, with **depth as tie-breaker**
-(deepest first). This enables:
+**Soft-drop BFS** (default when soft-drop is ON): BFS over
+(x, y, rotation) states — move left/right, soft-drop, rotate with
+SRS wall kicks. Enumerates ALL reachable landing positions, including
+placements under overhangs that hard-drop cannot reach. Uses SRS
+wall kick tables (`SRS_KICKS_JLSTZ`, `SRS_KICKS_I`) for rotation
+around obstacles.
+
+**2-piece look-ahead** (when enabled): after simulating the current
+piece placement, simulate the best placement of the NEXT piece on
+the resulting board (Dellacherie-optimal). The V-network evaluates
+the board after both pieces are placed.
+
+For each candidate:
+1. Simulate placement (hard-drop or soft-drop BFS)
+2. Simulate line clears on the resulting board
+3. If look-ahead: simulate best next-piece placement
+4. Extract 17-dim DT-20 features from the resulting board
+
+The V-network evaluates each candidate: `V = network(features)`.
+The agent picks `argmax(V)` (greedy) or random (exploration).
+
+---
+
+## 4. Reward Function
+
+### 4.1 Base Reward
 
 ```
 reward = (
@@ -98,47 +110,66 @@ reward = (
     +5.0   × lines_cleared²           # bonus for multi-line clears
     -5.0   × holes_created             # delta: NEW holes only
     -0.1   × new_holes                 # residual absolute holes penalty
-    -0.05  × aggregate_height           # stack height penalty
-    -0.1   × bumpiness                  # surface unevenness penalty
-    -10.0  if game_over                 # terminal penalty
+    -0.5   × aggregate_height           # stack height penalty (10× stronger)
+    -0.3   × bumpiness                  # surface unevenness penalty (3× stronger)
+    -0.5   × wells                      # deep well penalty
+    -50.0  if game_over                 # terminal penalty (5× stronger)
     +1.0   per piece placed             # survival incentive
 )
 ```
 
 The hole penalty is **delta-based** (`new_holes - old_holes`): the
 agent learns which actions create holes rather than inheriting a
-constant penalty for pre-existing holes. A small residual on absolute
-holes keeps the agent motivated to clear existing holes over time.
+constant penalty for pre-existing holes.
 
-### 4.1 Feature Definitions
+### 4.2 PBRS (Potential-Based Reward Shaping)
 
-| Feature | Formula |
+The base reward is augmented with a PBRS term using the Dellacherie
+board value as the potential function Φ:
+
+```
+shaped_reward = base_reward + PBRS_SCALE × (γ × Φ(new_grid) - Φ(prev_grid))
+```
+
+Where Φ uses Dellacherie weights:
+
+| Feature | Weight |
 | --------- | --------- |
-| `lines_cleared` | Number of rows completed this placement |
-| `holes_created` | `max(0, new_holes - old_holes)` — new holes this placement |
-| `new_holes` | Empty cells with at least one filled cell above them |
-| `aggregate_height` | Sum of heights of all columns |
-| `bumpiness` | Σ ` | height[i] - height[i+1] | ` for adjacent columns |
----
+| `row_transitions` | -3.418893 |
+| `column_transitions` | -9.336683 |
+| `holes` | -7.899265 |
+| `wells` | -3.385597 |
+| `hole_depth` | -0.192486 |
+| `rows_with_holes` | -0.106548 |
+
+PBRS is **policy-preserving** (Ng et al. 1999): it speeds convergence
+without changing the optimal policy. For empty grids Φ=0 so PBRS=0.
+Excludes landing_height/eroded_cells (placement-specific, not board-state).
+
+`PBRS_SCALE = 0.1` caps the PBRS contribution to ±20, keeping it
+meaningful without dominating the base reward (±130).
 
 ## 5. Neural Network Architecture
 
 ```
-Input  (220)
-  ↓
-Dense (256, ReLU)
+Input  (17, normalized)
   ↓
 Dense (128, ReLU)
   ↓
 Dense (64, ReLU)
   ↓
-Output (40, Linear) → Q-values per macro-action (column × rotation)
+Output (1, Linear) → V(board) = board value
 ```
 
-- **Optimizer**: Adam, learning rate 1e-4 (with gradient clipping at 1.0)
-- **Loss**: SmoothL1Loss (Huber) — Double DQN target
+- **Optimizer**: Adam, learning rate 1e-3 (with gradient clipping at 1.0)
+- **Loss**: SmoothL1Loss (Huber) — V-function Bellman target
 - **Batch size**: 64
 - **Discount factor (γ)**: 0.97
+- **Polyak τ**: 0.005 (soft target update every step)
+
+The V-network evaluates board quality. Per-candidate action selection:
+evaluate V(resulting_board) for each valid placement, pick max. No
+action dimension — the network outputs a single scalar board value.
 
 ### 5.1 Framework Choice
 
@@ -179,6 +210,17 @@ optional dependency.
 | --------- | ------- | ----- | ---- |
 | `epsilon_decay` | 0.999 | 0.990–0.9999 | 0.0001 |
 | `epsilon_end` | 0.10 | 0.02–0.10 | 0.01 |
+| `ai_lr` | 1e-3 | 1e-6–1e-2 | ×10 |
+| `ai_gamma` | 0.97 | 0.80–0.99 | 0.01 |
+| `ai_batch_size` | 64 | 8–256 | 8 |
+| `ai_buffer_size` | 50,000 | 1,000–200,000 | 5,000 |
+| `ai_curriculum` | OFF | ON/OFF | toggle |
+| `ai_curriculum_freq` | 50 | 10–500 | 10 |
+| `ai_curriculum_epsilon` | reset | reset/boost/decay | cycle |
+| `ai_warm_start` | ON | ON/OFF | toggle |
+| `ai_learn_per_action` | 2 | 1–8 | 1 |
+| `ai_lookahead` | ON | ON/OFF | toggle |
+| `ai_soft_drop` | ON | ON/OFF | toggle |
 
 These are configurable in the **AI submenu** and persisted to
 `settings.json`.
@@ -187,13 +229,13 @@ These are configurable in the **AI submenu** and persisted to
 
 An episode runs from game start to game over. One macro-action per piece:
 
-1. Observe state `s` (board + current/next piece)
-2. Select action `a` via ε-greedy with action masking
-3. Execute `a`: rotate + move to target column, BFS soft-drop
-4. Observe reward `r` (delta holes + line bonus + board quality) and next state `s'`
-5. Store `(s, a, r, s', done)` in replay buffer
-6. Run 2 Double DQN gradient updates via mini-batch sampling
-7. Periodically sync target network (every 500 steps)
+1. Generate candidate states: enumerate valid (rotation, column) placements, simulate hard-drop + line clear, extract DT-20 features
+2. Select candidate via ε-greedy: random or `argmax(V(candidate_states))`
+3. Execute placement: rotate → move to column → hard-drop → lock
+4. Observe reward `r` (delta holes + line bonus + board quality + PBRS shaping)
+5. Store `(s, 0, r, s', done)` in n-step buffer → PER (delayed: s = board after prev placement, s' = board after this placement)
+6. Run `learn_per_action` V-function Bellman gradient updates via prioritized mini-batch (IS-weighted)
+7. Polyak soft target update (τ=0.005, every step)
 8. Decay ε once per episode
 
 | File | Purpose |
@@ -212,10 +254,10 @@ An episode runs from game start to game over. One macro-action per piece:
 tetris/
 ├── ai/
 │   ├── __init__.py
-│   ├── agent.py          # DQNAgent (ε-greedy, Double DQN, replay, target net)
-│   ├── network.py        # DQNetwork (220→256→128→64→40)
+│   ├── agent.py          # DQNAgent (per-candidate eval, V-function Bellman, replay, target net)
+│   ├── network.py        # DQNetwork (17→64→32→1 V-network)
 │   ├── replay_buffer.py  # Experience replay buffer (50,000)
-│   ├── rewards.py        # Reward function & board feature extraction
+│   ├── rewards.py        # DT-20 features, Dellacherie value, PBRS reward, simulation helpers
 │   └── trainer.py        # TrainingLog (per-episode JSON persistence)
 ├── states/
 │   ├── ai.py             # AIState (subclass of GameState)
@@ -231,12 +273,13 @@ MenuState (Joueur: IA)
     ↓
 AIState (subclass of GameState)
     ↓
-  AI agent selects macro-action (column + rotation)
+  AI generates candidate states (rotation + column + hard-drop simulation)
+  AI evaluates V(candidate_states) per-candidate, picks max
   AIState executes action:
     - Rotate piece to target rotation
     - Move to target column
-    - BFS soft-drop to best reachable position
-    - Lock piece → compute reward → store transition → learn
+    - Hard-drop to lowest position
+    - Lock piece → compute reward (PBRS) → store transition → learn
 ```
 
 `AIState` inherits all board, piece, stats, and rendering logic from
@@ -303,7 +346,7 @@ first draw. Any key returns to the AI submenu.
 | **Level reached** | Highest level achieved |
 | **Pieces placed** | Total tetrominoes placed |
 | **Survival time** | Steps before game over |
-| **Average Q-value** | Network confidence over time |
+| **Average V-value** | Network confidence over time |
 
 ### 8.2 Milestones
 
@@ -320,20 +363,28 @@ first draw. Any key returns to the AI submenu.
 
 | Challenge | Mitigation |
 | ----------- | ------------ |
-| **Sparse rewards** (few lines cleared early) | Shape reward with height/bumpiness penalties |
+| **Sparse rewards** (few lines cleared early) | Shape reward with height/bumpiness penalties + PBRS (Dellacherie potential) |
 | **Catastrophic forgetting** | Experience replay + target network |
-| **Slow training** | Macro-actions + frame skipping |
+| **Slow training** | Macro-actions + DT-20 features (17-dim vs 220-dim) + frame skipping |
+| **Reward hacking** | PBRS (policy-preserving, Ng et al. 1999) — cannot change optimal policy |
 | **Overfitting to one piece sequence** | Randomized piece generator (already in `tetris/game/tetromino.py`) |
 | **Memory growth** | Cap replay buffer; LRU eviction |
 
 ---
 
 ## 10. Future Enhancements
-
-- ~~**Double DQN**~~ — ✅ Implemented. Online net selects best action, target net evaluates it.
-- **Prioritized Experience Replay (PER)** — sample important transitions more.
-- **Curriculum Learning** — start with only I and O pieces, gradually
-  add harder pieces.
+- ~~**Double DQN**~~ — ✅ Implemented (now V-network DQN).
+- ✅ **Per-candidate evaluation** — V-network evaluates V(resulting_board) per valid placement.
+- ✅ **DT-20 features** — 17-dim engineered features replace 220-dim raw board.
+- ✅ **PBRS** — Potential-based reward shaping with Dellacherie board value.
+- ✅ **Prioritized Experience Replay (PER)** — Proportional PER with IS weights (Schaul et al. 2015).
+- ✅ ~~**Soft target update (Polyak averaging)**~~ — Implemented (τ=0.005, every step).
+- ✅ ~~**Heuristic warm-start**~~ — Implemented (Dellacherie-weighted softmax exploration).
+- ✅ ~~**Curriculum Learning**~~ — Implemented (O → I → L → J → T → S → Z).
+- ✅ **N-step returns** — 3-step Bellman targets for faster credit assignment.
+- ✅ **Soft-drop BFS** — SRS wall kicks + BFS candidate generation (overhangs, T-Spins).
+- ✅ **2-piece look-ahead** — Simulate best next-piece placement before evaluation.
+- ✅ **Feature normalization** — Standardize DT-20 features (mean/std) before network input.
 - **Self-Play Tournament** — run multiple AI agents in parallel, keep the
   best-performing model.
 - **Human Replay** — let a human play, record the session, and pre-train
@@ -361,7 +412,10 @@ first draw. Any key returns to the AI submenu.
 - [x] **Step 14**: AI HUD statistics table with trend row
 - [x] **Step 15**: Settings persistence (`settings.json`)
 - [x] **Step 16**: Score-vs-episode graph in AI submenu (matplotlib)
-- [ ] **Step 17**: Compare DQN vs NEAT approaches
+- [x] **Step 17**: Per-candidate V-function evaluation (rotation + column + hard-drop)
+- [x] **Step 18**: DT-20 feature set (17-dim engineered features replace 220-dim raw board)
+- [x] **Step 19**: PBRS with Dellacherie board value potential
+- [ ] **Step 20**: Compare DQN vs NEAT approaches
 
 ## 12. Dependencies
 
@@ -391,17 +445,17 @@ Human selects "Joueur : IA"
         ↓
 AIState launched (subclass of GameState)
         ↓
-AI agent observes board state (220 features)
+AI agent generates candidate states (17 DT-20 features each)
         ↓
-ε-greedy selects macro-action (column × rotation)
+ε-greedy evaluates V per candidate, picks max
         ↓
-Action executed: rotate → move → BFS soft-drop
+Action executed: rotate → move → hard-drop
         ↓
-Reward computed (delta holes, lines, height, bumpiness)
+Reward computed (delta holes, lines, height, bumpiness + PBRS)
         ↓
-Experience stored in replay buffer
+Experience stored in replay buffer (delayed: s + s' from consecutive placements)
         ↓
-Double DQN updates Q-network from mini-batch
+V-network Bellman updates from mini-batch
         ↓
 Repeat until game over
         ↓

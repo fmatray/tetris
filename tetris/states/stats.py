@@ -97,7 +97,7 @@ class StatsState(State):
         # --- Graph on the right ---
         if self._surface is not None:
             surf = self._surface
-            gx = SCREEN_WIDTH - surf.get_width() - 60
+            gx = SCREEN_WIDTH - surf.get_width() - 30
             gy = TITLE_Y
             screen.blit(surf, (gx, gy))
 

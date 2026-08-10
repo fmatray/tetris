@@ -24,7 +24,7 @@ Returning a new `State` from `handle_event`/`update` transitions the app; `None`
 - `tetris/audio/` — procedural sound synthesis via NumPy
 - `tetris/storage/` — JSON persistence (leaderboard, human stats)
 - `tetris/states/` — FSM states binding input → game logic → rendering
-- `tetris/ai/` — DQN agent, network, replay buffer, reward shaping, training log
+- `tetris/ai/` — V-network DQN agent, DT-20 features, PBRS reward shaping, PER, n-step returns, soft-drop BFS, training log
 
 ### State Machine Tree
 
@@ -48,7 +48,7 @@ MenuState (root, owns settings)
 |---|---|
 | `tetris/game/` | Pure domain: `Board`, `Tetromino`, `PieceProvider`, `ScoreEngine`, `GameStats` |
 | `tetris/states/` | FSM states (`State` base + 15 concrete states) |
-| `tetris/ai/` | DQN: `DQNetwork`, `DQNAgent`, `ReplayBuffer`, reward/feature extraction, `TrainingLog` |
+| `tetris/ai/` | V-network DQN: `DQNetwork` (V-function), `DQNAgent` (per-candidate eval), `PrioritizedReplayBuffer`, DT-20 features + PBRS reward, SRS wall kicks + soft-drop BFS, `TrainingLog` |
 | `tetris/visuals/` | `Renderer`, `ParticleSystem`, leaderboard/graph views |
 | `tetris/audio/` | `AudioManager` — procedural NumPy sine-wave synthesis |
 | `tetris/storage/` | JSON load/save for leaderboard and human game history |
@@ -75,7 +75,7 @@ python -m tetris.verify_training
 
 **Runtime:** Python 3.14.5rc1, pygame-ce 2.5.x, macOS arm64.
 
-**No test suite exists.** Verification is done via headless smoke tests with `SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy` and synthetic `pygame.event.Event(pygame.KEYDOWN, key=K_x)` events.
+**Test suite**: `tests/` directory with pytest tests for rewards, agent (n-step, PER), board, tetromino, scoring, stats, piece provider, curriculum. Run with `SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy python -m pytest tests/ -q`.
 
 ## Code Conventions & Common Patterns
 
@@ -85,7 +85,7 @@ python -m tetris.verify_training
 - **Path constants**: All data paths centralized in `tetris/settings.py` — never hardcode `"data/..."` in consumer modules; import from `settings`.
 - **Data directory**: `DATA_DIR = "data"` with `os.makedirs(DATA_DIR, exist_ok=True)` at import time — directory always exists.
 - **AI exclusion from human stats**: `save_human_game()` is only called in `GameOverState._handle_name_event()`. `AIState` has its own `_on_episode_end()` and never creates `GameOverState` — architectural guarantee that AI games never pollute human stats.
-- **AI gameplay**: `AIState` inherits `GameState`, replaces keyboard input with `DQNAgent.select_action()` macro-actions (rotation + column + BFS drop to deepest reachable position). Learning mode does `LEARN_PER_ACTION = 2` gradient updates per locked piece; playing mode sets epsilon=0 (greedy), skips transition storage/learning/episode logging.
+- **AI gameplay**: `AIState` inherits `GameState`, replaces keyboard input with per-candidate V-function evaluation. Candidate generation: soft-drop BFS (with SRS wall kicks) or hard-drop; 2-piece look-ahead simulates best next-piece placement. `DQNAgent.select_action(candidate_states)` evaluates V per valid placement, picks max. Learning mode does `learn_per_action` (default 2) gradient updates per locked piece; playing mode sets epsilon=0 (greedy), skips transition storage/learning/episode logging.
 - **Rendering**: `Renderer` is pure presentation — takes game state, draws to surface. `ParticleSystem` handles physics-based effects. Fonts are proportional (Arial), so use explicit pixel-positioned columns, not format-string alignment (`f"{x:<10}"` won't align).
 - **Naming**: `PascalCase` classes, `snake_case` functions/variables, `UPPER_CASE` constants in `settings.py`.
 
@@ -101,8 +101,8 @@ python -m tetris.verify_training
 | `tetris/states/game.py` | Human gameplay loop, `_setup_keybinds()` |
 | `tetris/states/ai.py` | AI gameplay + RL training integration |
 | `tetris/ai/agent.py` | `DQNAgent` — `select_action`, `store`, `learn`, `save`, `load` |
-| `tetris/ai/rewards.py` | `extract_state` (220-dim vector) + `compute_reward` |
-| `tetris/ai/network.py` | `DQNetwork` — 220→256→128→64→40 MLP |
+| `tetris/ai/rewards.py` | `extract_features` (17-dim DT-20, normalized) + `compute_reward` (PBRS scale 0.1) + `dellacherie_value` + SRS wall kicks + `soft_drop_placements` BFS |
+| `tetris/ai/network.py` | `DQNetwork` — 17→128→64→1 V-network MLP |
 | `tetris/verify_training.py` | Headless training validation script |
 | `data/settings.json` | Persisted menu settings + keybinds |
 | `requirements.txt` | Dependencies: pygame>=2.5.0, numpy>=1.24.0, torch>=2.0, matplotlib>=3.7.0 |
@@ -153,12 +153,13 @@ All in `data/` (gitignored via blanket `data/` rule):
 | `ai_training_log.json` | `LOG_PATH` | JSON | Per-episode training metrics |
 | `replay_pieces.json` | `REPLAY_PATH` | JSON | Stored piece sequences for Replay mode |
 
-**`settings.json` schema**: `player` ("Humain"/"IA"), `mode` ("Normal"/"Replay"), `handicap` (0-5), `sound` (bool), `ai_speed` ("normal"/"fast"), `ai_epsilon_decay` (float), `ai_epsilon_end` (float), `ai_mode` ("learning"/"playing"), `keybinds` (dict: action→pygame keycode).
+**`settings.json` schema**: `player` ("Humain"/"IA"), `mode` ("Normal"/"Replay"), `handicap` (0-5), `sound` (bool), `ai_speed` ("normal"/"fast"), `ai_epsilon_decay` (float), `ai_epsilon_end` (float), `ai_lr` (float), `ai_gamma` (float), `ai_batch_size` (int), `ai_buffer_size` (int), `ai_mode` ("learning"/"playing"), `ai_curriculum` (bool), `ai_curriculum_freq` (int), `ai_curriculum_epsilon` (str), `ai_warm_start` (bool), `ai_learn_per_action` (int), `ai_lookahead` (bool), `ai_soft_drop` (bool), `keybinds` (dict: action→pygame keycode).
 
 ## DQN AI Specifics
 
-- **Network**: `DQNetwork` — Input(220) → Dense(256, ReLU) → Dense(128, ReLU) → Dense(64, ReLU) → Output(40, Linear). 40 macro-actions = (10 columns × 4 rotations).
-- **State vector** (`extract_state`, 220-dim): board cells (200) + current piece one-hot (7) + next piece one-hot (7) + orientation one-hot (4) + normalized x (1) + normalized y (1).
-- **Hyperparameters**: lr=1e-4, gamma=0.97, epsilon 1.0→0.10 (decay 0.999/episode, configurable), batch=64, target sync=500 steps, buffer capacity=50,000. Double DQN, SmoothL1Loss, grad clipping at 1.0.
-- **Reward** (`compute_reward`): +50×lines + 5×lines², +1.0 survival, -10.0 game over, -5.0 per new hole, -0.1 per total hole, -0.05×height, -0.1×bumpiness.
+- **Network**: `DQNetwork` — Input(17, normalized) → Dense(128, ReLU) → Dense(64, ReLU) → Output(1, Linear). V-function evaluates board quality per candidate placement.
+- **State vector** (`extract_features`, 17-dim DT-20, normalized via `(x - mean) / std`): `[lines_cleared, holes, aggregate_height, bumpiness, max_height, row_transitions, column_transitions, wells, hole_depth, rows_with_holes, *next_piece_one_hot(7)]`.
+- **Hyperparameters**: lr=1e-3, gamma=0.97, epsilon 1.0→0.10 (decay 0.999/episode, configurable), batch=64, Polyak τ=0.005 (soft target update every step), buffer capacity=50,000 (PrioritizedReplayBuffer, α=0.6, β=0.4→1.0). N-step returns (N=3). V-function Bellman, SmoothL1Loss (IS-weighted), grad clipping at 1.0.
+- **Reward** (`compute_reward`): +50×lines + 5×lines², +1.0 survival, -50.0 game over, -5.0 per new hole, -0.1 per total hole, -0.5×height, -0.3×bumpiness, -0.5×wells. PBRS term: `PBRS_SCALE × (γ·Φ(new) - Φ(prev))` where Φ = Dellacherie board value, `PBRS_SCALE = 0.1`.
+- **Candidate generation**: soft-drop BFS (`soft_drop_placements`) with SRS wall kicks (`SRS_KICKS_JLSTZ`, `SRS_KICKS_I`) — enumerates all reachable placements including overhangs. 2-piece look-ahead simulates best next-piece placement (Dellacherie-optimal). Hard-drop fallback when soft-drop is OFF.
 - **Modes**: `ai_mode="learning"` (epsilon-greedy + training updates + logging) vs `"playing"` (greedy, epsilon=0, no learning). Set in `AIState.__init__` after `agent.load(MODEL_PATH)`.

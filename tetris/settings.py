@@ -103,6 +103,11 @@ GAME_OVER_PARTICLE_COUNT = 400
 # AI behavior
 AI_ACTION_DELAY_MS = 80        # normal-mode reaction delay
 AI_MODEL_SAVE_INTERVAL = 50    # save model every N episodes
+LEARN_PER_ACTION = 2          # gradient updates per locked piece
+
+# Curriculum learning: piece introduction order (easy → hard)
+CURRICULUM_ORDER: list[str] = ["O", "I", "L", "J", "T", "S", "Z"]
+CURRICULUM_EPSILON_POLICIES: list[str] = ["reset", "boost", "decay"]
 
 # Leaderboard
 LEADERBOARD_SIZE = 10

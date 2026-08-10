@@ -36,11 +36,17 @@ class HyperparamMenuState(MenuBase):
         "Gamma",
         "Batch size",
         "Buffer size",
-        "Target sync",
+        "Curriculum",
+        "Fréq. curriculum",
+        "Epsilon curr.",
+        "Warm-start",
+        "Maj. par pièce",
+        "Look-ahead",
+        "Soft-drop",
         "Réinitialiser",
         "Retour",
     )
-    _toggle_indices = frozenset({0, 1, 2, 3, 4, 5, 6})
+    _toggle_indices = frozenset({0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12})
 
     # Per-param metadata: (min, max, step, explanation)
     _PARAM_META: ClassVar[tuple[tuple[str, str, str, str, str], ...]] = (
@@ -50,19 +56,31 @@ class HyperparamMenuState(MenuBase):
         ("0.80", "0.99", "0.01", "Actualisation récompenses futures. ↑ = long terme, ↓ = court terme"),
         ("8", "256", "8", "Taille du mini-batch. ↑ = gradients plus stables mais plus de mémoire"),
         ("1000", "200000", "5000", "Capacité du replay buffer. ↑ = plus de diversité, moins de corrélation"),
-        ("100", "2000", "100", "Sync du target network. ↑ = cible plus stable, ↓ = adaptation plus rapide"),
+        ("OFF", "ON", "ON/OFF", "Apprentissage progressif: O → +I → +L → +J → +T → +S → +Z"),
+        ("10", "2000", "10", "Épisodes entre ajout de pièce (curriculum)"),
+        ("reset", "decay", "", "Epsilon à l'ajout: reset=1.0, boost=0.5, decay=normal"),
+        ("OFF", "ON", "ON/OFF", "Exploration dirigée par heuristique Dellacherie (warm-start)"),
+        ("1", "8", "1", "Mises à jour gradient par pièce verrouillée"),
+        ("OFF", "ON", "ON/OFF", "Anticipation 2 pièces: simule le meilleur placement de la pièce suivante"),
+        ("OFF", "ON", "ON/OFF", "Recherche BFS: placements en glissé (surplombs, T-Spins)"),
         ("", "", "", ""),  # Réinitialiser
         ("", "", "", ""),  # Retour
     )
 
-    _DEFAULTS: ClassVar[dict[str, float | int]] = {
+    _DEFAULTS: ClassVar[dict[str, float | int | bool | str]] = {
         "ai_epsilon_decay": 0.999,
         "ai_epsilon_end": 0.10,
-        "ai_lr": 1e-4,
+        "ai_lr": 1e-3,
         "ai_gamma": 0.97,
         "ai_batch_size": 64,
         "ai_buffer_size": 50_000,
-        "ai_target_sync_steps": 500,
+        "ai_curriculum": False,
+        "ai_curriculum_freq": 50,
+        "ai_curriculum_epsilon": "reset",
+        "ai_warm_start": True,
+        "ai_learn_per_action": 2,
+        "ai_lookahead": True,
+        "ai_soft_drop": True,
     }
 
     def __init__(self, screen, font, audio, ai_menu) -> None:
@@ -91,7 +109,19 @@ class HyperparamMenuState(MenuBase):
         if i == 5:
             return f"{m.ai_buffer_size:,}"
         if i == 6:
-            return str(m.ai_target_sync_steps)
+            return "ON" if m.ai_curriculum else "OFF"
+        if i == 7:
+            return str(m.ai_curriculum_freq)
+        if i == 8:
+            return m.ai_curriculum_epsilon
+        if i == 9:
+            return "ON" if m.ai_warm_start else "OFF"
+        if i == 10:
+            return str(m.ai_learn_per_action)
+        if i == 11:
+            return "ON" if m.ai_lookahead else "OFF"
+        if i == 12:
+            return "ON" if m.ai_soft_drop else "OFF"
         return ""
 
     def _toggle(self, direction: int) -> None:
@@ -117,10 +147,22 @@ class HyperparamMenuState(MenuBase):
             m.ai_buffer_size = max(
                 1_000, min(200_000, m.ai_buffer_size + direction * 5_000)
             )
-        elif s == 6:  # Target sync
-            m.ai_target_sync_steps = max(
-                100, min(2_000, m.ai_target_sync_steps + direction * 100)
-            )
+        elif s == 6:  # Curriculum
+            m.ai_curriculum = not m.ai_curriculum
+        elif s == 7:  # Curriculum frequency
+            m.ai_curriculum_freq = max(10, min(2000, m.ai_curriculum_freq + direction * 10))
+        elif s == 8:  # Curriculum epsilon policy
+            policies = ["reset", "boost", "decay"]
+            idx = policies.index(m.ai_curriculum_epsilon)
+            m.ai_curriculum_epsilon = policies[(idx + direction) % len(policies)]
+        elif s == 9:  # Warm-start
+            m.ai_warm_start = not m.ai_warm_start
+        elif s == 10:  # Maj. par pièce
+            m.ai_learn_per_action = max(1, min(8, m.ai_learn_per_action + direction))
+        elif s == 11:  # Look-ahead
+            m.ai_lookahead = not m.ai_lookahead
+        elif s == 12:  # Soft-drop
+            m.ai_soft_drop = not m.ai_soft_drop
 
     def _save(self) -> None:
         self.menu.save_settings()
@@ -129,15 +171,14 @@ class HyperparamMenuState(MenuBase):
         return self.ai_menu
 
     def _on_select(self) -> State | None:
-        if self.selection == 7:  # Réinitialiser
+        if self.selection == 13:  # Réinitialiser
             for attr, val in self._DEFAULTS.items():
                 setattr(self.menu, attr, val)
             self.menu.save_settings()
             return None
-        if self.selection == 8:  # Retour
+        if self.selection == 14:  # Retour
             return self.ai_menu
         return None
-
     # --- Custom table draw ------------------------------------------------
 
     def draw(self, screen: pygame.Surface, *, particles=None) -> None:
@@ -156,7 +197,7 @@ class HyperparamMenuState(MenuBase):
         headers = ("Paramètre", "Current", "Min", "Max", "Step", "Explication")
         margin = 40
         left_w = 180     # Param
-        num_w = 80        # Current, Min, Max, Step (right-aligned)
+        num_w = 100        # Current, Min, Max, Step (right-aligned)
         gap = 15
         expl_w = SCREEN_WIDTH - margin * 2 - left_w - num_w * 4 - gap
 
