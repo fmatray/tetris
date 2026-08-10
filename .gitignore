@@ -30,6 +30,7 @@ htmlcov/
 
 # --- Generated data (all runtime artifacts in data/) ---
 data/
+*.log
 
 # --- OS files ---
 .DS_Store
@@ -50,3 +51,4 @@ Desktop.ini
 .env
 .env.*
 !.env.example
+.python-version

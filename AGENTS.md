@@ -40,7 +40,6 @@ MenuState (root, owns settings)
 
 `MenuState` is the settings owner: loads/saves `data/settings.json` via `_load_settings()`/`save_settings()`. Child menu states hold a reference to `MenuState` and mutate its attributes directly, then trigger `save_settings()`.
 
-**`GraphState`** (`tetris/states/graph.py`) is orphaned — `StatsState` replaced it. Safe to delete.
 
 ## Key Directories
 
@@ -52,6 +51,8 @@ MenuState (root, owns settings)
 | `tetris/visuals/` | `Renderer`, `ParticleSystem`, leaderboard/graph views |
 | `tetris/audio/` | `AudioManager` — procedural NumPy sine-wave synthesis |
 | `tetris/storage/` | JSON load/save for leaderboard and human game history |
+| `tests/` | Pytest suite for game logic and AI components |
+| `docs/` | Technical documentation (AI design, Architecture, etc.) |
 | `data/` | All runtime-generated files (gitignored) |
 
 ## Development Commands
@@ -120,7 +121,7 @@ python -m tetris.verify_training
 
 ## Testing & QA
 
-No formal test framework. Verification patterns:
+Verification patterns:
 
 ```bash
 # Lint
@@ -140,6 +141,11 @@ python -m tetris.verify_training
 # avg_duration > 30s, max_loss < 1000
 ```
 
+
+## Workflow
+
+- **Documentation**: Always update `README.md` and `docs/` when changing features or architecture.
+- **Git**: Always commit and push after modifications with comprehensive messages.
 ## Data Files
 
 All in `data/` (gitignored via blanket `data/` rule):
