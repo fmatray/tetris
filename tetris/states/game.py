@@ -20,9 +20,8 @@ from tetris.settings import (
     BLOCK_SIZE,
     BOARD_OFFSET_X,
     BOARD_OFFSET_Y,
-    DROP_BASE,
-    DROP_DECAY,
     SOFT_DROP_FACTOR,
+    drop_interval,
 )
 from tetris.states.base import State
 from tetris.visuals.particles import ParticleSystem
@@ -54,9 +53,9 @@ class GameState(State):
         self.pieces = piece_provider or PieceProvider()
         self.current_piece = Tetromino(self.pieces.next_type())
         self.next_piece = Tetromino(self.pieces.next_type())
-        self.stats = GameStats()
         self.drop_time = 0
-        self.current_speed = DROP_BASE
+        self.stats = GameStats()
+        self.current_speed = drop_interval(0)
         self.game_over = False
         self.paused = False
         self.down_pressed = False
@@ -160,9 +159,9 @@ class GameState(State):
             return None
         self.drop_time += dt
         speed = (
-            DROP_BASE * SOFT_DROP_FACTOR
+            drop_interval(self.stats.level) * SOFT_DROP_FACTOR
             if self.down_pressed
-            else DROP_BASE * (DROP_DECAY ** self.stats.level)
+            else drop_interval(self.stats.level)
         )
         self.current_speed = speed
         if self.drop_time / 1000 >= speed:

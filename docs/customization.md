@@ -14,7 +14,7 @@
 
 > Les touches sont reconfigurables via le menu (**Humain > Touches**) et persistées dans `settings.json`. Les valeurs par défaut sont définies dans `tetris/settings.py` (`DEFAULT_KEYBINDS`).
 >
-> La vitesse de chute est calculée dans `tetris/states/game.py` (`DROP_BASE × DROP_DECAY^niveau`) et configurable via `tetris/settings.py` (`DROP_BASE`, `DROP_DECAY`, `SOFT_DROP_FACTOR`).
+> La vitesse de chute est calculée dans `tetris/settings.py` (`drop_interval(level)`, formule Tetris Guideline $(0{,}8 - \text{niveau} \times 0{,}007)^{\text{niveau}}$) configurable via `SOFT_DROP_FACTOR` (ralentisseur de chute douce).
 
 ### Mode débogage
 

@@ -71,10 +71,16 @@ SHAPES = {
 # Line-clear base points (× level at clear time)
 LINE_CLEAR_POINTS = {1: 100, 2: 300, 3: 500, 4: 800}
 
-# Drop speed: base seconds, exponential decay per level
-DROP_BASE = 0.5
-DROP_DECAY = 0.98
-SOFT_DROP_FACTOR = 0.1  # soft drop speed = DROP_BASE * SOFT_DROP_FACTOR
+# Drop speed: Tetris Guideline formula (seconds per row at given level).
+# Super-exponential: (0.8 - level×0.007)^level.
+# Level 0 → 1.0s, level 10 → 0.04s, level 20 → 0.001s.
+SOFT_DROP_FACTOR = 0.1  # soft drop speed = gravity × SOFT_DROP_FACTOR
+
+
+def drop_interval(level: int) -> float:
+    """Seconds per row at the given level (Tetris Guideline gravity)."""
+    base = max(0.001, 0.8 - level * 0.007)
+    return max(0.001, base ** level)
 
 # Lines required to advance one level
 LINES_PER_LEVEL = 10
