@@ -40,6 +40,7 @@ class MenuState(MenuBase):
     _instructions = "Flèches: Navigation | Entrée: Valider | Échap: Quitter"
 
     def __init__(self, screen, font, audio) -> None:
+        self.ai_speed = "normal"
         super().__init__(screen, font, audio)
         # Defaults — overridden by _load_settings() if a file exists
         self.handicap = 0
