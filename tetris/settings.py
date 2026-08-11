@@ -89,10 +89,11 @@ NEXT_PANEL_Y = 100
 
 # HUD text positions
 HUD_POSITIONS = {
-    "tetrominos": (20, 20),
-    "lines": (20, 60),
-    "level": (20, 100),
-    "speed": (20, 140),
+    "score": (20, 20),
+    "tetrominos": (20, 60),
+    "lines": (20, 100),
+    "level": (20, 140),
+    "speed": (20, 180),
     "next": (570, 50),
     "ai_stats": (570, 180),
     "mode": (20, 700),

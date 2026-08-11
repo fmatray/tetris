@@ -57,6 +57,7 @@ class Renderer:
         self.screen.fill(BLACK)
         self.draw_grid(game.board)
         self.draw_tetromino(game.current_piece)
+        self._draw_text(f"SCORE: {game.stats.score}", HUD_POSITIONS["score"])
         self._draw_text(f"TETROMINOS: {game.stats.piece_count}", HUD_POSITIONS["tetrominos"])
         self._draw_text(f"LINES: {game.stats.total_lines}", HUD_POSITIONS["lines"])
         self._draw_text(f"LEVEL: {game.stats.level}", HUD_POSITIONS["level"])
