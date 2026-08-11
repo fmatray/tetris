@@ -24,18 +24,19 @@ def draw_leaderboard(screen: pygame.Surface, font: pygame.font.Font) -> None:
     title = get_large_font().render("TOP 10 LEADERBOARD", True, WHITE)
     screen.blit(title, (SCREEN_WIDTH // 2 - title.get_width() // 2, TITLE_Y))
     # Explicit pixel columns — proportional Arial breaks f-string padding.
+    # pad gives breathing room between adjacent columns.
     margin = 150
+    pad = 15
     columns = [
         ("#", 60, "right"),
-        ("Name", 260, "left"),
-        ("Score", 150, "right"),
-        ("Lvl", 70, "right"),
-        ("Lines", 90, "right"),
-        ("Générateur", 160, "left"),
+        ("Name", 240, "left"),
+        ("Score", 130, "right"),
+        ("Lvl", 60, "right"),
+        ("Lines", 80, "right"),
+        ("Générateur", 170, "left"),
         ("Mode", 130, "left"),
-        ("Date", 280, "left"),
+        ("Date", 330, "left"),
     ]
-    total_width = sum(w for _, w, _ in columns)
     x0 = margin
     # Compute absolute x for each column (start of cell).
     xs = []
@@ -46,7 +47,7 @@ def draw_leaderboard(screen: pygame.Surface, font: pygame.font.Font) -> None:
     # Header row.
     for (label, w, align), cx in zip(columns, xs):
         surf = font.render(label, True, GRAY)
-        px = cx if align == "left" else cx + w - surf.get_width()
+        px = cx + pad if align == "left" else cx + w - pad - surf.get_width()
         screen.blit(surf, (px, CONTENT_Y))
     # Data rows.
     for i, entry in enumerate(scores[:10], 1):
@@ -65,7 +66,7 @@ def draw_leaderboard(screen: pygame.Surface, font: pygame.font.Font) -> None:
         ]
         for val, (label, w, align), cx in zip(values, columns, xs):
             surf = font.render(val, True, WHITE)
-            px = cx if align == "left" else cx + w - surf.get_width()
+            px = cx + pad if align == "left" else cx + w - pad - surf.get_width()
             screen.blit(surf, (px, y))
     instr = font.render("Press any key to continue", True, GRAY)
     screen.blit(instr, (SCREEN_WIDTH // 2 - instr.get_width() // 2, INSTRUCTIONS_Y))
