@@ -23,6 +23,10 @@ _logger = get_logger("piece_provider")
 class PieceProvider:
     """Controls tetromino spawning: random, recorded, or replayed.
 
+    Bag generators repeat each pool piece a fixed number of times:
+    7-bag = 1 copy, 35-bag = 5 copies. Everything else (shuffle, pop,
+    first-piece swap) is shared.
+
     Parameters
     ----------
     mode : str
@@ -32,12 +36,14 @@ class PieceProvider:
         File path for the recorded/replayed piece sequence.
     """
 
+    _BAG_MULTIPLIERS: dict[str, int] = {"7bag": 1, "35bag": 5}
+
     def __init__(
         self,
         mode: str = "normal",
         path: Path | str = REPLAY_PATH,
         allowed_types: list[str] | None = None,
-        generator: str = "random",  # "random" or "7bag"
+        generator: str = "random",  # "random", "7bag", or "35bag"
     ) -> None:
         self.mode = mode
         self.path = Path(path)
@@ -79,7 +85,7 @@ class PieceProvider:
 
         # Normal mode, or replay exhausted → generator-based spawn
         pool = self.allowed_types if self.allowed_types is not None else list(SHAPES.keys())
-        if self.generator == "7bag":
+        if self.generator in self._BAG_MULTIPLIERS:
             piece_type = self._bag_next(pool)
         else:
             piece_type = self._first_piece_choice(pool)
@@ -95,7 +101,7 @@ class PieceProvider:
 
     def _bag_next(self, pool: list[str]) -> str:
         if not self._bag:
-            self._bag = pool[:]
+            self._bag = pool * self._BAG_MULTIPLIERS[self.generator]
             random.shuffle(self._bag)
         piece = self._bag.pop()
         if self._first_piece and piece not in FIRST_PIECE_TYPES:
@@ -131,7 +137,7 @@ class PieceProvider:
 
     @property
     def bag_remaining(self) -> list[str]:
-        """Remaining pieces in the current 7-bag (empty if random or bag exhausted)."""
+        """Remaining pieces in the current bag (empty if random or bag exhausted)."""
         return self._bag[:]
 
     # --- Internal -----------------------------------------------------

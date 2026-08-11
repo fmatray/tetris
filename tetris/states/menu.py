@@ -34,6 +34,7 @@ class MenuState(MenuBase):
         "Leaderboard",     # 7
         "Quitter",         # 8
     )
+    _GENERATOR_CYCLE: ClassVar[tuple[str, ...]] = ("random", "7bag", "35bag")
     _toggle_indices = frozenset({0, 1, 2, 3})  # Joueur, Son, Générateur, Débogage
     _title = "TETRIS"
 
@@ -132,7 +133,8 @@ class MenuState(MenuBase):
         if i == 1:
             return "ON" if self.sound_enabled else "OFF"
         if i == 2:
-            return "7-bag" if self.piece_generator == "7bag" else "Aléatoire"
+            labels = {"random": "Aléatoire", "7bag": "7-bag", "35bag": "35-bag"}
+            return labels.get(self.piece_generator, "Aléatoire")
         if i == 3:
             return "ON" if self.debug else "OFF"
         return ""
@@ -146,7 +148,8 @@ class MenuState(MenuBase):
         elif self.selection == 1:  # Son
             self.sound_enabled = not self.sound_enabled
         elif self.selection == 2:  # Générateur
-            self.piece_generator = "7bag" if self.piece_generator == "random" else "random"
+            idx = self._GENERATOR_CYCLE.index(self.piece_generator)
+            self.piece_generator = self._GENERATOR_CYCLE[(idx + direction) % len(self._GENERATOR_CYCLE)]
         elif self.selection == 3:  # Débogage
             self.debug = not self.debug
             configure_logging(self.debug)

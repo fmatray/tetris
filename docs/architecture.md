@@ -118,7 +118,7 @@ Le module `tetris/logger.py` centralise la journalisation via Python `logging`. 
 - **Debug OFF** (défaut) : niveau WARNING — seul les erreurs sont écrites dans `data/debug.log`.
 - **Debug ON** : niveau DEBUG — tous les messages (apparition de pièces, verrouillage, fin de partie, épisodes IA, curriculum) sont journalisés.
 
-Le mode débogage est activable depuis le menu principal (option Débogage ON/OFF). Il active également la visualisation du sac 7-bag (pièces restantes) à droite de l'aperçu de la prochaine pièce.
+Le mode débogage est activable depuis le menu principal (option Débogage ON/OFF). Il active également la visualisation du sac de pièces restantes (7-bag ou 35-bag) à droite de l'aperçu de la prochaine pièce.
 
 ### SLAP (Single Layer of Abstraction)
 

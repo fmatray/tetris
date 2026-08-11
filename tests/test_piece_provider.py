@@ -127,6 +127,50 @@ def test_7bag_set_allowed_types_resets_bag(tmp_path):
     assert provider.next_type() == "O"
 
 
+def test_35bag_deals_thirty_five_pieces(tmp_path):
+    """35-bag: each piece appears exactly 5 times per 35 draws."""
+    provider = PieceProvider(mode="normal", path=tmp_path / "bag.json", generator="35bag")
+    bag = [provider.next_type() for _ in range(35)]
+    counts = {t: bag.count(t) for t in SHAPES}
+    assert all(c == 5 for c in counts.values()), f"Expected 5 of each, got {counts}"
+
+
+def test_35bag_respects_allowed_types(tmp_path):
+    """35-bag with allowed_types=["O"] deals only O pieces."""
+    provider = PieceProvider(
+        mode="normal", path=tmp_path / "bag.json", generator="35bag", allowed_types=["O"]
+    )
+    for _ in range(50):
+        assert provider.next_type() == "O"
+
+
+def test_35bag_allowed_types_subset(tmp_path):
+    """35-bag with a subset deals each subset piece 5 times per bag."""
+    provider = PieceProvider(
+        mode="normal", path=tmp_path / "bag.json", generator="35bag", allowed_types=["O", "I", "T"]
+    )
+    bag = [provider.next_type() for _ in range(15)]
+    counts = {t: bag.count(t) for t in ("I", "O", "T")}
+    assert all(c == 5 for c in counts.values()), f"Expected 5 of each, got {counts}"
+
+
+def test_first_piece_35bag_is_safe(tmp_path):
+    """35-bag generator: first piece is always I, J, L, or T."""
+    for _ in range(50):
+        provider = PieceProvider(mode="normal", path=tmp_path / "bag.json", generator="35bag")
+        first = provider.next_type()
+        assert first in ("I", "J", "L", "T")
+
+
+def test_35bag_completeness(tmp_path):
+    """35-bag stays complete: all 7 pieces appear 5× in the first bag even with
+    the first-piece swap."""
+    provider = PieceProvider(mode="normal", path=tmp_path / "bag.json", generator="35bag")
+    bag = [provider.next_type() for _ in range(35)]
+    counts = {t: bag.count(t) for t in SHAPES}
+    assert all(c == 5 for c in counts.values()), f"Expected 5 of each, got {counts}"
+
+
 def test_default_generator_is_random(tmp_path):
     """Without the generator param, default is 'random'."""
     provider = PieceProvider(mode="normal", path=tmp_path / "bag.json")

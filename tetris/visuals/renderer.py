@@ -65,11 +65,11 @@ class Renderer:
             self._draw_text(f"SPEED: {int(game.current_speed * 1000)}ms", HUD_POSITIONS["speed"])
         self._draw_text("NEXT:", HUD_POSITIONS["next"])
         self.draw_next_piece(game.next_piece)
-        if game.debug and game.pieces.generator == "7bag":
+        if game.debug and game.pieces.generator in ("7bag", "35bag"):
             self._draw_debug_bag(game)
         # Bottom-left: mode and generator
         mode = game.menu.mode if game.menu else "Normal"
-        gen = "7-bag" if game.pieces.generator == "7bag" else "Aléatoire"
+        gen = {"7bag": "7-bag", "35bag": "35-bag"}.get(game.pieces.generator, "Aléatoire")
         self._draw_text(f"MODE: {mode}", HUD_POSITIONS["mode"])
         self._draw_text(f"GÉNÉRATEUR: {gen}", HUD_POSITIONS["generator"])
         if game.paused:
@@ -85,13 +85,18 @@ class Renderer:
         self.screen.blit(surf, pos)
 
     def _draw_debug_bag(self, game: GameState) -> None:
-        """Draw remaining 7-bag pieces as colored blocks right of the next-piece panel."""
+        """Draw remaining bag pieces as colored blocks right of the next-piece panel."""
         bag = game.pieces.bag_remaining
         x = NEXT_PANEL_X + 7 * BLOCK_SIZE + 20
         y = HUD_POSITIONS["next"][1]
         self._draw_text(f"SAC ({len(bag)}):", (x, y))
         y += 60
-        for piece_type in bag[::-1]:
+        start_x = x
+        max_per_row = max(1, (SCREEN_WIDTH - x) // (BLOCK_SIZE + 2))
+        for i, piece_type in enumerate(bag[::-1]):
+            if i and i % max_per_row == 0:
+                x = start_x
+                y += BLOCK_SIZE + 2
             color = SHAPES_COLORS[piece_type]
             rect = pygame.Rect(x, y, BLOCK_SIZE, BLOCK_SIZE)
             pygame.draw.rect(self.screen, color, rect)

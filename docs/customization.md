@@ -22,4 +22,4 @@
 
 Le mode débogage est activable depuis le menu principal (option Débogage ON/OFF, persisté dans `settings.json` clé `debug`). Quand activé :
 - Les événements de jeu sont journalisés dans `data/debug.log` (Python `logging`, niveau DEBUG).
-- Le contenu restant du sac 7-bag est affiché à droite de l'aperçu de la prochaine pièce (uniquement avec le générateur 7-bag).
+- Le contenu restant du sac de pièces est affiché à droite de l'aperçu de la prochaine pièce (uniquement avec les générateurs 7-bag ou 35-bag).
