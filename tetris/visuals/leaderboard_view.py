@@ -24,18 +24,19 @@ def draw_leaderboard(screen: pygame.Surface, font: pygame.font.Font) -> None:
     title = get_large_font().render("TOP 10 LEADERBOARD", True, WHITE)
     screen.blit(title, (SCREEN_WIDTH // 2 - title.get_width() // 2, TITLE_Y))
     # Explicit pixel columns — proportional Arial breaks f-string padding.
+    margin = 150
     columns = [
-        ("#", 40, "right"),
-        ("Name", 180, "left"),
-        ("Score", 100, "right"),
-        ("Lvl", 50, "right"),
-        ("Lines", 60, "right"),
-        ("Générateur", 110, "left"),
-        ("Mode", 90, "left"),
-        ("Date", 190, "left"),
+        ("#", 60, "right"),
+        ("Name", 260, "left"),
+        ("Score", 150, "right"),
+        ("Lvl", 70, "right"),
+        ("Lines", 90, "right"),
+        ("Générateur", 160, "left"),
+        ("Mode", 130, "left"),
+        ("Date", 280, "left"),
     ]
     total_width = sum(w for _, w, _ in columns)
-    x0 = SCREEN_WIDTH // 2 - total_width // 2
+    x0 = margin
     # Compute absolute x for each column (start of cell).
     xs = []
     x = x0
