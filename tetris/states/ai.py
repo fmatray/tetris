@@ -292,11 +292,15 @@ class AIState(GameState):
         # Soft-drop to target y (or hard-drop if soft_drop off)
         if not self.paused:
             if self.soft_drop:
+                drop_cells = 0
                 while piece.y < py and self.board.is_valid_move(piece, dy=1):
                     piece.move(0, 1)
+                    drop_cells += 1
+                self.stats.add_soft_drop(drop_cells)
                 self._lock_and_spawn()
             else:
-                self.board.hard_drop(piece)
+                distance = self.board.hard_drop(piece)
+                self.stats.add_hard_drop(distance)
                 self._lock_and_spawn()
 
     # --- Override _lock_and_spawn to capture RL transitions --------------

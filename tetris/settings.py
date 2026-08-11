@@ -68,8 +68,8 @@ SHAPES = {
     ],
 }
 
-# Line-clear bonus by number of lines cleared (base = lines * 100)
-LINE_BONUS = {1: 0, 2: 20, 3: 50, 4: 100}
+# Line-clear base points (× level at clear time)
+LINE_CLEAR_POINTS = {1: 100, 2: 300, 3: 500, 4: 800}
 
 # Drop speed: base seconds, exponential decay per level
 DROP_BASE = 0.5

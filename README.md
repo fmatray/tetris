@@ -7,7 +7,7 @@ Un jeu Tetris complet développé en Python avec Pygame, incluant des effets vis
 ### Gameplay
 
 - ✅ Mécaniques de Tetris classiques (rotation, déplacement, chute)
-- ✅ Système de score avec bonus pour les lignes multiples (1 ligne = 100 pts, 2 = 220, 3 = 350, 4 = 500)
+- ✅ Système de score standard (Guideline Tetris) : Single 100×niveau, Double 300×niveau, Triple 500×niveau, Tetris 800×niveau, combos 50×compteur×niveau, chute douce 1 pt/case, chute rapide 2 pts/case
 - ✅ Niveaux progressifs (la vitesse augmente selon `0.5 × 0.98^niveau` toutes les 10 lignes)
 - ✅ Handicap personnalisable (0-5, chaque niveau ajoute 2 rangées partielles de blocs gris en bas)
 

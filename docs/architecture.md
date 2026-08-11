@@ -27,7 +27,7 @@ tetris/
 │   │   ├── tetromino.py         # Modèle de pièce
 │   │   ├── board.py             # Grille, collisions, lignes, handicap, hard drop
 │   │   ├── piece_provider.py    # Fournisseur de pièces (Aléatoire / 7-Bag / Replay)
-│   │   ├── scoring.py           # Règles de score (bonus multi-lignes)
+│   │   ├── scoring.py           # Règles de score (Guideline : lignes × niveau, combos, drop)
 │   │   └── stats.py             # Score, lignes, niveau
 │   ├── ai/                      # Apprentissage par renforcement (V-network DQN)
 │   │   ├── __init__.py
@@ -96,7 +96,7 @@ Le code est organisé en packages (`game/`, `audio/`, `visuals/`, `states/`, `st
 ### DRY (Don't Repeat Yourself)
 
 - `draw_leaderboard()` dans `visuals/leaderboard_view.py` centralise le rendu du tableau des scores, partagé par `LeaderboardState` et `GameOverState` (auparavant dupliqué).
-- Le tableau des bonus de score (`LINE_BONUS`) est défini une fois dans `settings.py` et utilisé par `ScoreEngine` — pas de logique de score dupliquée.
+- Le tableau des points de ligne (`LINE_CLEAR_POINTS`) est défini une fois dans `settings.py` et utilisé par `ScoreEngine` — pas de logique de score dupliquée.
 
 ### KISS (Keep It Simple)
 
@@ -107,7 +107,7 @@ Chaque module est petit et fait une seule chose. `main.py` ne contient que l'app
 | Principe | Application |
 | -------- | -------- |
 | **S** — Single Responsibility | `Board` (grille), `Tetromino` (pièce), `GameStats` (score/niveau), `ScoreEngine` (règles), `AudioManager` (son), `Renderer` (affichage), `ParticleSystem` (effets), `TetrisApp` (boucle) — une classe, un rôle. |
-| **O** — Open/Closed | `State` est une classe de base ; ajouter un état se fait par sous-classe sans modifier `TetrisApp`. Les bonus de score s'ajoutent via `LINE_BONUS` (donnée) sans modifier `ScoreEngine`. |
+| **O** — Open/Closed | `State` est une classe de base ; ajouter un état se fait par sous-classe sans modifier `TetrisApp`. Les points de ligne s'ajoutent via `LINE_CLEAR_POINTS` (donnée) sans modifier `ScoreEngine`. |
 | **L** — Liskov Substitution | Tous les états héritent de `State` avec la même signature `handle_event` / `update` / `draw`. `TetrisApp` les dispatche polymorphiquement. |
 | **I** — Interface Segregation | Les `__init__.py` de chaque package n'exposent que le strict nécessaire (ex. `game/` exporte `Board`, `Tetromino`, `GameStats`, `ScoreEngine`). |
 | **D** — Dependency Inversion | Les états reçoivent `AudioManager` et `Board` par injection de dépendances (constructeur), jamais par construction interne. `Renderer` lit l'état du jeu sans le muter. |

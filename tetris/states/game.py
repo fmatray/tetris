@@ -110,7 +110,8 @@ class GameState(State):
         """Drop piece to bottom instantly, lock, and spawn next piece."""
         if self.paused:
             return
-        self.board.hard_drop(self.current_piece)
+        distance = self.board.hard_drop(self.current_piece)
+        self.stats.add_hard_drop(distance)
         self._lock_and_spawn()
 
     def _lock_and_spawn(self) -> tuple[int, list]:
@@ -179,6 +180,8 @@ class GameState(State):
         """Advance one drop step: move down or lock the current piece."""
         if self.board.is_valid_move(self.current_piece, dy=1):
             self.current_piece.move(0, 1)
+            if self.down_pressed:
+                self.stats.add_soft_drop(1)
             return
 
         cleared, rows_data = self._lock_and_spawn()
