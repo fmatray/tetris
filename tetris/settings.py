@@ -117,6 +117,9 @@ LEARN_PER_ACTION = 2          # gradient updates per locked piece
 
 # Curriculum learning: piece introduction order (easy → hard)
 CURRICULUM_ORDER: list[str] = ["O", "I", "L", "J", "T", "S", "Z"]
+# First piece of each game must be from this set (avoids forced overhang
+# on an empty board: S/Z/O create awkward gaps right from the start).
+FIRST_PIECE_TYPES: list[str] = ["I", "J", "L", "T"]
 CURRICULUM_EPSILON_POLICIES: list[str] = ["reset", "boost", "decay"]
 
 # Leaderboard

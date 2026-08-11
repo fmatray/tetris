@@ -16,7 +16,7 @@ import random
 from pathlib import Path
 
 from tetris.logger import get_logger
-from tetris.settings import REPLAY_PATH, SHAPES
+from tetris.settings import FIRST_PIECE_TYPES, REPLAY_PATH, SHAPES
 
 _logger = get_logger("piece_provider")
 
@@ -45,6 +45,7 @@ class PieceProvider:
         self.generator = generator
         self._bag: list[str] = []
         self._recorded: list[str] = []
+        self._first_piece = True
         self._replay_queue: list[str] = []
         self._replay_idx = 0
 
@@ -53,6 +54,15 @@ class PieceProvider:
 
     # --- Public API ----------------------------------------------------
 
+    def reset(self) -> None:
+        """Re-arm the first-piece restriction and clear the bag.
+
+        Called by AIState between episodes so each game starts with a
+        safe piece (I, J, L, or T).
+        """
+        self._first_piece = True
+        self._bag = []
+
     def next_type(self) -> str:
         if self.mode == "replay" and self._replay_idx < len(self._replay_queue):
             piece_type = self._replay_queue[self._replay_idx]
@@ -60,15 +70,20 @@ class PieceProvider:
             # Curriculum: skip pieces outside allowed_types
             if self.allowed_types is not None and piece_type not in self.allowed_types:
                 return self.next_type()
+            # First-piece restriction: skip queue pieces not in the safe set
+            if self._first_piece and piece_type not in FIRST_PIECE_TYPES:
+                return self.next_type()
+            self._first_piece = False
             self._recorded.append(piece_type)
             return piece_type
 
         # Normal mode, or replay exhausted → generator-based spawn
         pool = self.allowed_types if self.allowed_types is not None else list(SHAPES.keys())
         if self.generator == "7bag":
-            piece_type = self._bag_next()
+            piece_type = self._bag_next(pool)
         else:
-            piece_type = random.choice(pool)
+            piece_type = self._first_piece_choice(pool)
+        self._first_piece = False
         self._recorded.append(piece_type)
         _logger.debug("Spawned %s | bag=%s", piece_type, self._bag)
         return piece_type
@@ -78,12 +93,28 @@ class PieceProvider:
         self._bag = []  # force refill with new pool
 
 
-    def _bag_next(self) -> str:
-        pool = self.allowed_types if self.allowed_types is not None else list(SHAPES.keys())
+    def _bag_next(self, pool: list[str]) -> str:
         if not self._bag:
             self._bag = pool[:]
             random.shuffle(self._bag)
-        return self._bag.pop()
+        piece = self._bag.pop()
+        if self._first_piece and piece not in FIRST_PIECE_TYPES:
+            # Swap the popped piece with an eligible one still in the bag
+            # so the 7-bag stays complete (no duplicates, no missing pieces).
+            for i, t in enumerate(self._bag):
+                if t in FIRST_PIECE_TYPES:
+                    self._bag[i] = piece
+                    piece = t
+                    break
+        return piece
+
+    def _first_piece_choice(self, pool: list[str]) -> str:
+        """Pick a piece, restricting the first to the safe set when possible."""
+        if self._first_piece:
+            safe = [t for t in pool if t in FIRST_PIECE_TYPES]
+            if safe:
+                return random.choice(safe)
+        return random.choice(pool)
 
     def save(self) -> None:
         """Persist the recorded piece sequence to disk."""

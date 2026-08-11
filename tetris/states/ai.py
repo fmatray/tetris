@@ -432,7 +432,8 @@ class AIState(GameState):
         self._prev_done = False
         self._prev_action = None
 
-        # Reset board and pieces
+        # Reset pieces (re-arm first-piece restriction) and board
+        self.pieces.reset()
         self.board = Board()
         # Fresh board for learning diversity — no handicap carried over
         self.current_piece = Tetromino(self.pieces.next_type())

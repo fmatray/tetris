@@ -142,3 +142,67 @@ def test_bag_remaining_shows_current_bag(tmp_path):
     remaining = provider.bag_remaining
     assert len(remaining) == 6
     assert all(t in SHAPES for t in remaining)
+
+
+def test_first_piece_random_is_safe(tmp_path):
+    """Random generator: first piece is always I, J, L, or T."""
+    for _ in range(50):
+        provider = PieceProvider(mode="normal", path=tmp_path / "fp.json")
+        first = provider.next_type()
+        assert first in ("I", "J", "L", "T")
+
+
+def test_first_piece_7bag_is_safe(tmp_path):
+    """7-bag generator: first piece is always I, J, L, or T."""
+    for _ in range(50):
+        provider = PieceProvider(mode="normal", path=tmp_path / "fp.json", generator="7bag")
+        first = provider.next_type()
+        assert first in ("I", "J", "L", "T")
+
+
+def test_first_piece_7bag_completeness(tmp_path):
+    """7-bag stays complete: all 7 pieces appear in the first bag even with
+    the first-piece swap."""
+    provider = PieceProvider(mode="normal", path=tmp_path / "fp.json", generator="7bag")
+    bag = [provider.next_type() for _ in range(7)]
+    assert sorted(bag) == sorted(SHAPES.keys())
+
+
+def test_second_piece_not_restricted(tmp_path):
+    """Only the first piece is restricted; the second can be anything."""
+    for _ in range(50):
+        provider = PieceProvider(mode="normal", path=tmp_path / "fp.json")
+        provider.next_type()  # first (restricted)
+        second = provider.next_type()
+        assert second in SHAPES
+
+
+def test_reset_rearms_first_piece(tmp_path):
+    """reset() re-arms the first-piece restriction for the next game."""
+    provider = PieceProvider(mode="normal", path=tmp_path / "fp.json", generator="7bag")
+    first = provider.next_type()
+    assert first in ("I", "J", "L", "T")
+    # Drain rest of bag
+    for _ in range(6):
+        provider.next_type()
+    provider.reset()
+    first_again = provider.next_type()
+    assert first_again in ("I", "J", "L", "T")
+
+
+def test_first_piece_respects_curriculum(tmp_path):
+    """When curriculum restricts to ["O"], first piece is O (no safe overlap)."""
+    provider = PieceProvider(
+        mode="normal", path=tmp_path / "fp.json", allowed_types=["O"]
+    )
+    first = provider.next_type()
+    assert first == "O"
+
+
+def test_first_piece_replay_skips_unsafe(tmp_path):
+    """Replay mode skips queue pieces not in the safe set for the first piece."""
+    path = tmp_path / "replay.json"
+    path.write_text(json.dumps(["S", "Z", "I", "T"]))
+    provider = PieceProvider(mode="replay", path=path)
+    first = provider.next_type()
+    assert first in ("I", "J", "L", "T")
