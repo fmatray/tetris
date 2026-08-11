@@ -23,12 +23,16 @@ def draw_leaderboard(screen: pygame.Surface, font: pygame.font.Font) -> None:
     scores = load_leaderboard()
     title = get_large_font().render("TOP 10 LEADERBOARD", True, WHITE)
     screen.blit(title, (SCREEN_WIDTH // 2 - title.get_width() // 2, TITLE_Y))
-    header = font.render("Name       Score    Lvl   Lines   Date", True, GRAY)
+    header = font.render(
+        "#  Name       Score   Lvl  Lines  Générateur  Mode     Date", True, GRAY
+    )
     screen.blit(header, (SCREEN_WIDTH // 2 - header.get_width() // 2, CONTENT_Y))
     for i, entry in enumerate(scores[:10], 1):
+        gen = {"7bag": "7-bag", "35bag": "35-bag"}.get(entry.get("generator", ""), "Aléatoire")
+        mode = entry.get("mode", "-") or "-"
         row_str = (
-            f"{i:<2} {entry['name']:<10} {entry['score']:<8} "
-            f"{entry['level']:<5} {entry['lines']:<7} {entry['date']}"
+            f"{i:<2} {entry['name']:<10} {entry['score']:<7} "
+            f"{entry['level']:<4} {entry['lines']:<6} {gen:<11} {mode:<8} {entry['date']}"
         )
         row = font.render(row_str, True, WHITE)
         screen.blit(row, (SCREEN_WIDTH // 2 - row.get_width() // 2,

@@ -73,6 +73,8 @@ class GameOverState(State):
                 self.game.stats.score,
                 self.game.stats.level,
                 self.game.stats.total_lines,
+                self.game.pieces.generator,
+                self.game.menu.mode if self.game.menu else "Normal",
             )
             save_human_game(
                 self.name,

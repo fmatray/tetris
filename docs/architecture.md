@@ -8,7 +8,7 @@ Le projet repose sur une architecture modulaire et extensible :
 - **Audio Procédural** : Génération d'ondes sinusoïdales via NumPy pour créer des mélodies et effets sonores sans dépendances de fichiers externes.
 - **Système de Particules** : Moteur d'effets visuels gérant la physique (gravité, friction) et le cycle de vie des particules pour des explosions dynamiques.
 - **Rendu Isolé** : Classe `Renderer` dédiée pour séparer la logique de mise à jour du moteur graphique.
-- **Persistance JSON** : Leaderboard stocké dans `leaderboard.json`, trié par score décroissant, incluant le nom, le score, le niveau, les lignes effacées et la date.
+- **Persistance JSON** : Leaderboard stocké dans `leaderboard.json`, trié par score décroissant, incluant le nom, le score, le niveau, les lignes effacées, le générateur de pièces, le mode de jeu et la date.
 - **Apprentissage par Renforcement (V-network DQN)** : Agent V-network DQN implémenté avec PyTorch. L'IA apprend en jouant de manière autonome : évaluation par candidat (V-function, features DT-20 17-dim normalisées), exploration ε-greedy (decay et fin configurables), Prioritized Experience Replay (PER Schaul et al. 2015, avec importance sampling), n-step returns (3-step), target network (Polyak τ=0.005, Bellman). La récompense pénalise les nouveaux trous (delta), la hauteur, l'irrégularité et les puits, avec PBRS (Dellacherie, scale 0.1). Soft-drop BFS avec SRS wall kicks pour les surplombs et T-Spins. Look-ahead 2 pièces. Le modèle, les statistiques et les paramètres sont sauvegardés entre les sessions (`ai_model.pt`, `ai_training_log.json`, `settings.json`).
 
 ## Structure du projet

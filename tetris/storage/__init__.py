@@ -28,6 +28,8 @@ def load_leaderboard() -> list[dict[str, Any]]:
                 "score": d[1],
                 "level": 0,
                 "lines": 0,
+                "generator": "-",
+                "mode": "-",
                 "date": "Unknown",
             }
             for d in data
@@ -36,7 +38,9 @@ def load_leaderboard() -> list[dict[str, Any]]:
         return []
 
 
-def save_score(name: str, score: int, level: int, lines: int) -> None:
+def save_score(
+    name: str, score: int, level: int, lines: int, generator: str = "", mode: str = ""
+) -> None:
     """Append a score, sort descending, and persist the top entries."""
     scores = load_leaderboard()
     scores.append(
@@ -45,6 +49,8 @@ def save_score(name: str, score: int, level: int, lines: int) -> None:
             "score": score,
             "level": level,
             "lines": lines,
+            "generator": generator,
+            "mode": mode,
             "date": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M"),
         }
     )
