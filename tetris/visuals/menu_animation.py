@@ -41,8 +41,8 @@ class _FallingPiece:
     """
 
     __slots__ = (
-        "age", "blocks", "color", "rot_index", "rot_timer",
-        "shape_key", "x", "y",
+        "age", "blocks", "color", "explode_delay", "rot_index",
+        "rot_timer", "shape_key", "x", "y",
     )
 
     def __init__(self, shape_key: str) -> None:
@@ -54,6 +54,7 @@ class _FallingPiece:
         self.x = random.uniform(0, max(0, SCREEN_WIDTH - MENU_ANIM_BLOCK_SIZE * 4))
         self.y = -MENU_ANIM_BLOCK_SIZE * 4  # just above visible area
         self.age = 0.0
+        self.explode_delay = random.uniform(*MENU_ANIM_EXPLODE_DELAY)
         self.rot_timer = random.uniform(*MENU_ANIM_ROT_INTERVAL)
 
     @property
@@ -79,10 +80,8 @@ class _FallingPiece:
             direction = 1 if random.random() < MENU_ANIM_ROT_CHANCE else -1
             self.rotate(direction)
             self.rot_timer = random.uniform(*MENU_ANIM_ROT_INTERVAL)
-
     def should_explode(self) -> bool:
-        delay = random.uniform(*MENU_ANIM_EXPLODE_DELAY)
-        return self.age > delay and random.random() < MENU_ANIM_EXPLODE_CHANCE
+        return self.age > self.explode_delay and random.random() < MENU_ANIM_EXPLODE_CHANCE
 
     def is_offscreen(self) -> bool:
         return self.y + self.max_row() * MENU_ANIM_BLOCK_SIZE > SCREEN_HEIGHT
