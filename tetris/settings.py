@@ -133,7 +133,7 @@ LOG_PATH = os.path.join(DATA_DIR, "ai_training_log.json")
 REPLAY_PATH = os.path.join(DATA_DIR, "replay_pieces.json")
 DEBUG_LOG_PATH = os.path.join(DATA_DIR, "debug.log")
 # --- Menu background animation ------------------------------------------
-MENU_ANIM_MAX_PIECES = 7          # max simultaneously falling tetrominos
+MENU_ANIM_MAX_PIECES = 35          # max simultaneously falling tetrominos
 MENU_ANIM_BLOCK_SIZE = 20         # block size for falling tetrominos (px)
 MENU_ANIM_FALL_SPEED = 35         # vertical fall speed (px/s)
 MENU_ANIM_MIN_SPAWN_INTERVAL = 2.0  # min seconds between spawns
@@ -141,7 +141,7 @@ MENU_ANIM_MAX_SPAWN_INTERVAL = 5.0  # max seconds between spawns
 MENU_ANIM_ROT_INTERVAL = (1.5, 4.0)  # seconds between random rotations
 MENU_ANIM_ROT_CHANCE = 0.5        # probability rotation is CW vs CCW
 MENU_ANIM_EXPLODE_DELAY = (3.0, 16.0)  # seconds before explosion check
-MENU_ANIM_EXPLODE_CHANCE = 0.5  # per-frame probability after delay
+MENU_ANIM_EXPLODE_CHANCE = 0.01  # per-frame probability after delay
 MENU_ANIM_EXPLODE_PARTICLES = 60  # particles per explosion
 MENU_ANIM_FADE_DISTANCE = 80     # px from bottom where fade-out begins
 
