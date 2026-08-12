@@ -103,6 +103,8 @@ class MenuBase(State):
     def draw(self, screen: pygame.Surface, *, particles: ParticleSystem | None = None) -> None:
         screen.fill(BLACK)
         self.bg_anim.draw(screen)
+        if particles is not None:
+            particles.draw(screen)
 
         title = get_large_font().render(self._title, True, WHITE)
         screen.blit(title, (SCREEN_WIDTH // 2 - title.get_width() // 2, self._title_y))

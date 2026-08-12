@@ -141,7 +141,7 @@ MENU_ANIM_MAX_SPAWN_INTERVAL = 5.0  # max seconds between spawns
 MENU_ANIM_ROT_INTERVAL = (1.5, 4.0)  # seconds between random rotations
 MENU_ANIM_ROT_CHANCE = 0.5        # probability rotation is CW vs CCW
 MENU_ANIM_EXPLODE_DELAY = (3.0, 16.0)  # seconds before explosion check
-MENU_ANIM_EXPLODE_CHANCE = 0.05  # per-frame probability after delay
+MENU_ANIM_EXPLODE_CHANCE = 0.5  # per-frame probability after delay
 MENU_ANIM_EXPLODE_PARTICLES = 60  # particles per explosion
 MENU_ANIM_FADE_DISTANCE = 80     # px from bottom where fade-out begins
 

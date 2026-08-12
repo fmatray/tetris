@@ -188,7 +188,8 @@ class HyperparamMenuState(MenuBase):
         """
         screen.fill(BLACK)
         self.bg_anim.draw(screen)
-        # --- Title ---
+        if particles is not None:
+            particles.draw(screen)
         title = get_large_font().render(self._title, True, WHITE)
         screen.blit(title, (SCREEN_WIDTH // 2 - title.get_width() // 2, TITLE_Y))
 
