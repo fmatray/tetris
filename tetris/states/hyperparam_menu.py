@@ -187,7 +187,7 @@ class HyperparamMenuState(MenuBase):
         Columns: Param | Current | Min | Max | Step | Explanation
         """
         screen.fill(BLACK)
-
+        self.bg_anim.draw(screen)
         # --- Title ---
         title = get_large_font().render(self._title, True, WHITE)
         screen.blit(title, (SCREEN_WIDTH // 2 - title.get_width() // 2, TITLE_Y))

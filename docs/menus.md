@@ -37,3 +37,13 @@ Menu principal
 │       Réinitialiser IA          [ENTER ×2]       supprime modèle + log
 │       Retour                    [ENTER | ESC]
 ```
+
+## Animation de fond
+
+Les menus affichent une animation de fond: des tétraminos (max 7) tombent
+lentement depuis le haut de l'écran, en partant d'une position x aléatoire.
+Chaque tétromino tourne aléatoirement (horaire ou anti-horaire). Après un
+délai, il peut exploser en une animation de particules; sinon il disparaît
+en s'estompant près du bas de l'écran. Les couleurs classiques des
+tétriminos sont respectées. Les constantes sont dans `tetris/settings.py`
+(préfixe `MENU_ANIM_`).

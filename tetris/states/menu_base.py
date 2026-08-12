@@ -15,6 +15,7 @@ from tetris.visuals.fonts import (
     TITLE_Y,
     get_large_font,
 )
+from tetris.visuals.menu_animation import MenuBackgroundAnimation
 
 if TYPE_CHECKING:
     from tetris.visuals.particles import ParticleSystem
@@ -44,10 +45,16 @@ class MenuBase(State):
     _item_spacing: int = LINE_HEIGHT_SMALL
     _instructions: str = "Flèches: Navigation | Entrée: Valider | Échap: Retour"
     _disabled_color: tuple[int, int, int] = (64, 64, 64)
-
     def __init__(self, screen, font, audio) -> None:
         self.screen, self.font, self.audio = screen, font, audio
         self.selection = 0
+        self.bg_anim = MenuBackgroundAnimation()
+
+    # --- Update: drive background animation ---------------------------
+
+    def update(self, dt: float, particles: ParticleSystem) -> State | None:
+        self.bg_anim.update(dt / 1000.0, particles)
+        return None
 
     # --- Navigation --------------------------------------------------
 
@@ -95,6 +102,7 @@ class MenuBase(State):
 
     def draw(self, screen: pygame.Surface, *, particles: ParticleSystem | None = None) -> None:
         screen.fill(BLACK)
+        self.bg_anim.draw(screen)
 
         title = get_large_font().render(self._title, True, WHITE)
         screen.blit(title, (SCREEN_WIDTH // 2 - title.get_width() // 2, self._title_y))
