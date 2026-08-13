@@ -140,6 +140,18 @@ class GameState(State):
         _logger.debug("Locked %s, cleared %d", locked_type, cleared)
         return cleared, rows_data
 
+    def _do_game_over(self) -> State:
+        """Stop music, save, and transition to GameOverState."""
+        self.audio.stop_music()
+        _logger.debug(
+            "Game over | score=%d, lines=%d, level=%d",
+            self.stats.score, self.stats.total_lines, self.stats.level,
+        )
+        self.pieces.save()
+        from tetris.states.game_over import GameOverState
+
+        return GameOverState(self.screen, self.font, self.audio, self, self.menu)
+
     # --- Event / update / render ----------------------------------------
 
     def _return_to_menu(self) -> State:
@@ -167,7 +179,9 @@ class GameState(State):
         return None
 
     def update(self, dt: float, particles: ParticleSystem) -> State | None:
-        if self.paused or self.game_over:
+        if self.game_over:
+            return self._do_game_over()
+        if self.paused:
             return None
         self.drop_time += dt
         speed = (
@@ -186,12 +200,7 @@ class GameState(State):
         if self._pending_level_up and self.audio.play("level_up"):
             self._pending_level_up = False
         if self.game_over:
-            self.audio.stop_music()
-            _logger.debug("Game over | score=%d, lines=%d, level=%d", self.stats.score, self.stats.total_lines, self.stats.level)
-            self.pieces.save()
-            from tetris.states.game_over import GameOverState
-
-            return GameOverState(self.screen, self.font, self.audio, self, self.menu)
+            return self._do_game_over()
         return None
 
     def _tick(self, particles: ParticleSystem) -> None:
