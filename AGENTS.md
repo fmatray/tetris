@@ -86,7 +86,7 @@ python -m tetris.verify_training
 - **Settings flow**: `MenuState` is the single source of truth for runtime settings. Child states mutate `MenuState` attributes, then call `save_settings()`. Never read settings from disk in child states — read from the parent `MenuState` reference.
 - **Keybind flow**: `MenuState.keybinds` (dict: action→pygame keycode) → `GameState._setup_keybinds()` builds the active `input_map`. Modified by `KeybindState`.
 - **Path constants**: All data paths centralized in `tetris/settings.py` — never hardcode `"data/..."` in consumer modules; import from `settings`.
-- **Data directory**: `DATA_DIR = "data"` with `os.makedirs(DATA_DIR, exist_ok=True)` at import time — directory always exists.
+- **Data directory**: `DATA_DIR = "data"`; callers create it via `os.makedirs(DATA_DIR, exist_ok=True)` (done in `TetrisApp.__init__` and `verify_training.py`).
 - **AI exclusion from human stats**: `save_human_game()` is only called in `GameOverState._handle_name_event()`. `AIState` has its own `_on_episode_end()` and never creates `GameOverState` — architectural guarantee that AI games never pollute human stats.
 - **AI gameplay**: `AIState` inherits `GameState`, replaces keyboard input with per-candidate V-function evaluation. Candidate generation: soft-drop BFS (with SRS wall kicks) or hard-drop; 2-piece look-ahead simulates best next-piece placement. `DQNAgent.select_action(candidate_states)` evaluates V per valid placement, picks max. Learning mode does `learn_per_action` (default 2) gradient updates per locked piece; playing mode sets epsilon=0 (greedy), skips transition storage/learning/episode logging.
 - **Rendering**: `Renderer` is pure presentation — takes game state, draws to surface. `ParticleSystem` handles physics-based effects. Fonts are proportional (Arial), so use explicit pixel-positioned columns, not format-string alignment (`f"{x:<10}"` won't align).
@@ -101,11 +101,12 @@ python -m tetris.verify_training
 |---|---|
 | `main.py` | Entry point → `tetris.run()` |
 | `tetris/app.py` | `TetrisApp` — main loop, pygame init, state dispatch |
-| `tetris/settings.py` | All constants, path constants, `DEFAULT_KEYBINDS`, `KEYBIND_LABELS`, `key_name()` |
+| `tetris/settings.py` | All constants, path constants, `DEFAULT_KEYBINDS`, `KEYBIND_LABELS` (pure constants — no functions) |
 | `tetris/states/base.py` | `State` base class contract |
 | `tetris/states/menu.py` | Root menu, settings load/save, navigation hub |
 | `tetris/states/audio_menu.py` | Audio sub-menu: sound/music volume, song selection |
 | `tetris/states/game.py` | Human gameplay loop, `_setup_keybinds()` |
+| `tetris/states/keybind.py` | Keybinding state, `key_name()` (moved from settings.py) |
 | `tetris/states/ai.py` | AI gameplay + RL training integration |
 | `tetris/ai/agent.py` | `DQNAgent` — `select_action`, `store`, `learn`, `save`, `load` |
 | `tetris/ai/rewards.py` | `extract_features` (17-dim DT-20, normalized) + `compute_reward` (PBRS scale 0.1) + `dellacherie_value` + SRS wall kicks + `soft_drop_placements` BFS |

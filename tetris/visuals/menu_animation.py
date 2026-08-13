@@ -85,9 +85,6 @@ class _FallingPiece:
         """Largest row offset in the current rotation (used for bottom-edge math)."""
         return max(r for _, r in self.cells)
 
-    def max_col(self) -> int:
-        """Largest column offset in the current rotation."""
-        return max(c for c, _ in self.cells)
 
     def update(self, dt: float) -> None:
         """Advance fall position, age, and rotation timer.

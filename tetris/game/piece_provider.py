@@ -128,12 +128,6 @@ class PieceProvider:
             return
         self.path.write_text(json.dumps(self._recorded))
 
-    @property
-    def replay_remaining(self) -> int:
-        """Number of replay pieces still queued (0 in normal mode)."""
-        if self.mode != "replay":
-            return 0
-        return max(0, len(self._replay_queue) - self._replay_idx)
 
     @property
     def bag_remaining(self) -> list[str]:

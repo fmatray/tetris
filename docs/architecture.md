@@ -109,7 +109,7 @@ Chaque module est petit et fait une seule chose. `main.py` ne contient que l'app
 | **S** — Single Responsibility | `Board` (grille), `Tetromino` (pièce), `GameStats` (score/niveau), `ScoreEngine` (règles), `AudioManager` (son), `Renderer` (affichage), `ParticleSystem` (effets), `TetrisApp` (boucle) — une classe, un rôle. |
 | **O** — Open/Closed | `State` est une classe de base ; ajouter un état se fait par sous-classe sans modifier `TetrisApp`. Les points de ligne s'ajoutent via `LINE_CLEAR_POINTS` (donnée) sans modifier `ScoreEngine`. |
 | **L** — Liskov Substitution | Tous les états héritent de `State` avec la même signature `handle_event` / `update` / `draw`. `TetrisApp` les dispatche polymorphiquement. |
-| **I** — Interface Segregation | Les `__init__.py` de chaque package n'exposent que le strict nécessaire (ex. `game/` exporte `Board`, `Tetromino`, `GameStats`, `ScoreEngine`). |
+| **I** — Interface Segregation | Les `__init__.py` de chaque package sont des docstrings-only — pas de re-exports inutilisés. Les imports se font directement depuis le module source (ex. `from tetris.game.board import Board`). |
 | **D** — Dependency Inversion | Les états reçoivent `AudioManager` et `Board` par injection de dépendances (constructeur), jamais par construction interne. `Renderer` lit l'état du jeu sans le muter. |
 
 ### Logging et mode débogage

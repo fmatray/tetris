@@ -20,7 +20,6 @@ from tetris.settings import (
     RED,
     SCREEN_WIDTH,
     WHITE,
-    key_name,
 )
 from tetris.states.base import State
 from tetris.visuals.fonts import (
@@ -30,6 +29,33 @@ from tetris.visuals.fonts import (
     TITLE_Y,
     get_large_font,
 )
+
+
+def key_name(key: int) -> str:
+    """Human-readable name for a pygame key constant (French where ambiguous)."""
+    _SPECIALS = {
+        pygame.K_LEFT: "←",
+        pygame.K_RIGHT: "→",
+        pygame.K_UP: "↑",
+        pygame.K_DOWN: "↓",
+        pygame.K_SPACE: "Espace",
+        pygame.K_RETURN: "Entrée",
+        pygame.K_ESCAPE: "Échap",
+        pygame.K_TAB: "Tab",
+        pygame.K_BACKSPACE: "Retour",
+        pygame.K_LSHIFT: "Maj G",
+        pygame.K_RSHIFT: "Maj D",
+        pygame.K_LCTRL: "Ctrl G",
+        pygame.K_RCTRL: "Ctrl D",
+        pygame.K_LALT: "Alt G",
+        pygame.K_RALT: "Alt D",
+    }
+    if key in _SPECIALS:
+        return _SPECIALS[key]
+    name = pygame.key.name(key)
+    if len(name) == 1:
+        return name.upper()
+    return name
 
 if TYPE_CHECKING:
     from tetris.states.human_menu import HumanMenuState

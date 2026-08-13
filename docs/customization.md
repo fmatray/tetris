@@ -14,7 +14,7 @@
 
 > Les touches sont reconfigurables via le menu (**Humain > Touches**) et persistées dans `settings.json`. Les valeurs par défaut sont définies dans `tetris/settings.py` (`DEFAULT_KEYBINDS`).
 >
-> La vitesse de chute est calculée dans `tetris/settings.py` (`drop_interval(level)`, formule Tetris Guideline $(0{,}8 - \text{niveau} \times 0{,}007)^{\text{niveau}}$) configurable via `SOFT_DROP_FACTOR` (ralentisseur de chute douce).
+> La vitesse de chute est calculée dans `tetris/states/game.py` (`_drop_interval(level)`, formule Tetris Guideline $(0{,}8 - \text{niveau} \times 0{,}007)^{\text{niveau}}$) configurable via `SOFT_DROP_FACTOR` (ralentisseur de chute douce).
 >
 > La première pièce de chaque partie est restreinte à I, J, L ou T (`FIRST_PIECE_TYPES` dans `tetris/settings.py`) pour éviter les surplombs forcés sur un plateau vide.
 

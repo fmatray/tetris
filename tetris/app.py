@@ -8,13 +8,14 @@ audio, particles) into states and drives ``handle_event`` / ``update``
 
 from __future__ import annotations
 
+import os
 import sys
 
 import pygame
 
 from tetris.audio import AudioManager
 from tetris.logger import configure_logging, get_logger
-from tetris.settings import SCREEN_HEIGHT, SCREEN_WIDTH, ensure_data_dir
+from tetris.settings import DATA_DIR, SCREEN_HEIGHT, SCREEN_WIDTH
 from tetris.states.base import State
 from tetris.states.menu import MenuState
 from tetris.visuals.fonts import get_small_font
@@ -25,7 +26,7 @@ class TetrisApp:
     """Owns pygame initialization and the FSM main loop."""
 
     def __init__(self) -> None:
-        ensure_data_dir()
+        os.makedirs(DATA_DIR, exist_ok=True)
         configure_logging(False)
         pygame.init()
         pygame.mixer.init()
@@ -57,11 +58,7 @@ class TetrisApp:
             if new_state:
                 self.state = new_state
 
-        new_state = (
-            self.state.update(dt, self.particles)
-            if hasattr(self.state, "update")
-            else None
-        )
+        new_state = self.state.update(dt, self.particles)
         if new_state:
             self.state = new_state
 

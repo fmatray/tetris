@@ -248,12 +248,13 @@ class HyperparamMenuState(MenuBase):
 
             # Explanation (left-aligned)
             if meta[3]:
-                surf = self.font.render(meta[3], True, color)
+                text = meta[3]
+                surf = self.font.render(text, True, color)
                 # Truncate if too wide
                 if surf.get_width() > expl_w:
-                    while surf.get_width() > expl_w - 10 and len(meta[3]) > 5:
-                        meta = (meta[0], meta[1], meta[2], meta[3][:-1])
-                        surf = self.font.render(meta[3] + "…", True, color)
+                    while surf.get_width() > expl_w - 10 and len(text) > 5:
+                        text = text[:-1]
+                        surf = self.font.render(text + "…", True, color)
                 screen.blit(surf, (x_expl, y))
 
             y += lh

@@ -7,14 +7,8 @@ import pygame
 # --- Data directory ----------------------------------------------------
 # All generated runtime data (settings, leaderboard, stats, AI model,
 # training log, replay sequences) lives under this directory so the repo
-# root stays clean. Created on first use via ``ensure_data_dir()``.
+# root stays clean. Callers create it via ``os.makedirs(DATA_DIR, exist_ok=True)``.
 DATA_DIR = "data"
-
-
-def ensure_data_dir() -> None:
-    """Create the data directory if it doesn't exist."""
-    os.makedirs(DATA_DIR, exist_ok=True)
-
 
 # Screen dimensions
 SCREEN_WIDTH = 1500
@@ -73,15 +67,12 @@ SHAPES = {
 LINE_CLEAR_POINTS = {1: 100, 2: 300, 3: 500, 4: 800}
 
 # Drop speed: Tetris Guideline formula (seconds per row at given level).
-# Super-exponential: (0.8 - level×0.007)^level.
+# Super-exponential: (DROP_BASE - level×DROP_STEP)^level.
 # Level 0 → 1.0s, level 10 → 0.04s, level 20 → 0.001s.
-SOFT_DROP_FACTOR = 0.1  # soft drop speed = gravity × SOFT_DROP_FACTOR
-
-
-def drop_interval(level: int) -> float:
-    """Seconds per row at the given level (Tetris Guideline gravity)."""
-    base = max(0.001, 0.8 - level * 0.007)
-    return max(0.001, base ** level)
+DROP_BASE = 0.8            # Tetris Guideline gravity base
+DROP_STEP = 0.007          # per-level decrement of the base
+DROP_MIN_INTERVAL = 0.001  # minimum seconds per row (cap)
+SOFT_DROP_FACTOR = 0.1     # soft drop speed = gravity × SOFT_DROP_FACTOR
 
 # Lines required to advance one level
 LINES_PER_LEVEL = 10
@@ -163,10 +154,6 @@ MUSIC_SPEED_PER_LEVEL = 0.05  # +5% speed per level
 MUSIC_MAX_SPEED = 2.0          # cap at 2x
 
 
-def music_speed_for_level(level: int) -> float:
-    """Music playback speed factor for the given level."""
-    return min(MUSIC_BASE_SPEED + level * MUSIC_SPEED_PER_LEVEL, MUSIC_MAX_SPEED)
-
 # --- Keybindings --------------------------------------------------------
 # Human player keybindings: action name → pygame key constant.
 # Stored in settings.json as integer key codes.
@@ -192,30 +179,3 @@ KEYBIND_LABELS: dict[str, str] = {
     "pause": "Pause",
     "mute": "Muet",
 }
-
-
-def key_name(key: int) -> str:
-    """Human-readable name for a pygame key constant (French where ambiguous)."""
-    _SPECIALS = {
-        pygame.K_LEFT: "←",
-        pygame.K_RIGHT: "→",
-        pygame.K_UP: "↑",
-        pygame.K_DOWN: "↓",
-        pygame.K_SPACE: "Espace",
-        pygame.K_RETURN: "Entrée",
-        pygame.K_ESCAPE: "Échap",
-        pygame.K_TAB: "Tab",
-        pygame.K_BACKSPACE: "Retour",
-        pygame.K_LSHIFT: "Maj G",
-        pygame.K_RSHIFT: "Maj D",
-        pygame.K_LCTRL: "Ctrl G",
-        pygame.K_RCTRL: "Ctrl D",
-        pygame.K_LALT: "Alt G",
-        pygame.K_RALT: "Alt D",
-    }
-    if key in _SPECIALS:
-        return _SPECIALS[key]
-    name = pygame.key.name(key)
-    if len(name) == 1:
-        return name.upper()
-    return name
