@@ -1,7 +1,7 @@
 """Generate MIDI files for game music (Korobeiniki, Kalinka).
 
 Run standalone:  python -m tetris.audio.midi_gen
-At import time:   ensure_midi_files() creates missing files in data/midi/.
+At import time:   ensure_midi_files() creates missing files in media/.
 """
 
 from __future__ import annotations
@@ -10,7 +10,7 @@ import os
 
 import mido
 
-from tetris.settings import MUSIC_MIDI_DIR, MUSIC_SONG_PATHS, ensure_data_dir
+from tetris.settings import MUSIC_MIDI_DIR, MUSIC_SONG_PATHS
 
 # --- Note helpers -------------------------------------------------------
 # MIDI note numbers: C-1=0, A4=69 (440 Hz). We build from note names.
@@ -113,8 +113,7 @@ def _generate_midi(song_name: str, path: str) -> None:
 
 
 def ensure_midi_files() -> None:
-    """Generate MIDI files if they don't exist in data/midi/."""
-    ensure_data_dir()
+    """Generate MIDI files if they don't exist in media/."""
     os.makedirs(MUSIC_MIDI_DIR, exist_ok=True)
     for song_name, path in MUSIC_SONG_PATHS.items():
         if not os.path.exists(path):
