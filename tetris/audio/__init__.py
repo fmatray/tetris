@@ -37,9 +37,10 @@ class AudioManager:
         self._music_start_tick = 0  # pygame.time.get_ticks() when music started
         self._music_pos_sec = 0.0   # position within the song when speed changes
         self.sounds: dict[str, pygame.mixer.Sound] = {}
-        pygame.mixer.set_reserved(2)
+        pygame.mixer.set_reserved(3)
         self._music_channel = pygame.mixer.Channel(0)
         self._sfx_channel = pygame.mixer.Channel(1)
+        self._xfade_channel = pygame.mixer.Channel(2)  # crossfade target
         self._music_buffer: np.ndarray | None = None  # raw float64 buffer at 1.0x
         self._music_duration: float = 0.0  # total duration at 1.0x speed
         self._music_sound: pygame.mixer.Sound | None = None
@@ -155,17 +156,18 @@ class AudioManager:
         self._music_buffer = buffer
         self._build_music_sound()
 
-    def _build_music_sound(self, from_pos: float = 0.0) -> None:
+    def _build_music_sound(self, from_pos: float = 0.0, fade_in_ms: int = 0) -> None:
         """Build a playable Sound from the raw buffer at current speed.
 
         ``from_pos`` is the position in the song (at 1.0x speed) to start
         from, in seconds. The buffer is resampled to compress/expand time
-        by ``_music_speed`` (higher speed = fewer samples = faster playback).
+        by ``_music_speed``. ``fade_in_ms`` applies a linear volume ramp
+        at the start for smooth crossfades.
         """
         if self._music_buffer is None:
             return
         start_sample = int(from_pos * self._SAMPLE_RATE)
-        chunk = self._music_buffer[start_sample:]
+        chunk = self._music_buffer[start_sample:].copy()
         n_orig = len(chunk)
         if n_orig == 0:
             return
@@ -174,6 +176,11 @@ class AudioManager:
         old_idx = np.linspace(0, n_orig - 1, n_orig)
         new_idx = np.linspace(0, n_orig - 1, n_new)
         resampled = np.interp(new_idx, old_idx, chunk)
+        # Apply fade-in envelope for smooth crossfade
+        if fade_in_ms > 0:
+            fade_samples = min(int(self._SAMPLE_RATE * fade_in_ms / 1000), n_new)
+            if fade_samples > 0:
+                resampled[:fade_samples] *= np.linspace(0, 1, fade_samples)
         wave = (32767 * resampled).astype(np.int16)
         stereo = np.column_stack([wave, wave])
         try:
@@ -246,6 +253,7 @@ class AudioManager:
 
     def stop_music(self) -> None:
         self._music_channel.stop()
+        self._xfade_channel.stop()
 
     def set_music_speed(self, speed: float) -> None:
         if speed == self._music_speed:
@@ -253,18 +261,28 @@ class AudioManager:
         was_playing = self._music_channel.get_busy()
         if was_playing:
             pos = self._get_music_pos()
-            self._music_channel.fadeout(100)
         else:
             pos = 0.0
         self._music_speed = speed
-        self._build_music_sound(from_pos=pos)
-        if was_playing and not self.muted and self.music_volume > 0:
-            self.start_music()
+        self._build_music_sound(from_pos=pos, fade_in_ms=300)
+        if not was_playing or self.muted or self.music_volume == 0:
+            return
+        # Crossfade: start new buffer (with 300ms fade-in) on xfade channel,
+        # fade old out over 300ms — overlap creates smooth transition
+        vol = MUSIC_VOLUME_LEVELS[self.music_volume]
+        self._xfade_channel.set_volume(vol)
+        self._xfade_channel.play(self._music_sound, loops=-1)
+        self._music_channel.fadeout(300)
+        # Swap channels: xfade becomes the main music channel
+        self._music_channel, self._xfade_channel = (
+            self._xfade_channel, self._music_channel
+        )
+        self._music_start_tick = pygame.time.get_ticks()
 
     def toggle_mute(self) -> None:
         self.muted = not self.muted
         if self.muted:
-            self._music_channel.stop()
+            self.stop_music()
         else:
             self.start_music()
 
@@ -272,6 +290,7 @@ class AudioManager:
         self.sound_volume = sound_volume
         self.music_volume = music_volume
         self.muted = False
+        self.stop_music()
         self._music_speed = 1.0
         self.song = song
         self._generate_music()
