@@ -1,0 +1,729 @@
+# Class Diagram
+
+Exhaustive Mermaid.js class diagram of the Tetris codebase: every class, every method, every attribute, every relationship with label and cardinality.
+
+Module-level functions (non-class) are listed in `%% Module-level functions` comments within each namespace.
+
+```mermaid
+classDiagram
+    %% ====================================================================
+    %%  App
+    %% ====================================================================
+    namespace App {
+        class TetrisApp {
+            +screen: pygame.Surface
+            +clock: pygame.time.Clock
+            +font: pygame.font.Font
+            +audio: AudioManager
+            +particles: ParticleSystem
+            +state: State
+            +__init__() None
+            +run() None
+            - _frame() None
+        }
+    }
+
+    %% ====================================================================
+    %%  States
+    %% ====================================================================
+    namespace States {
+        class State {
+            +handle_event(event: pygame.event.Event) State | None
+            +update(dt: float, particles: ParticleSystem) State | None
+            +draw(screen: pygame.Surface, particles: ParticleSystem | None) None
+        }
+
+        class MenuBase {
+            # _OPTIONS: tuple~str, ...~ ClassVar
+            # _title: str ClassVar
+            # _toggle_indices: frozenset~int~ ClassVar
+            # _title_y: int ClassVar
+            # _options_y: int ClassVar
+            # _item_spacing: int ClassVar
+            # _instructions: str ClassVar
+            # _disabled_color: tuple~int, int, int~ ClassVar
+            +screen: pygame.Surface
+            +font: pygame.font.Font
+            +audio: AudioManager
+            +selection: int
+            +bg_anim: MenuBackgroundAnimation
+            +__init__(screen, font, audio) None
+            +update(dt: float, particles: ParticleSystem) State | None
+            - _prev_enabled(current: int) int
+            - _next_enabled(current: int) int
+            +handle_event(event: pygame.event.Event) State | None
+            +draw(screen: pygame.Surface, particles: ParticleSystem | None) None
+            # _value_label(i: int) str
+            # _toggle(direction: int) None
+            # _on_select() State | None
+            # _is_disabled(i: int) bool
+            # _on_back() State | None
+            # _on_navigate() None
+            # _save() None
+            # _option_text(i: int, is_sel: bool) str
+            # _option_color(i: int, is_sel: bool, disabled: bool) tuple~int, int, int~
+        }
+
+        class MenuState {
+            # _OPTIONS: tuple~str, ...~ ClassVar
+            # _GENERATOR_CYCLE: tuple~str, ...~ ClassVar
+            # _toggle_indices: frozenset~int~ ClassVar
+            # _title: str ClassVar
+            # _SETTINGS_MAP: ClassVar~dict~str, str~~ ClassVar
+            +handicap: int
+            +sound_volume: int
+            +music_volume: int
+            +music_song: str
+            +player: str
+            +mode: str
+            +piece_generator: str
+            +ghost_piece: bool
+            +debug: bool
+            +ai_speed: str
+            +ai_epsilon_decay: float
+            +ai_epsilon_end: float
+            +ai_lr: float
+            +ai_gamma: float
+            +ai_batch_size: int
+            +ai_buffer_size: int
+            +ai_mode: str
+            +ai_curriculum: bool
+            +ai_curriculum_freq: int
+            +ai_curriculum_epsilon: str
+            +ai_warm_start: bool
+            +ai_learn_per_action: int
+            +ai_lookahead: bool
+            +ai_soft_drop: bool
+            +keybinds: dict~str, int~
+            +__init__(screen, font, audio) None
+            - _load_settings() None
+            +save_settings() None
+            # _value_label(i: int) str
+            # _is_disabled(i: int) bool
+            # _toggle(direction: int) None
+            # _save() None
+            # _on_back() State | None
+            # _on_select() State | None
+            - _build_ai_state() State
+        }
+
+        class HumanMenuState {
+            # _OPTIONS: tuple~str, ...~ ClassVar
+            # _toggle_indices: frozenset~int~ ClassVar
+            # _title: str ClassVar
+            +menu: MenuState
+            +__init__(screen, font, audio, menu) None
+            # _value_label(i: int) str
+            # _toggle(direction: int) None
+            # _save() None
+            # _on_back() State | None
+            # _on_select() State | None
+        }
+
+        class AIMenuState {
+            # _OPTIONS: tuple~str, ...~ ClassVar
+            # _toggle_indices: frozenset~int~ ClassVar
+            # _title: str ClassVar
+            +menu: MenuState
+            - _confirm_reset: bool
+            +__init__(screen, font, audio, menu) None
+            # _value_label(i: int) str
+            # _is_disabled(i: int) bool
+            # _toggle(direction: int) None
+            # _save() None
+            # _on_navigate() None
+            # _on_back() State | None
+            # _on_select() State | None
+            # _option_text(i: int, is_sel: bool) str
+            # _option_color(i: int, is_sel: bool, disabled: bool) tuple~int, int, int~
+            - _reset_ai() None
+        }
+
+        class HyperparamMenuState {
+            # _OPTIONS: tuple~str, ...~ ClassVar
+            # _toggle_indices: frozenset~int~ ClassVar
+            # _title: str ClassVar
+            # _PARAM_META: ClassVar~tuple~ ClassVar
+            # _DEFAULTS: ClassVar~dict~str, float | int | bool | str~~ ClassVar
+            # _VALUE_SPECS: ClassVar~list~tuple~str, Any~~~ ClassVar
+            +ai_menu: AIMenuState
+            +menu: MenuState
+            +__init__(screen, font, audio, ai_menu) None
+            # _value_label(i: int) str
+            # _toggle(direction: int) None
+            # _save() None
+            # _on_back() State | None
+            # _on_select() State | None
+            +draw(screen: pygame.Surface, particles: ParticleSystem | None) None
+        }
+
+        class AudioMenuState {
+            # _OPTIONS: tuple~str, ...~ ClassVar
+            # _toggle_indices: frozenset~int~ ClassVar
+            # _title: str ClassVar
+            +menu: MenuState
+            +__init__(screen, font, audio, menu) None
+            # _value_label(i: int) str
+            # _toggle(direction: int) None
+            # _save() None
+            # _on_back() State | None
+            # _on_select() State | None
+        }
+
+        class KeybindState {
+            +screen: pygame.Surface
+            +font: pygame.font.Font
+            +audio: AudioManager
+            +human_menu: HumanMenuState
+            +selection: int
+            - _listening: bool
+            - _conflict_msg: str
+            +menu: MenuState
+            +__init__(screen, font, audio, human_menu) None
+            - _keybinds() dict~str, int~
+            +handle_event(event: pygame.event.Event) State | None
+            - _reset_defaults() None
+            - _handle_listening(event: pygame.event.Event) State | None
+            +draw(screen: pygame.Surface, particles: ParticleSystem | None) None
+        }
+        %% Module-level function: key_name(key: int) -> str
+
+        class HumanStatsState {
+            +screen: pygame.Surface
+            +font: pygame.font.Font
+            +audio: AudioManager
+            +human_menu: HumanMenuState
+            - _games: list~dict~
+            +__init__(screen, font, audio, human_menu) None
+            - _load() None
+            - _aggregate() list~tuple~str, int, int, float~~
+            +draw(screen: pygame.Surface, particles: ParticleSystem | None) None
+            - _draw_instructions(screen: pygame.Surface) None
+            +handle_event(event: pygame.event.Event) State | None
+        }
+
+        class StatsState {
+            +screen: pygame.Surface
+            +font: pygame.font.Font
+            +audio: AudioManager
+            +ai_menu: AIMenuState
+            - _surface: pygame.Surface | None
+            - _episode_count: int
+            - _stats: TrainingLog
+            +__init__(screen, font, audio, ai_menu) None
+            - _stat_values() list~str~
+            - _build_surface() None
+            +draw(screen: pygame.Surface, particles: ParticleSystem | None) None
+            +handle_event(event: pygame.event.Event) State | None
+        }
+
+        class GameState {
+            +screen: pygame.Surface
+            +font: pygame.font.Font
+            +audio: AudioManager
+            - _last_level: int
+            - _pending_level_up: bool
+            +menu: MenuState | None
+            +debug: bool
+            +ghost_piece: bool
+            +renderer: Renderer
+            +board: Board
+            +pieces: PieceProvider
+            +current_piece: Tetromino
+            +next_piece: Tetromino
+            +drop_time: int
+            +stats: GameStats
+            +current_speed: float
+            +game_over: bool
+            +paused: bool
+            +down_pressed: bool
+            +input_map: dict~int, Callable~
+            - _mute_key: int
+            - _pause_key: int
+            - _soft_drop_key: int
+            +__init__(screen, font, audio, handicap, sound_volume, music_volume, music_song, piece_provider, menu, debug, ghost_piece) None
+            - _setup_keybinds(menu) None
+            - _move_left() None
+            - _move_right() None
+            - _rotate_cw() None
+            - _rotate_ccw() None
+            - _toggle_down_true() None
+            - _hard_drop() None
+            - _lock_and_spawn(hard_drop: bool) tuple~int, list~
+            - _do_game_over() State
+            - _return_to_menu() State
+            +handle_event(event: pygame.event.Event) State | None
+            +update(dt: float, particles: ParticleSystem) State | None
+            - _tick(particles: ParticleSystem) None
+            - _emit_line_particles(particles: ParticleSystem, rows_data) None
+            +draw(screen: pygame.Surface, particles: ParticleSystem | None) None
+        }
+        %% Module-level functions: _drop_interval(level: int) -> float
+        %% Module-level functions: _music_speed_for_level(level: int) -> float
+
+        class AIState {
+            +ghost_piece: bool
+            +agent: DQNAgent
+            +log: TrainingLog
+            +episode: int
+            +speed: str
+            +ai_mode: str
+            +learn_per_action: int
+            +lookahead: bool
+            +soft_drop: bool
+            - _candidate_placements: list~tuple~int, int, int~~
+            +episode_steps: int
+            +episode_start_grid: np.ndarray
+            - _prev_state: np.ndarray | None
+            - _prev_reward: float | None
+            - _prev_done: bool
+            - _prev_action: int | None
+            - _action_timer: float
+            +curriculum: bool
+            +warm_start: bool
+            +curriculum_freq: int
+            +curriculum_epsilon: str
+            - _curriculum_types: list~str~ | None
+            - _curriculum_level: int
+            - _curriculum_episode_count: int
+            +__init__(screen, font, audio, handicap, sound_volume, music_volume, music_song, piece_provider, speed, menu, epsilon_decay, epsilon_end, lr, gamma, batch_size, buffer_size, ai_mode, curriculum, curriculum_freq, curriculum_epsilon, warm_start, learn_per_action, lookahead, soft_drop, debug) None
+            - _is_valid_placement(piece, rotation: int, column: int) bool
+            - _best_next_placement(grid: np.ndarray, piece_type: str) np.ndarray
+            - _add_candidate(base_grid, shape, px, py, rot, next_piece_type, candidates, actions, dellacherie_values) None
+            - _get_candidate_states() tuple~np.ndarray, list~int~, np.ndarray~
+            - _execute_macro_action(action: int) None
+            - _lock_and_spawn(hard_drop: bool) tuple~int, list~
+            +update(dt: float, particles: ParticleSystem) State | None
+            - _on_episode_end() State | None
+            - _log_and_learn() None
+            - _reset_episode() None
+            - _maybe_advance_curriculum() bool
+            - _apply_epsilon_policy() None
+            +draw(screen: pygame.Surface, particles: ParticleSystem | None) None
+            - _draw_ai_hud() None
+            - _hud_table_rows() list~list~
+            - _trend_arrow(trend: str) str
+            +handle_event(event: pygame.event.Event) State | None
+        }
+
+        class GameOverState {
+            +screen: pygame.Surface
+            +font: pygame.font.Font
+            +audio: AudioManager
+            +game: GameState
+            +menu: MenuState | None
+            +renderer: Renderer
+            +name: str
+            +step: str
+            +__init__(screen, font, audio, game, menu) None
+            +update(dt: float, particles) State | None
+            +handle_event(event: pygame.event.Event) State | None
+            - _handle_name_event(event: pygame.event.Event) State | None
+            +draw(screen: pygame.Surface, particles: ParticleSystem | None) None
+            - _draw_name_entry(screen: pygame.Surface) None
+        }
+
+        class LeaderboardState {
+            +screen: pygame.Surface
+            +font: pygame.font.Font
+            +audio: AudioManager
+            +menu: MenuState | None
+            +__init__(screen, font, audio, menu) None
+            +handle_event(event: pygame.event.Event) State | None
+            +draw(screen: pygame.Surface, particles: ParticleSystem | None) None
+        }
+    }
+
+    %% ====================================================================
+    %%  Game
+    %% ====================================================================
+    namespace Game {
+        class Board {
+            +grid: list~list~tuple~int, int, int~ | None~~
+            +__init__() None
+            +is_valid_move(tetromino: Tetromino, dx: int, dy: int, rotation: int | None) bool
+            +lock_tetromino(tetromino: Tetromino) tuple~int, list~
+            +hard_drop(tetromino: Tetromino) int
+            +apply_handicap(level: int) None
+            +clear_lines() tuple~int, list~
+        }
+
+        class Tetromino {
+            +type: str
+            +color: tuple~int, int, int~
+            +rotation: int
+            +x: int
+            +y: int
+            +shape: list~tuple~int, int~~
+            +__init__(piece_type: str | None) None
+            +get_current_shape() list~tuple~int, int~~
+            +rotate(direction: int) None
+            +move(dx: int, dy: int) None
+            +get_blocks() list~tuple~int, int~~
+        }
+
+        class PieceProvider {
+            # _BAG_MULTIPLIERS: dict~str, int~ ClassVar
+            +mode: str
+            +path: Path
+            +allowed_types: list~str~ | None
+            +generator: str
+            - _bag: list~str~
+            - _recorded: list~str~
+            - _first_piece: bool
+            - _replay_queue: list~str~
+            - _replay_idx: int
+            +bag_remaining: list~str~
+            +__init__(mode: str, generator: str, path: str | None) None
+            +reset() None
+            +next_type() str
+            +set_allowed_types(types: list~str~) None
+            - _bag_next(pool: list~str~) str
+            - _first_piece_choice(pool: list~str~) str
+            +save() None
+            - _load_replay() None
+        }
+
+        class ScoreEngine {
+            %% static
+            +line_clear_points(lines_cleared: int, level: int) int
+            %% static
+            +combo_points(combo_count: int, level: int) int
+            %% static
+            +soft_drop_points(cells: int) int
+            %% static
+            +hard_drop_points(cells: int) int
+        }
+
+        class GameStats {
+            +score: int
+            +total_lines: int
+            +level: int
+            +piece_count: int
+            +combo: int
+            +__init__() None
+            +on_piece_locked(lines_cleared: int) None
+            +add_soft_drop(cells: int) None
+            +add_hard_drop(cells: int) None
+        }
+    }
+
+    %% ====================================================================
+    %%  AI
+    %% ====================================================================
+    namespace AI {
+        class DQNAgent {
+            +state_size: int
+            +gamma: float
+            +epsilon: float
+            +epsilon_end: float
+            +epsilon_decay: float
+            +batch_size: int
+            +tau: float
+            +device: torch.device
+            +online_net: DQNetwork
+            +target_net: DQNetwork
+            +optimizer: optim.Adam
+            +loss_fn: nn.SmoothL1Loss
+            +buffer: PrioritizedReplayBuffer
+            - _n_step_buffer: deque
+            +steps: int
+            +last_loss: float
+            +__init__(state_size, lr, gamma, epsilon_start, epsilon_end, epsilon_decay, batch_size, buffer_size, device) None
+            +select_action(candidate_states: np.ndarray, dellacherie_values: np.ndarray | None) int
+            +store(state: np.ndarray, action: int, reward: float, next_state: np.ndarray, done: bool) None
+            - _push_n_step() None
+            +flush_n_step() None
+            +decay_epsilon() None
+            +learn() float | None
+            - _sync_target() None
+            +save(path: str) None
+            +load(path: str) None
+        }
+        %% Module-level function: _softmax(x: np.ndarray) -> np.ndarray
+        %% Module-level constants: WARM_START_TEMP, N_STEP
+
+        class DQNetwork {
+            +net: nn.Sequential
+            +__init__(state_size: int) None
+            +forward(x: torch.Tensor) torch.Tensor
+        }
+
+        class PrioritizedReplayBuffer {
+            +capacity: int
+            +alpha: float
+            +beta: float
+            +beta_increment: float
+            +buffer: deque
+            +priorities: deque
+            +__init__(capacity: int, alpha: float, beta: float, beta_increment: float) None
+            +push(state: np.ndarray, action: int, reward: float, next_state: np.ndarray, done: bool) None
+            +sample(batch_size: int) tuple~list, np.ndarray, np.ndarray~
+            +update_priorities(indices: np.ndarray, td_errors: np.ndarray) None
+            +__len__() int
+        }
+
+        class TrainingLog {
+            # _SAVE_INTERVAL: int ClassVar
+            +path: str
+            +episodes: list~dict~
+            +total_episodes: int
+            +avg_score: float
+            +best_score: int
+            +total_lines: int
+            +total_steps: int
+            +avg_level: float
+            +best_level: int
+            +total_score: int
+            +best_lines: int
+            +avg_lines: float
+            +best_steps: int
+            +avg_steps: float
+            +last_100_avg: float
+            +last_100_avg_lines: float
+            +last_100_avg_level: float
+            +last_100_avg_steps: float
+            +__init__(path: str) None
+            - _load() None
+            +record(episode: int, score: int, lines: int, level: int, steps: int, epsilon: float, loss: float) None
+            +flush() None
+            - _save() None
+            - _trend(key: str) str
+        }
+    }
+
+    %% ====================================================================
+    %%  Visuals
+    %% ====================================================================
+    namespace Visuals {
+        class Renderer {
+            # _GLITCH_COLORS: tuple ClassVar
+            +screen: pygame.Surface
+            +font: pygame.font.Font
+            +__init__(screen: pygame.Surface, font: pygame.font.Font) None
+            +render_frame(game: GameState, particles: ParticleSystem) None
+            - _draw_text(text: str, pos: tuple~int, int~) None
+            - _draw_debug_bag(game: GameState) None
+            %% static
+            +_cell_rect(x: int, y: int, ox: int, oy: int) pygame.Rect
+            +draw_grid(board: Board) None
+            +draw_ghost(tetromino: Tetromino, board: Board) None
+            +draw_tetromino(tetromino: Tetromino) None
+            +draw_next_piece(tetromino: Tetromino) None
+            - _render_glitch_board(game: GameState, shake_x: int, shake_y: int, glitch: float) pygame.Surface
+            - _render_game_over_text(elapsed: int) None
+            +play_game_over_animation(game: GameState, audio) None
+        }
+
+        class Particle {
+            __slots__: color, decay, life, size, vx, vy, x, y
+            +x: float
+            +y: float
+            +color: tuple~int, int, int~
+            +vx: float
+            +vy: float
+            +life: float
+            +decay: float
+            +size: int
+            +__init__(x: float, y: float, color: tuple~int, int, int~) None
+            +update() None
+            +draw(screen: pygame.Surface) None
+        }
+
+        class ParticleSystem {
+            +particles: list~Particle~
+            +__init__() None
+            +emit(x: float, y: float, color: tuple~int, int, int~, count: int) None
+            +update() None
+            +draw(screen: pygame.Surface) None
+        }
+
+        class MenuBackgroundAnimation {
+            - _pieces: list~_FallingPiece~
+            - _spawn_timer: float
+            +__init__() None
+            +update(dt: float, particles: ParticleSystem) None
+            - _explode(particles: ParticleSystem, piece: _FallingPiece) None
+            +draw(screen: pygame.Surface) None
+        }
+
+        class _FallingPiece {
+            __slots__: age, blocks, color, explode_delay, rot_index, rot_timer, shape_key, x, y
+            +shape_key: str
+            +blocks: list~list~tuple~int, int~~
+            +color: tuple~int, int, int~
+            +x: float
+            +y: float
+            +rot_index: int
+            +rot_timer: float
+            +age: float
+            +explode_delay: float
+            +cells: list~tuple~int, int~~
+            +__init__(shape_key: str) None
+            +rotate(direction: int) None
+            +max_row() int
+            +update(dt: float) None
+            +should_explode() bool
+            +is_offscreen() bool
+            +fade_alpha() float
+            +draw(screen: pygame.Surface) None
+        }
+    }
+    %% Module-level functions: draw_leaderboard(screen, font) -> None
+    %% Module-level functions: render_score_graph(episodes, scores) -> pygame.Surface
+    %% Module-level functions: get_large_font() -> pygame.font.Font
+    %% Module-level functions: get_small_font() -> pygame.font.Font
+
+    %% ====================================================================
+    %%  Audio
+    %% ====================================================================
+    namespace Audio {
+        class AudioManager {
+            # _SAMPLE_RATE: int ClassVar
+            +sound_volume: int
+            +music_volume: int
+            +song: str
+            +muted: bool
+            - _music_speed: float
+            - _music_start_tick: int
+            - _music_pos_sec: float
+            +sounds: dict~str, pygame.mixer.Sound~
+            - _music_channel: pygame.mixer.Channel
+            - _sfx_channel: pygame.mixer.Channel
+            - _xfade_channel: pygame.mixer.Channel
+            - _music_buffer: np.ndarray | None
+            - _music_duration: float
+            - _music_sound: pygame.mixer.Sound | None
+            +__init__(sound_volume: int, music_volume: int, song: str) None
+            - _init_sounds() None
+            %% static
+            +_parse_midi(path: str) list~tuple~float, float, int~~
+            %% static
+            +_apply_envelope(n: int, attack_max: int, release_max: int) np.ndarray
+            - _generate_music() None
+            - _build_music_sound(from_pos: float, fade_in_ms: int) None
+            +generate_melody(notes: list~tuple~float, float~~) pygame.mixer.Sound
+            +play(key: str) bool
+            - _get_music_pos() float
+            +start_music() None
+            +stop_music() None
+            +set_music_speed(speed: float) None
+            +toggle_mute() None
+            +apply_settings(sound_volume: int, music_volume: int, song: str) None
+        }
+    }
+    %% Module-level functions: ensure_midi_files() -> None
+    %% Module-level functions: _note(name, octave) -> int
+    %% Module-level functions: _build_track(notes, ticks_per_beat) -> mido.MidiTrack
+    %% Module-level functions: _generate_midi(song_name, path) -> None
+
+    %% ====================================================================
+    %%  Storage (module-level functions only, no classes)
+    %% ====================================================================
+    %% load_leaderboard() -> list[dict]
+    %% save_score(name, score, level, lines, generator, mode) -> None
+    %% load_human_games() -> list[dict]
+    %% save_human_game(name, score, level, lines, tetrominos) -> None
+
+    %% ====================================================================
+    %%  External
+    %% ====================================================================
+    namespace External {
+        class nn_Module {
+            %% Placeholder for torch.nn.Module
+        }
+    }
+
+    %% ====================================================================
+    %%  Relationships — Inheritance
+    %% ====================================================================
+    State <|-- MenuBase
+    State <|-- GameState
+    State <|-- GameOverState
+    State <|-- LeaderboardState
+    State <|-- KeybindState
+    State <|-- HumanStatsState
+    State <|-- StatsState
+
+    MenuBase <|-- MenuState
+    MenuBase <|-- HumanMenuState
+    MenuBase <|-- AIMenuState
+    MenuBase <|-- HyperparamMenuState
+    MenuBase <|-- AudioMenuState
+
+    GameState <|-- AIState
+
+    nn_Module <|-- DQNetwork
+
+    %% ====================================================================
+    %%  Relationships — Composition
+    %% ====================================================================
+    TetrisApp "1" *-- "1" AudioManager : owns
+    TetrisApp "1" *-- "1" ParticleSystem : owns
+    TetrisApp "1" *-- "1" State : manages
+
+    MenuBase "1" *-- "1" MenuBackgroundAnimation : owns
+
+    GameState "1" *-- "1" Board : owns
+    GameState "1" *-- "1" PieceProvider : owns
+    GameState "1" *-- "1" GameStats : owns
+    GameState "1" *-- "1" Renderer : owns
+
+    AIState "1" *-- "1" DQNAgent : owns
+    AIState "1" *-- "1" TrainingLog : owns
+
+    DQNAgent "1" *-- "1" DQNetwork : online_net
+    DQNAgent "1" *-- "1" DQNetwork : target_net
+    DQNAgent "1" *-- "1" PrioritizedReplayBuffer : owns
+
+    GameOverState "1" *-- "1" Renderer : owns
+
+    ParticleSystem "1" *-- "many" Particle : contains
+
+    %% ====================================================================
+    %%  Relationships — Association
+    %% ====================================================================
+    GameState "1" --> "1" ScoreEngine : uses
+    GameState "1" --> "1" AudioManager : uses
+    GameState "1" --> "1" Tetromino : current_piece
+    GameState "1" --> "1" Tetromino : next_piece
+    GameState "1" --> "0..1" MenuState : references
+
+    AIState "1" --> "1" ScoreEngine : uses
+    AIState "1" --> "1" AudioManager : uses
+    AIState "1" --> "0..1" MenuState : references
+
+    GameOverState "1" --> "1" GameState : references
+    GameOverState "1" --> "0..1" MenuState : returns_to
+
+    MenuBackgroundAnimation "1" --> "many" _FallingPiece : manages
+    MenuBackgroundAnimation "1" --> "1" ParticleSystem : uses
+
+    Renderer "1" --> "1" Board : reads
+    Renderer "1" --> "1" Tetromino : reads
+
+    StatsState "1" --> "1" TrainingLog : reads
+
+    GameStats "1" --> "1" ScoreEngine : uses
+
+    %% ====================================================================
+    %%  Relationships — Navigation (FSM transitions)
+    %% ====================================================================
+    MenuState "1" --> "0..1" AudioMenuState : navigates
+    MenuState "1" --> "0..1" HumanMenuState : navigates
+    MenuState "1" --> "0..1" AIMenuState : navigates
+    MenuState "1" --> "0..1" GameState : navigates
+    MenuState "1" --> "0..1" AIState : navigates
+    MenuState "1" --> "0..1" LeaderboardState : navigates
+
+    HumanMenuState "1" --> "0..1" KeybindState : navigates
+    HumanMenuState "1" --> "0..1" HumanStatsState : navigates
+
+    AIMenuState "1" --> "0..1" HyperparamMenuState : navigates
+    AIMenuState "1" --> "0..1" StatsState : navigates
+
+    KeybindState "1" --> "1" HumanMenuState : returns_to
+    HumanStatsState "1" --> "1" HumanMenuState : returns_to
+    StatsState "1" --> "1" AIMenuState : returns_to
+    LeaderboardState "1" --> "0..1" MenuState : returns_to
+```
