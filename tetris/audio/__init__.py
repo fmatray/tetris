@@ -1,38 +1,27 @@
-"""Procedural audio: NumPy-generated sounds and music, no external files."""
+"""Procedural audio: NumPy-generated SFX + MIDI-based polyphonic music."""
 
-from typing import ClassVar
 
+import mido
 import numpy as np
 import pygame
 
+from tetris.audio.midi_gen import ensure_midi_files
 from tetris.logger import get_logger
-from tetris.settings import MUSIC_VOLUME_LEVELS, SOUND_VOLUME_LEVELS
+from tetris.settings import (
+    MUSIC_SONG_PATHS,
+    MUSIC_VOLUME_LEVELS,
+    SOUND_VOLUME_LEVELS,
+)
 
 
 class AudioManager:
-    """Generates and plays short procedural sounds plus background music.
+    """Generates SFX and plays polyphonic music from MIDI files.
 
     SFX play on a dedicated channel (1); music loops on channel 0.
     Volume is a 0–3 index into ``SOUND_VOLUME_LEVELS`` / ``MUSIC_VOLUME_LEVELS``.
     """
 
     _SAMPLE_RATE = 44100
-
-    _SONGS: ClassVar[dict[str, list[tuple[float, float]]]] = {
-        "korobeiniki": [
-            (659.25, 0.5), (493.88, 0.25), (523.25, 0.25), (587.33, 0.5),
-            (523.25, 0.25), (493.88, 0.25), (440.0, 0.5), (440.0, 0.25),
-            (0, 0.25), (523.25, 0.25), (659.25, 0.25), (587.33, 0.25),
-            (523.25, 0.25), (493.88, 0.5), (523.25, 0.25), (587.33, 0.25),
-            (659.25, 0.5), (523.25, 0.5), (440.0, 0.5), (440.0, 0.25), (0, 0.25),
-        ],
-        "kalinka": [
-            (293.66, 0.2), (329.63, 0.2), (392.0, 0.2), (349.23, 0.2),
-            (329.63, 0.2), (293.66, 0.4), (329.63, 0.2), (392.0, 0.2),
-            (440.0, 0.4), (493.88, 0.4), (440.0, 0.2), (392.0, 0.2),
-            (349.23, 0.2), (329.63, 0.2), (293.66, 0.6),
-        ],
-    }
 
     def __init__(
         self,
@@ -50,6 +39,7 @@ class AudioManager:
         self._music_channel = pygame.mixer.Channel(0)
         self._sfx_channel = pygame.mixer.Channel(1)
         self._music_sound: pygame.mixer.Sound | None = None
+        ensure_midi_files()
         self._init_sounds()
         self._generate_music()
 
@@ -97,10 +87,91 @@ class AudioManager:
             [(523.25, 0.08), (659.25, 0.08), (783.99, 0.08), (1046.50, 0.2)]
         )
 
+    # --- MIDI parsing ---------------------------------------------------
+
+    @staticmethod
+    def _parse_midi(path: str) -> list[tuple[float, float, int]]:
+        """Parse a MIDI file into a list of (start_sec, duration_sec, note).
+
+        Overlapping notes across tracks are preserved for polyphony.
+        Returns notes sorted by start time.
+        """
+        mid = mido.MidiFile(path)
+        notes: list[tuple[float, float, int]] = []
+        # Read tempo from the first set_tempo meta message (default 120 BPM)
+        tempo = mido.bpm2tempo(120)
+        for track in mid.tracks:
+            for msg in track:
+                if msg.type == "set_tempo":
+                    tempo = msg.tempo
+                    break
+            if tempo != mido.bpm2tempo(120):
+                break
+        for track in mid.tracks:
+            abs_tick = 0
+            # Track active notes: note_number → start_time_in_seconds
+            active: dict[int, float] = {}
+            for msg in track:
+                abs_tick += msg.time
+                abs_sec = mido.tick2second(abs_tick, mid.ticks_per_beat, tempo)
+                if msg.type == "note_on" and msg.velocity > 0:
+                    active[msg.note] = abs_sec
+                elif msg.type == "note_off" or (
+                    msg.type == "note_on" and msg.velocity == 0
+                ):
+                    start = active.pop(msg.note, None)
+                    if start is not None:
+                        notes.append((start, abs_sec - start, msg.note))
+        notes.sort(key=lambda n: n[0])
+        return notes
+
     def _generate_music(self) -> None:
-        notes = self._SONGS[self.song]
-        scaled = [(f, d / self._music_speed) for f, d in notes]
-        self._music_sound = self.generate_melody(scaled)
+        """Synthesize a looping music Sound from the current MIDI file."""
+        path = MUSIC_SONG_PATHS.get(self.song)
+        if path is None:
+            return
+        notes = self._parse_midi(path)
+        if not notes:
+            return
+        total_duration = max(n[0] + n[1] for n in notes) / self._music_speed
+        total_samples = int(self._SAMPLE_RATE * total_duration)
+        if total_samples <= 0:
+            return
+        buffer = np.zeros(total_samples, dtype=np.float64)
+        for start, duration, note_num in notes:
+            freq = 440.0 * 2 ** ((note_num - 69) / 12)
+            scaled_start = start / self._music_speed
+            scaled_duration = duration / self._music_speed
+            s0 = int(scaled_start * self._SAMPLE_RATE)
+            s1 = min(int((scaled_start + scaled_duration) * self._SAMPLE_RATE),
+                     total_samples)
+            n = s1 - s0
+            if n <= 0:
+                continue
+            t = np.arange(n) / self._SAMPLE_RATE
+            envelope = np.ones(n)
+            attack = min(200, n)
+            release = min(200, n)
+            if attack > 0:
+                envelope[:attack] = np.linspace(0, 1, attack)
+            if release > 0:
+                envelope[-release:] = np.linspace(1, 0, release)
+            buffer[s0:s1] += np.sin(2 * np.pi * freq * t) * envelope
+        # Normalize to prevent clipping with polyphony
+        peak = np.max(np.abs(buffer))
+        if peak > 1.0:
+            buffer /= peak
+        wave = (32767 * buffer).astype(np.int16)
+        stereo = np.column_stack([wave, wave])
+        try:
+            self._music_sound = pygame.sndarray.make_sound(stereo)
+        except (ValueError, pygame.error) as e:
+            get_logger("audio").error("Music synthesis error: %s", e)
+            self._music_sound = pygame.mixer.Sound(
+                buffer=np.zeros((self._SAMPLE_RATE, 2), dtype=np.int16)
+            )
+
+    # --- SFX synthesis --------------------------------------------------
 
     def generate_melody(self, notes: list[tuple[float, float]]) -> pygame.mixer.Sound:
         """Synthesize a sequence of ``(freq, duration)`` notes into a Sound."""
@@ -126,6 +197,8 @@ class AudioManager:
             return pygame.mixer.Sound(
                 buffer=np.zeros((self._SAMPLE_RATE, 2), dtype=np.int16)
             )
+
+    # --- Playback -------------------------------------------------------
 
     def play(self, key: str) -> bool:
         """Play a SFX on the dedicated channel. Returns True if played."""
