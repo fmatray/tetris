@@ -34,10 +34,14 @@ class AudioManager:
         self.song = song
         self.muted = False
         self._music_speed = 1.0
+        self._music_start_tick = 0  # pygame.time.get_ticks() when music started
+        self._music_pos_sec = 0.0   # position within the song when speed changes
         self.sounds: dict[str, pygame.mixer.Sound] = {}
         pygame.mixer.set_reserved(2)
         self._music_channel = pygame.mixer.Channel(0)
         self._sfx_channel = pygame.mixer.Channel(1)
+        self._music_buffer: np.ndarray | None = None  # raw float64 buffer at 1.0x
+        self._music_duration: float = 0.0  # total duration at 1.0x speed
         self._music_sound: pygame.mixer.Sound | None = None
         ensure_midi_files()
         self._init_sounds()
@@ -116,25 +120,22 @@ class AudioManager:
         return notes
 
     def _generate_music(self) -> None:
-        """Synthesize a looping music Sound from the current MIDI file."""
+        """Synthesize the raw music buffer at 1.0x speed from the MIDI file."""
         path = MUSIC_SONG_PATHS.get(self.song)
         if path is None:
             return
         notes = self._parse_midi(path)
         if not notes:
             return
-        total_duration = max(n[0] + n[1] for n in notes) / self._music_speed
-        total_samples = int(self._SAMPLE_RATE * total_duration)
+        self._music_duration = max(n[0] + n[1] for n in notes)
+        total_samples = int(self._SAMPLE_RATE * self._music_duration)
         if total_samples <= 0:
             return
         buffer = np.zeros(total_samples, dtype=np.float64)
         for start, duration, note_num in notes:
             freq = 440.0 * 2 ** ((note_num - 69) / 12)
-            scaled_start = start / self._music_speed
-            scaled_duration = duration / self._music_speed
-            s0 = int(scaled_start * self._SAMPLE_RATE)
-            s1 = min(int((scaled_start + scaled_duration) * self._SAMPLE_RATE),
-                     total_samples)
+            s0 = int(start * self._SAMPLE_RATE)
+            s1 = min(int((start + duration) * self._SAMPLE_RATE), total_samples)
             n = s1 - s0
             if n <= 0:
                 continue
@@ -151,7 +152,29 @@ class AudioManager:
         peak = np.max(np.abs(buffer))
         if peak > 1.0:
             buffer /= peak
-        wave = (32767 * buffer).astype(np.int16)
+        self._music_buffer = buffer
+        self._build_music_sound()
+
+    def _build_music_sound(self, from_pos: float = 0.0) -> None:
+        """Build a playable Sound from the raw buffer at current speed.
+
+        ``from_pos`` is the position in the song (at 1.0x speed) to start
+        from, in seconds. The buffer is resampled to compress/expand time
+        by ``_music_speed`` (higher speed = fewer samples = faster playback).
+        """
+        if self._music_buffer is None:
+            return
+        start_sample = int(from_pos * self._SAMPLE_RATE)
+        chunk = self._music_buffer[start_sample:]
+        n_orig = len(chunk)
+        if n_orig == 0:
+            return
+        # Resample: compress by _music_speed (1.5x → 2/3 the samples)
+        n_new = int(n_orig / self._music_speed)
+        old_idx = np.linspace(0, n_orig - 1, n_orig)
+        new_idx = np.linspace(0, n_orig - 1, n_new)
+        resampled = np.interp(new_idx, old_idx, chunk)
+        wave = (32767 * resampled).astype(np.int16)
         stereo = np.column_stack([wave, wave])
         try:
             self._music_sound = pygame.sndarray.make_sound(stereo)
@@ -202,11 +225,24 @@ class AudioManager:
         self._sfx_channel.play(self.sounds[key])
         return True
 
+    def _get_music_pos(self) -> float:
+        """Return the current position in the song (at 1.0x speed), in seconds."""
+        if not self._music_channel.get_busy() or self._music_duration <= 0:
+            return 0.0
+        elapsed_ms = pygame.time.get_ticks() - self._music_start_tick
+        elapsed_sec = elapsed_ms / 1000.0
+        # Position in the scaled timeline, wrapped to song length
+        scaled_duration = self._music_duration / self._music_speed
+        pos_in_scaled = elapsed_sec % scaled_duration
+        # Convert back to 1.0x position
+        return pos_in_scaled * self._music_speed
+
     def start_music(self) -> None:
         if self.muted or self.music_volume == 0 or self._music_sound is None:
             return
         self._music_channel.set_volume(MUSIC_VOLUME_LEVELS[self.music_volume])
         self._music_channel.play(self._music_sound, loops=-1)
+        self._music_start_tick = pygame.time.get_ticks()
 
     def stop_music(self) -> None:
         self._music_channel.stop()
@@ -215,9 +251,13 @@ class AudioManager:
         if speed == self._music_speed:
             return
         was_playing = self._music_channel.get_busy()
-        self._music_channel.stop()
+        if was_playing:
+            pos = self._get_music_pos()
+            self._music_channel.fadeout(100)
+        else:
+            pos = 0.0
         self._music_speed = speed
-        self._generate_music()
+        self._build_music_sound(from_pos=pos)
         if was_playing and not self.muted and self.music_volume > 0:
             self.start_music()
 
