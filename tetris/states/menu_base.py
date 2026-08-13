@@ -46,6 +46,16 @@ class MenuBase(State):
     _instructions: str = "Flèches: Navigation | Entrée: Valider | Échap: Retour"
     _disabled_color: tuple[int, int, int] = (64, 64, 64)
     def __init__(self, screen, font, audio) -> None:
+        """Initialize the menu with a fresh background animation instance.
+
+        Each menu state owns its own :class:`MenuBackgroundAnimation`;
+        the animation resets on every menu transition.
+
+        Args:
+            screen: Pygame display surface.
+            font: Font for menu option text.
+            audio: Audio manager for navigation sounds.
+        """
         self.screen, self.font, self.audio = screen, font, audio
         self.selection = 0
         self.bg_anim = MenuBackgroundAnimation()
@@ -53,6 +63,16 @@ class MenuBase(State):
     # --- Update: drive background animation ---------------------------
 
     def update(self, dt: float, particles: ParticleSystem) -> State | None:
+        """Drive the background animation; never transitions state.
+
+        Args:
+            dt: Milliseconds since last frame (from ``clock.tick(60)``);
+                converted to seconds for the animation.
+            particles: Shared particle system for explosion bursts.
+
+        Returns:
+            Always ``None`` — menus stay until user navigates away.
+        """
         self.bg_anim.update(dt / 1000.0, particles)
         return None
 
@@ -101,6 +121,17 @@ class MenuBase(State):
         return None
 
     def draw(self, screen: pygame.Surface, *, particles: ParticleSystem | None = None) -> None:
+        """Render the menu: background animation, particles, title, options.
+
+        Draw order (back to front): black fill → falling tetrominos →
+        explosion particles → title → option rows → instructions.  This
+        keeps the UI text readable above the animation.
+
+        Args:
+            screen: Target surface to draw onto.
+            particles: Shared particle system; if provided, its particles
+                are drawn between the animation and the UI text.
+        """
         screen.fill(BLACK)
         self.bg_anim.draw(screen)
         if particles is not None:

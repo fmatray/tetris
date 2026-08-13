@@ -184,6 +184,11 @@ class HyperparamMenuState(MenuBase):
     def draw(self, screen: pygame.Surface, *, particles=None) -> None:
         """Render hyperparameters as a multi-column table.
 
+        Draw order: black fill → background animation → explosion
+        particles → title → table → instructions.  Overrides
+        :meth:`MenuBase.draw` to use a multi-column pixel layout instead
+        of centered single-column options.
+
         Columns: Param | Current | Min | Max | Step | Explanation
         """
         screen.fill(BLACK)
