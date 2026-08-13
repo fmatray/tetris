@@ -150,6 +150,8 @@ SOUND_VOLUME_LEVELS = [0.0, 0.25, 0.5, 1.0]  # Off, Low, Half, Full
 SOUND_VOLUME_LABELS = ["Off", "Bas", "Moyen", "Max"]
 MUSIC_VOLUME_LEVELS = [0.0, 0.25, 0.5, 1.0]
 MUSIC_VOLUME_LABELS = ["Off", "Bas", "Moyen", "Max"]
+MUSIC_SONGS = ["korobeiniki", "kalinka"]
+MUSIC_SONG_LABELS = {"korobeiniki": "Korobeiniki", "kalinka": "Kalinka"}
 MUSIC_MIDI_DIR = os.path.join(DATA_DIR, "midi")
 MUSIC_SONG_PATHS = {
     "korobeiniki": os.path.join(MUSIC_MIDI_DIR, "korobeiniki.mid"),
