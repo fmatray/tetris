@@ -22,6 +22,7 @@ from tetris.settings import (
     BOARD_OFFSET_Y,
     SOFT_DROP_FACTOR,
     drop_interval,
+    music_speed_for_level,
 )
 from tetris.states.base import State
 from tetris.visuals.particles import ParticleSystem
@@ -38,13 +39,17 @@ class GameState(State):
         font: pygame.font.Font,
         audio: AudioManager,
         handicap: int,
-        sound_enabled: bool = True,
+        sound_volume: int = 3,
+        music_volume: int = 3,
+        music_song: str = "korobeiniki",
         piece_provider: PieceProvider | None = None,
         menu: MenuState | None = None,
         debug: bool = False,
     ) -> None:
         self.screen, self.font, self.audio = screen, font, audio
-        self.audio.enabled = sound_enabled
+        self.audio.apply_settings(sound_volume, music_volume, music_song)
+        self._last_level = 0
+        self._pending_level_up = False
         self.menu = menu
         self.debug = debug
         self.renderer = Renderer(screen, font)
@@ -75,6 +80,7 @@ class GameState(State):
             kb["soft_drop"]: self._toggle_down_true,
             kb["hard_drop"]: self._hard_drop,
         }
+        self._mute_key: int = kb["mute"]
         self._pause_key: int = kb["pause"]
         self._soft_drop_key: int = kb["soft_drop"]
 
@@ -104,6 +110,7 @@ class GameState(State):
 
     def _toggle_down_true(self) -> None:
         self.down_pressed = True
+        self.audio.play("soft_drop")
 
     def _hard_drop(self) -> None:
         """Drop piece to bottom instantly, lock, and spawn next piece."""
@@ -111,17 +118,19 @@ class GameState(State):
             return
         distance = self.board.hard_drop(self.current_piece)
         self.stats.add_hard_drop(distance)
-        self._lock_and_spawn()
+        self._lock_and_spawn(hard_drop=True)
 
-    def _lock_and_spawn(self) -> tuple[int, list]:
+    def _lock_and_spawn(self, hard_drop: bool = False) -> tuple[int, list]:
         """Lock current piece, update stats, spawn next. Returns (cleared, rows_data)."""
         cleared, rows_data = self.board.lock_tetromino(self.current_piece)
         locked_type = self.current_piece.type
         self.stats.on_piece_locked(cleared)
         if cleared > 0:
             self.audio.play(f"clear_{cleared}")
+        elif hard_drop:
+            self.audio.play("hard_drop")
         else:
-            self.audio.play("lock")
+            self.audio.play("spawn")
         self.current_piece, self.next_piece = self.next_piece, Tetromino(
             self.pieces.next_type()
         )
@@ -145,7 +154,10 @@ class GameState(State):
         if event.type == pygame.KEYDOWN:
             if event.key == self._pause_key:
                 self.paused = not self.paused
+            elif event.key == self._mute_key:
+                self.audio.toggle_mute()
             elif event.key == pygame.K_ESCAPE:
+                self.audio.stop_music()
                 self.pieces.save()
                 return self._return_to_menu()
             elif event.key in self.input_map:
@@ -165,9 +177,15 @@ class GameState(State):
         )
         self.current_speed = speed
         if self.drop_time / 1000 >= speed:
-            self._tick(particles)
             self.drop_time = 0
+        if self.stats.level > self._last_level:
+            self._pending_level_up = True
+            self.audio.set_music_speed(music_speed_for_level(self.stats.level))
+        self._last_level = self.stats.level
+        if self._pending_level_up and self.audio.play("level_up"):
+            self._pending_level_up = False
         if self.game_over:
+            self.audio.stop_music()
             _logger.debug("Game over | score=%d, lines=%d, level=%d", self.stats.score, self.stats.total_lines, self.stats.level)
             self.pieces.save()
             from tetris.states.game_over import GameOverState

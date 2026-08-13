@@ -33,7 +33,7 @@ class TetrisApp:
         self.clock = pygame.time.Clock()
         pygame.display.set_caption("Tetris Python")
         self.font = get_small_font()
-        self.audio = AudioManager(True)
+        self.audio = AudioManager()
         self.particles = ParticleSystem()
         self.state: State = MenuState(self.screen, self.font, self.audio)
 

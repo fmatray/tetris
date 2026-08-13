@@ -1,25 +1,57 @@
-"""Procedural audio: NumPy-generated sounds, no external files."""
+"""Procedural audio: NumPy-generated sounds and music, no external files."""
+
+from typing import ClassVar
 
 import numpy as np
 import pygame
 
 from tetris.logger import get_logger
+from tetris.settings import MUSIC_VOLUME_LEVELS, SOUND_VOLUME_LEVELS
 
 
 class AudioManager:
-    """Generates and plays short procedural sounds.
+    """Generates and plays short procedural sounds plus background music.
 
-    All sounds are synthesized from sine waves with attack/release
-    envelopes via NumPy. Toggling ``enabled`` mutes playback without
-    destroying the generated buffers.
+    SFX play on a dedicated channel (1); music loops on channel 0.
+    Volume is a 0–3 index into ``SOUND_VOLUME_LEVELS`` / ``MUSIC_VOLUME_LEVELS``.
     """
 
     _SAMPLE_RATE = 44100
 
-    def __init__(self, enabled: bool = True) -> None:
-        self.enabled = enabled
+    _SONGS: ClassVar[dict[str, list[tuple[float, float]]]] = {
+        "korobeiniki": [
+            (659.25, 0.5), (493.88, 0.25), (523.25, 0.25), (587.33, 0.5),
+            (523.25, 0.25), (493.88, 0.25), (440.0, 0.5), (440.0, 0.25),
+            (0, 0.25), (523.25, 0.25), (659.25, 0.25), (587.33, 0.25),
+            (523.25, 0.25), (493.88, 0.5), (523.25, 0.25), (587.33, 0.25),
+            (659.25, 0.5), (523.25, 0.5), (440.0, 0.5), (440.0, 0.25), (0, 0.25),
+        ],
+        "kalinka": [
+            (293.66, 0.2), (329.63, 0.2), (392.0, 0.2), (349.23, 0.2),
+            (329.63, 0.2), (293.66, 0.4), (329.63, 0.2), (392.0, 0.2),
+            (440.0, 0.4), (493.88, 0.4), (440.0, 0.2), (392.0, 0.2),
+            (349.23, 0.2), (329.63, 0.2), (293.66, 0.6),
+        ],
+    }
+
+    def __init__(
+        self,
+        sound_volume: int = 3,
+        music_volume: int = 3,
+        song: str = "korobeiniki",
+    ) -> None:
+        self.sound_volume = sound_volume
+        self.music_volume = music_volume
+        self.song = song
+        self.muted = False
+        self._music_speed = 1.0
         self.sounds: dict[str, pygame.mixer.Sound] = {}
+        pygame.mixer.set_reserved(2)
+        self._music_channel = pygame.mixer.Channel(0)
+        self._sfx_channel = pygame.mixer.Channel(1)
+        self._music_sound: pygame.mixer.Sound | None = None
         self._init_sounds()
+        self._generate_music()
 
     def _init_sounds(self) -> None:
         # Line clears — one melody per clear count (1-4)
@@ -57,7 +89,18 @@ class AudioManager:
             [(261.63, 0.2), (196.00, 0.2), (130.81, 0.5)]
         )
         self.sounds["glitch"] = self.generate_melody([(880.0, 0.01), (1760.0, 0.01)])
-        self.sounds["lock"] = self.generate_melody([(600.0, 0.05), (400.0, 0.05)])
+        # Piece events
+        self.sounds["spawn"] = self.generate_melody([(880.0, 0.03)])
+        self.sounds["soft_drop"] = self.generate_melody([(220.0, 0.02)])
+        self.sounds["hard_drop"] = self.generate_melody([(150.0, 0.05), (100.0, 0.1)])
+        self.sounds["level_up"] = self.generate_melody(
+            [(523.25, 0.08), (659.25, 0.08), (783.99, 0.08), (1046.50, 0.2)]
+        )
+
+    def _generate_music(self) -> None:
+        notes = self._SONGS[self.song]
+        scaled = [(f, d / self._music_speed) for f, d in notes]
+        self._music_sound = self.generate_melody(scaled)
 
     def generate_melody(self, notes: list[tuple[float, float]]) -> pygame.mixer.Sound:
         """Synthesize a sequence of ``(freq, duration)`` notes into a Sound."""
@@ -84,6 +127,49 @@ class AudioManager:
                 buffer=np.zeros((self._SAMPLE_RATE, 2), dtype=np.int16)
             )
 
-    def play(self, key: str) -> None:
-        if self.enabled and key in self.sounds and not pygame.mixer.get_busy():
-            self.sounds[key].play()
+    def play(self, key: str) -> bool:
+        """Play a SFX on the dedicated channel. Returns True if played."""
+        if self.muted or self.sound_volume == 0:
+            return False
+        if key not in self.sounds:
+            return False
+        if self._sfx_channel.get_busy():
+            return False
+        self._sfx_channel.set_volume(SOUND_VOLUME_LEVELS[self.sound_volume])
+        self._sfx_channel.play(self.sounds[key])
+        return True
+
+    def start_music(self) -> None:
+        if self.muted or self.music_volume == 0 or self._music_sound is None:
+            return
+        self._music_channel.set_volume(MUSIC_VOLUME_LEVELS[self.music_volume])
+        self._music_channel.play(self._music_sound, loops=-1)
+
+    def stop_music(self) -> None:
+        self._music_channel.stop()
+
+    def set_music_speed(self, speed: float) -> None:
+        if speed == self._music_speed:
+            return
+        was_playing = self._music_channel.get_busy()
+        self._music_channel.stop()
+        self._music_speed = speed
+        self._generate_music()
+        if was_playing and not self.muted and self.music_volume > 0:
+            self.start_music()
+
+    def toggle_mute(self) -> None:
+        self.muted = not self.muted
+        if self.muted:
+            self._music_channel.stop()
+        else:
+            self.start_music()
+
+    def apply_settings(self, sound_volume: int, music_volume: int, song: str) -> None:
+        self.sound_volume = sound_volume
+        self.music_volume = music_volume
+        self.muted = False
+        self._music_speed = 1.0
+        self.song = song
+        self._generate_music()
+        self.start_music()

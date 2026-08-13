@@ -145,6 +145,22 @@ MENU_ANIM_EXPLODE_CHANCE = 0.01  # per-frame probability after delay
 MENU_ANIM_EXPLODE_PARTICLES = 80  # particles per explosion
 MENU_ANIM_FADE_DISTANCE = 100     # px from bottom where fade-out begins
 
+# --- Audio --------------------------------------------------------------
+SOUND_VOLUME_LEVELS = [0.0, 0.25, 0.5, 1.0]  # Off, Low, Half, Full
+SOUND_VOLUME_LABELS = ["Off", "Bas", "Moyen", "Max"]
+MUSIC_VOLUME_LEVELS = [0.0, 0.25, 0.5, 1.0]
+MUSIC_VOLUME_LABELS = ["Off", "Bas", "Moyen", "Max"]
+MUSIC_SONGS = ["korobeiniki", "kalinka"]
+MUSIC_SONG_LABELS = {"korobeiniki": "Korobeiniki", "kalinka": "Kalinka"}
+MUSIC_BASE_SPEED = 1.0
+MUSIC_SPEED_PER_LEVEL = 0.05  # +5% speed per level
+MUSIC_MAX_SPEED = 2.0          # cap at 2x
+
+
+def music_speed_for_level(level: int) -> float:
+    """Music playback speed factor for the given level."""
+    return min(MUSIC_BASE_SPEED + level * MUSIC_SPEED_PER_LEVEL, MUSIC_MAX_SPEED)
+
 # --- Keybindings --------------------------------------------------------
 # Human player keybindings: action name → pygame key constant.
 # Stored in settings.json as integer key codes.
@@ -156,6 +172,7 @@ DEFAULT_KEYBINDS: dict[str, int] = {
     "soft_drop": pygame.K_DOWN,
     "hard_drop": pygame.K_SPACE,
     "pause": pygame.K_p,
+    "mute": pygame.K_m,
 }
 
 # Display labels for each action (French).
@@ -167,6 +184,7 @@ KEYBIND_LABELS: dict[str, str] = {
     "soft_drop": "Chute douce",
     "hard_drop": "Chute rapide",
     "pause": "Pause",
+    "mute": "Muet",
 }
 
 

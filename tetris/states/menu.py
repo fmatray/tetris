@@ -25,7 +25,7 @@ class MenuState(MenuBase):
 
     _OPTIONS = (
         "Joueur",          # 0
-        "Son",             # 1
+        "Audio",           # 1
         "Générateur",      # 2
         "Débogage",        # 3
         "Humain",          # 4
@@ -35,7 +35,7 @@ class MenuState(MenuBase):
         "Quitter",         # 8
     )
     _GENERATOR_CYCLE: ClassVar[tuple[str, ...]] = ("random", "7bag", "35bag")
-    _toggle_indices = frozenset({0, 1, 2, 3})  # Joueur, Son, Générateur, Débogage
+    _toggle_indices = frozenset({0, 2, 3})  # Joueur, Générateur, Débogage
     _title = "TETRIS"
 
     _instructions = "Flèches: Navigation | Entrée: Valider | Échap: Quitter"
@@ -45,7 +45,9 @@ class MenuState(MenuBase):
         super().__init__(screen, font, audio)
         # Defaults — overridden by _load_settings() if a file exists
         self.handicap = 0
-        self.sound_enabled = True
+        self.sound_volume = 3      # 0=Off, 1=Low, 2=Half, 3=Full
+        self.music_volume = 3
+        self.music_song = "korobeiniki"
         self.player = "Humain"
         self.mode = "Normal"
         self.piece_generator = "7bag"
@@ -75,9 +77,10 @@ class MenuState(MenuBase):
     # Maps internal attribute names to human-readable JSON keys.
     _SETTINGS_MAP: ClassVar[dict[str, str]] = {
         "player": "player",
-        "mode": "mode",
+        "sound_volume": "sound",
+        "music_volume": "music",
+        "music_song": "song",
         "handicap": "handicap",
-        "sound_enabled": "sound",
         "ai_speed": "ai_speed",
         "ai_epsilon_decay": "ai_epsilon_decay",
         "ai_epsilon_end": "ai_epsilon_end",
@@ -113,6 +116,9 @@ class MenuState(MenuBase):
             for action, key_code in data["keybinds"].items():
                 if action in self.keybinds:
                     self.keybinds[action] = int(key_code)
+        # Migrate old boolean "sound" to integer "sound_volume"
+        if isinstance(self.sound_volume, bool):
+            self.sound_volume = 3 if self.sound_volume else 0
 
     def save_settings(self) -> None:
         """Persist current menu options to the settings JSON file."""
@@ -130,8 +136,6 @@ class MenuState(MenuBase):
     def _value_label(self, i: int) -> str:
         if i == 0:
             return self.player
-        if i == 1:
-            return "ON" if self.sound_enabled else "OFF"
         if i == 2:
             labels = {"random": "Aléatoire", "7bag": "7-bag", "35bag": "35-bag"}
             return labels.get(self.piece_generator, "Aléatoire")
@@ -145,8 +149,6 @@ class MenuState(MenuBase):
     def _toggle(self, direction: int) -> None:
         if self.selection == 0:  # Joueur
             self.player = "IA" if self.player == "Humain" else "Humain"
-        elif self.selection == 1:  # Son
-            self.sound_enabled = not self.sound_enabled
         elif self.selection == 2:  # Générateur
             idx = self._GENERATOR_CYCLE.index(self.piece_generator)
             self.piece_generator = self._GENERATOR_CYCLE[(idx + direction) % len(self._GENERATOR_CYCLE)]
@@ -163,6 +165,10 @@ class MenuState(MenuBase):
 
     def _on_select(self) -> State | None:
         sel = self.selection
+        if sel == 1:  # Audio submenu
+            from tetris.states.audio_menu import AudioMenuState
+
+            return AudioMenuState(self.screen, self.font, self.audio, self)
         if sel == 4:  # Humain sub-menu
             from tetris.states.human_menu import HumanMenuState
 
@@ -184,7 +190,8 @@ class MenuState(MenuBase):
 
                 ai_provider = PieceProvider(mode="normal", generator=self.piece_generator)
                 return AIState(
-                    self.screen, self.font, self.audio, self.handicap, self.sound_enabled,
+                    self.screen, self.font, self.audio, self.handicap,
+                    self.sound_volume, self.music_volume, self.music_song,
                     ai_provider, self.ai_speed, self,
                     epsilon_decay=self.ai_epsilon_decay,
                     epsilon_end=self.ai_epsilon_end,
@@ -203,7 +210,8 @@ class MenuState(MenuBase):
                     debug=self.debug,
                 )
             return GameState(
-                self.screen, self.font, self.audio, self.handicap, self.sound_enabled, provider, self,
+                self.screen, self.font, self.audio, self.handicap,
+                self.sound_volume, self.music_volume, self.music_song, provider, self,
                 debug=self.debug,
             )
         if sel == 7:  # Leaderboard

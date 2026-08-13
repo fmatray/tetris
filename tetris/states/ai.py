@@ -77,7 +77,9 @@ class AIState(GameState):
         font: pygame.font.Font,
         audio: AudioManager,
         handicap: int,
-        sound_enabled: bool = True,
+        sound_volume: int = 3,
+        music_volume: int = 3,
+        music_song: str = "korobeiniki",
         piece_provider: PieceProvider | None = None,
         speed: str = "fast",
         menu: MenuState | None = None,
@@ -100,7 +102,7 @@ class AIState(GameState):
         # Curriculum: restrict piece pool BEFORE super().__init__() spawns pieces
         if curriculum and ai_mode == "learning" and piece_provider is not None:
             piece_provider.set_allowed_types(["O"])
-        super().__init__(screen, font, audio, handicap, sound_enabled, piece_provider, menu, debug=debug)
+        super().__init__(screen, font, audio, handicap, sound_volume, music_volume, music_song, piece_provider, menu, debug=debug)
         self.agent = DQNAgent(
             epsilon_decay=epsilon_decay,
             epsilon_end=epsilon_end,
@@ -301,13 +303,13 @@ class AIState(GameState):
             else:
                 distance = self.board.hard_drop(piece)
                 self.stats.add_hard_drop(distance)
-                self._lock_and_spawn()
+                self._lock_and_spawn(hard_drop=True)
 
     # --- Override _lock_and_spawn to capture RL transitions --------------
 
-    def _lock_and_spawn(self) -> tuple[int, list]:
+    def _lock_and_spawn(self, hard_drop: bool = False) -> tuple[int, list]:
         """Intercept piece locking to compute reward and store transition (delayed)."""
-        cleared, rows_data = super()._lock_and_spawn()
+        cleared, rows_data = super()._lock_and_spawn(hard_drop=hard_drop)
 
         new_grid = board_to_grid(self.board)
         reward = compute_reward(
@@ -431,6 +433,9 @@ class AIState(GameState):
         self._prev_reward = None
         self._prev_done = False
         self._prev_action = None
+        self._last_level = 0
+        self._pending_level_up = False
+        self.audio.set_music_speed(1.0)
 
         # Reset pieces (re-arm first-piece restriction) and board
         self.pieces.reset()
@@ -573,13 +578,17 @@ class AIState(GameState):
     # --- ESC handling (return to menu) -----------------------------------
 
     def handle_event(self, event: pygame.event.Event) -> State | None:
-        if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
-            self.pieces.save()
-            self.log.flush()
-            try:
-                self.agent.save(MODEL_PATH)
-            except (OSError, RuntimeError) as e:
-                logger.error("Failed to save AI model: %s", e)
-            return self._return_to_menu()
+        if event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_ESCAPE:
+                self.audio.stop_music()
+                self.pieces.save()
+                self.log.flush()
+                try:
+                    self.agent.save(MODEL_PATH)
+                except (OSError, RuntimeError) as e:
+                    logger.error("Failed to save AI model: %s", e)
+                return self._return_to_menu()
+            if event.key == self._mute_key:
+                self.audio.toggle_mute()
         # Ignore other key input — AI controls the game
         return None

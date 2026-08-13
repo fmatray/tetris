@@ -24,7 +24,7 @@ _font = pygame.font.Font(None, 16)
 def audio():
     from tetris.audio import AudioManager
 
-    return AudioManager(enabled=False)
+    return AudioManager(sound_volume=0, music_volume=0)
 
 
 def _make_ai(audio, curriculum=True, freq=2, epsilon_policy="reset"):
@@ -34,7 +34,8 @@ def _make_ai(audio, curriculum=True, freq=2, epsilon_policy="reset"):
         _font,
         audio,
         handicap=0,
-        sound_enabled=False,
+        sound_volume=0,
+        music_volume=0,
         piece_provider=provider,
         speed="fast",
         menu=None,
@@ -64,11 +65,12 @@ class TestCurriculumInit:
             _screen,
             _font,
             audio,
-            0,
-            False,
-            provider,
-            "fast",
-            None,
+            handicap=0,
+            sound_volume=0,
+            music_volume=0,
+            piece_provider=provider,
+            speed="fast",
+            menu=None,
             ai_mode="playing",
             curriculum=True,
         )
@@ -190,7 +192,8 @@ class TestCurriculum7Bag:
             _font,
             audio,
             handicap=0,
-            sound_enabled=False,
+            sound_volume=0,
+            music_volume=0,
             piece_provider=provider,
             speed="fast",
             menu=None,

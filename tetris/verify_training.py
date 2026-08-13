@@ -33,9 +33,9 @@ AI_INTERVAL = 80.0
 def run_training(n_episodes: int) -> None:
     screen = pygame.display.set_mode((800, 700))
     font = get_small_font()
-    audio = AudioManager(False)
+    audio = AudioManager(sound_volume=0, music_volume=0)
 
-    state = AIState(screen, font, audio, 0, False)
+    state = AIState(screen, font, audio, 0, sound_volume=0, music_volume=0)
     particles = ParticleSystem()
     initial_episodes = state.log.total_episodes
     target = initial_episodes + n_episodes

@@ -21,7 +21,7 @@ Returning a new `State` from `handle_event`/`update` transitions the app; `None`
 **Layering** (domain → presentation → persistence):
 - `tetris/game/` — pure game logic (board, tetromino, scoring, stats, piece provider)
 - `tetris/visuals/` — rendering + particle effects (no game logic)
-- `tetris/audio/` — procedural sound synthesis via NumPy
+- `tetris/audio/` — procedural sound + music synthesis via NumPy
 - `tetris/storage/` — JSON persistence (leaderboard, human stats)
 - `tetris/states/` — FSM states binding input → game logic → rendering
 - `tetris/ai/` — V-network DQN agent, DT-20 features, PBRS reward shaping, PER, n-step returns, soft-drop BFS, training log
@@ -32,6 +32,7 @@ Returning a new `State` from `handle_event`/`update` transitions the app; `None`
 MenuState (root, owns settings)
 ├── HumanMenuState → { KeybindState, HumanStatsState }
 ├── AIMenuState → { TrainingMenuState → { HyperparamMenuState, PlaceholderState }, StatsState }
+├── AudioMenuState
 ├── GameState   (human gameplay)
 ├── AIState     (AI gameplay, inherits GameState)
 ├── LeaderboardState
@@ -49,7 +50,7 @@ MenuState (root, owns settings)
 | `tetris/states/` | FSM states (`State` base + 15 concrete states) |
 | `tetris/ai/` | V-network DQN: `DQNetwork` (V-function), `DQNAgent` (per-candidate eval), `PrioritizedReplayBuffer`, DT-20 features + PBRS reward, SRS wall kicks + soft-drop BFS, `TrainingLog` |
 | `tetris/visuals/` | `Renderer`, `ParticleSystem`, leaderboard/graph views |
-| `tetris/audio/` | `AudioManager` — procedural NumPy sine-wave synthesis |
+| `tetris/audio/` | `AudioManager` — procedural NumPy sine-wave synthesis, SFX + background music |
 | `tetris/storage/` | JSON load/save for leaderboard and human game history |
 | `tetris/logger.py` | Central logging module — `configure_logging()`, `get_logger()` |
 | `tests/` | Pytest suite for game logic and AI components |
@@ -102,6 +103,7 @@ python -m tetris.verify_training
 | `tetris/settings.py` | All constants, path constants, `DEFAULT_KEYBINDS`, `KEYBIND_LABELS`, `key_name()` |
 | `tetris/states/base.py` | `State` base class contract |
 | `tetris/states/menu.py` | Root menu, settings load/save, navigation hub |
+| `tetris/states/audio_menu.py` | Audio sub-menu: sound/music volume, song selection |
 | `tetris/states/game.py` | Human gameplay loop, `_setup_keybinds()` |
 | `tetris/states/ai.py` | AI gameplay + RL training integration |
 | `tetris/ai/agent.py` | `DQNAgent` — `select_action`, `store`, `learn`, `save`, `load` |
@@ -165,7 +167,7 @@ All in `data/` (gitignored via blanket `data/` rule):
 | `replay_pieces.json` | `REPLAY_PATH` | JSON | Stored piece sequences for Replay mode |
 | `debug.log` | `DEBUG_LOG_PATH` | Text | Debug logging output (when debug ON) |
 
-**`settings.json` schema**: `player` ("Humain"/"IA"), `mode` ("Normal"/"Replay"), `handicap` (0-5), `sound` (bool), `debug` (bool), `ai_speed` ("normal"/"fast"), `ai_epsilon_decay` (float), `ai_epsilon_end` (float), `ai_lr` (float), `ai_gamma` (float), `ai_batch_size` (int), `ai_buffer_size` (int), `ai_mode` ("learning"/"playing"), `ai_curriculum` (bool), `ai_curriculum_freq` (int), `ai_curriculum_epsilon` (str), `ai_warm_start` (bool), `ai_learn_per_action` (int), `ai_lookahead` (bool), `ai_soft_drop` (bool), `keybinds` (dict: action→pygame keycode).
+**`settings.json` schema**: `player` ("Humain"/"IA"), `mode` ("Normal"/"Replay"), `handicap` (0-5), `sound` (int 0-3), `music` (int 0-3), `song` ("korobeiniki"/"kalinka"), `debug` (bool), `ai_speed` ("normal"/"fast"), `ai_epsilon_decay` (float), `ai_epsilon_end` (float), `ai_lr` (float), `ai_gamma` (float), `ai_batch_size` (int), `ai_buffer_size` (int), `ai_mode` ("learning"/"playing"), `ai_curriculum` (bool), `ai_curriculum_freq` (int), `ai_curriculum_epsilon` (str), `ai_warm_start` (bool), `ai_learn_per_action` (int), `ai_lookahead` (bool), `ai_soft_drop` (bool), `keybinds` (dict: action→pygame keycode, includes `mute`).
 
 ## DQN AI Specifics
 
