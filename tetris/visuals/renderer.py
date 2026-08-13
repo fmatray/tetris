@@ -25,6 +25,7 @@ from tetris.settings import (
     BOARD_WIDTH,
     GAME_OVER_DURATION_MS,
     GAME_OVER_PARTICLE_COUNT,
+    GHOST_OUTLINE_WIDTH,
     GRAY,
     HUD_POSITIONS,
     NEXT_PANEL_X,
@@ -56,6 +57,8 @@ class Renderer:
     def render_frame(self, game: GameState, particles: ParticleSystem) -> None:
         self.screen.fill(BLACK)
         self.draw_grid(game.board)
+        if game.ghost_piece:
+            self.draw_ghost(game.current_piece, game.board)
         self.draw_tetromino(game.current_piece)
         self._draw_text(f"SCORE: {game.stats.score}", HUD_POSITIONS["score"])
         self._draw_text(f"TETROMINOS: {game.stats.piece_count}", HUD_POSITIONS["tetrominos"])
@@ -117,6 +120,23 @@ class Renderer:
                 color = board.grid[y][x]
                 if color:
                     pygame.draw.rect(self.screen, color, rect)
+
+    def draw_ghost(self, tetromino: Tetromino, board: Board) -> None:
+        drop = 0
+        while board.is_valid_move(tetromino, dy=drop + 1):
+            drop += 1
+        if drop == 0:
+            return
+        for x, y in tetromino.get_blocks():
+            gy = y + drop
+            if gy >= 0:
+                rect = pygame.Rect(
+                    x * BLOCK_SIZE + BOARD_OFFSET_X,
+                    gy * BLOCK_SIZE + BOARD_OFFSET_Y,
+                    BLOCK_SIZE,
+                    BLOCK_SIZE,
+                )
+                pygame.draw.rect(self.screen, tetromino.color, rect, GHOST_OUTLINE_WIDTH)
 
     def draw_tetromino(self, tetromino: Tetromino) -> None:
         for x, y in tetromino.get_blocks():

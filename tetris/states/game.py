@@ -45,6 +45,7 @@ class GameState(State):
         piece_provider: PieceProvider | None = None,
         menu: MenuState | None = None,
         debug: bool = False,
+        ghost_piece: bool = True,
     ) -> None:
         self.screen, self.font, self.audio = screen, font, audio
         self.audio.apply_settings(sound_volume, music_volume, music_song)
@@ -52,6 +53,7 @@ class GameState(State):
         self._pending_level_up = False
         self.menu = menu
         self.debug = debug
+        self.ghost_piece = ghost_piece
         self.renderer = Renderer(screen, font)
         self.board = Board()
         self.board.apply_handicap(handicap)

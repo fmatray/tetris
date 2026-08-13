@@ -20,6 +20,7 @@ def ensure_data_dir() -> None:
 SCREEN_WIDTH = 1500
 SCREEN_HEIGHT = 800
 BLOCK_SIZE = 30
+GHOST_OUTLINE_WIDTH = 2  # pixel width of ghost piece outline
 
 # Game board dimensions
 BOARD_WIDTH = 10

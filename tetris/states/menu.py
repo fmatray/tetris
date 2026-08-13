@@ -51,6 +51,7 @@ class MenuState(MenuBase):
         self.player = "Humain"
         self.mode = "Normal"
         self.piece_generator = "7bag"
+        self.ghost_piece = True
         self.debug = False
         self.ai_epsilon_decay = 0.999
         self.ai_epsilon_end = 0.1
@@ -97,6 +98,7 @@ class MenuState(MenuBase):
         "ai_lookahead": "ai_lookahead",
         "ai_soft_drop": "ai_soft_drop",
         "piece_generator": "piece_generator",
+        "ghost_piece": "ghost_piece",
         "debug": "debug",
     }
 
@@ -212,6 +214,7 @@ class MenuState(MenuBase):
             return GameState(
                 self.screen, self.font, self.audio, self.handicap,
                 self.sound_volume, self.music_volume, self.music_song, provider, self,
+                ghost_piece=self.ghost_piece,
                 debug=self.debug,
             )
         if sel == 7:  # Leaderboard

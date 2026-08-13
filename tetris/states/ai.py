@@ -103,6 +103,7 @@ class AIState(GameState):
         if curriculum and ai_mode == "learning" and piece_provider is not None:
             piece_provider.set_allowed_types(["O"])
         super().__init__(screen, font, audio, handicap, sound_volume, music_volume, music_song, piece_provider, menu, debug=debug)
+        self.ghost_piece = False  # AI never shows ghost piece
         self.agent = DQNAgent(
             epsilon_decay=epsilon_decay,
             epsilon_end=epsilon_end,
