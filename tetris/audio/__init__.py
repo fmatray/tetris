@@ -93,35 +93,25 @@ class AudioManager:
     def _parse_midi(path: str) -> list[tuple[float, float, int]]:
         """Parse a MIDI file into a list of (start_sec, duration_sec, note).
 
-        Overlapping notes across tracks are preserved for polyphony.
-        Returns notes sorted by start time.
+        Handles tempo changes mid-file. Overlapping notes are preserved
+        for polyphony. Returns notes sorted by start time.
         """
         mid = mido.MidiFile(path)
         notes: list[tuple[float, float, int]] = []
-        # Read tempo from the first set_tempo meta message (default 120 BPM)
-        tempo = mido.bpm2tempo(120)
-        for track in mid.tracks:
-            for msg in track:
-                if msg.type == "set_tempo":
-                    tempo = msg.tempo
-                    break
-            if tempo != mido.bpm2tempo(120):
-                break
-        for track in mid.tracks:
-            abs_tick = 0
-            # Track active notes: note_number → start_time_in_seconds
-            active: dict[int, float] = {}
-            for msg in track:
-                abs_tick += msg.time
-                abs_sec = mido.tick2second(abs_tick, mid.ticks_per_beat, tempo)
-                if msg.type == "note_on" and msg.velocity > 0:
-                    active[msg.note] = abs_sec
-                elif msg.type == "note_off" or (
-                    msg.type == "note_on" and msg.velocity == 0
-                ):
-                    start = active.pop(msg.note, None)
-                    if start is not None:
-                        notes.append((start, abs_sec - start, msg.note))
+        # Iterate merged tracks — mido yields events in chronological order
+        # across all tracks, with correct delta times including tempo changes.
+        abs_sec = 0.0
+        active: dict[int, float] = {}
+        for msg in mid:
+            abs_sec += msg.time
+            if msg.type == "note_on" and msg.velocity > 0:
+                active[msg.note] = abs_sec
+            elif msg.type == "note_off" or (
+                msg.type == "note_on" and msg.velocity == 0
+            ):
+                start = active.pop(msg.note, None)
+                if start is not None:
+                    notes.append((start, abs_sec - start, msg.note))
         notes.sort(key=lambda n: n[0])
         return notes
 

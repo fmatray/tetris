@@ -1,7 +1,11 @@
-"""Generate MIDI files for game music (Korobeiniki, Kalinka).
+"""Fallback MIDI file generation for game music (Korobeiniki, Kalinka).
+
+Shipped MIDI files in media/ are public-domain downloads from mfiles.co.uk
+ (traditional Russian folk songs). This module generates simplified fallbacks
+ if those files are missing (e.g. fresh clone without media/).
 
 Run standalone:  python -m tetris.audio.midi_gen
-At import time:   ensure_midi_files() creates missing files in media/.
+At import time:   ensure_midi_files() generates missing files in media/.
 """
 
 from __future__ import annotations
