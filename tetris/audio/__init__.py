@@ -157,26 +157,27 @@ class AudioManager:
         self._build_music_sound()
 
     def _build_music_sound(self, from_pos: float = 0.0, fade_in_ms: int = 0) -> None:
-        """Build a playable Sound from the raw buffer at current speed.
+        """Build a full-length looping Sound at current speed from the raw buffer.
 
-        ``from_pos`` is the position in the song (at 1.0x speed) to start
-        from, in seconds. The buffer is resampled to compress/expand time
-        by ``_music_speed``. ``fade_in_ms`` applies a linear volume ramp
-        at the start for smooth crossfades.
+        Resamples the entire 1.0x buffer by ``_music_speed`` (compressing time),
+        then rolls it so ``from_pos`` maps to index 0. This produces a
+        seamless infinite loop at the new tempo starting from the same
+        musical position — no slice, no truncated loop, no restart.
         """
         if self._music_buffer is None:
             return
-        start_sample = int(from_pos * self._SAMPLE_RATE)
-        chunk = self._music_buffer[start_sample:].copy()
-        n_orig = len(chunk)
+        n_orig = len(self._music_buffer)
         if n_orig == 0:
             return
-        # Resample: compress by _music_speed (1.5x → 2/3 the samples)
+        # Resample the entire buffer at the new speed
         n_new = int(n_orig / self._music_speed)
         old_idx = np.linspace(0, n_orig - 1, n_orig)
         new_idx = np.linspace(0, n_orig - 1, n_new)
-        resampled = np.interp(new_idx, old_idx, chunk)
-        # Apply fade-in envelope for smooth crossfade
+        resampled = np.interp(new_idx, old_idx, self._music_buffer)
+        # Roll so the current position maps to index 0 for seamless start
+        roll_amount = int(from_pos * self._SAMPLE_RATE / self._music_speed) % n_new
+        resampled = np.roll(resampled, -roll_amount)
+        # Optional fade-in for crossfade transitions
         if fade_in_ms > 0:
             fade_samples = min(int(self._SAMPLE_RATE * fade_in_ms / 1000), n_new)
             if fade_samples > 0:
@@ -264,15 +265,14 @@ class AudioManager:
         else:
             pos = 0.0
         self._music_speed = speed
-        self._build_music_sound(from_pos=pos, fade_in_ms=300)
+        self._build_music_sound(from_pos=pos, fade_in_ms=500)
         if not was_playing or self.muted or self.music_volume == 0:
             return
-        # Crossfade: start new buffer (with 300ms fade-in) on xfade channel,
-        # fade old out over 300ms — overlap creates smooth transition
+        # Crossfade: new buffer fades in over 500ms while old fades out
         vol = MUSIC_VOLUME_LEVELS[self.music_volume]
         self._xfade_channel.set_volume(vol)
         self._xfade_channel.play(self._music_sound, loops=-1)
-        self._music_channel.fadeout(300)
+        self._music_channel.fadeout(500)
         # Swap channels: xfade becomes the main music channel
         self._music_channel, self._xfade_channel = (
             self._xfade_channel, self._music_channel
