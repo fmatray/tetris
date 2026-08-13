@@ -148,8 +148,9 @@ python -m tetris.verify_training
 
 ## Workflow
 
-- **Documentation**: Always update `README.md` and `docs/` when changing features or architecture.
-- **Git**: Always commit and push after modifications with comprehensive messages.
+- **Documentation**: Use the `code-documentation` skill for code documentation, global documentation reviews, and updates. Always update `README.md` and `docs/` when changing features or architecture.
+- **Git**: Use the `version-control` skill for all git operations. Always commit and push after modifications with comprehensive messages.
+
 ## Data Files
 
 All in `data/` (gitignored via blanket `data/` rule):
