@@ -177,6 +177,7 @@ class GameState(State):
         )
         self.current_speed = speed
         if self.drop_time / 1000 >= speed:
+            self._tick(particles)
             self.drop_time = 0
         if self.stats.level > self._last_level:
             self._pending_level_up = True
