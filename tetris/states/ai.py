@@ -437,6 +437,10 @@ class AIState(GameState):
         self.drop_time = 0
         self._action_timer = 0.0
         self.down_pressed = False
+        self._lock_timer = 0.0
+        self._lock_resets = 0
+        self._grounded = False
+        self._das_held = {}
         self._prev_state = None
         self._prev_reward = None
         self._prev_done = False
@@ -451,8 +455,9 @@ class AIState(GameState):
         # Fresh board for learning diversity — no handicap carried over
         self.current_piece = Tetromino(self.pieces.next_type())
         self.next_piece = Tetromino(self.pieces.next_type())
+        self.preview_pieces = [Tetromino(self.pieces.next_type()) for _ in range(2)]
+        self.hold_piece = None
         self.stats = type(self.stats)()
-        self.episode_start_grid = board_to_grid(self.board)
 
     def _maybe_advance_curriculum(self) -> bool:
         """Add next piece from CURRICULUM_ORDER if enough episodes elapsed."""

@@ -404,31 +404,8 @@ def compute_reward(
     return reward
 
 
-# --- SRS wall kick data (https://tetris.wiki/Super_Rotation_System) ---
-# Format: {(from_state, to_state): [(dx, dy), ...]}
-# States: 0=spawn, 1=CW, 2=180, 3=CCW. Positive y = up (screen y inverted).
-
-SRS_KICKS_JLSTZ: dict[tuple[int, int], list[tuple[int, int]]] = {
-    (0, 1): [(0, 0), (-1, 0), (-1, 1), (0, -2), (-1, -2)],
-    (1, 0): [(0, 0), (1, 0), (1, -1), (0, 2), (1, 2)],
-    (1, 2): [(0, 0), (1, 0), (1, -1), (0, 2), (1, 2)],
-    (2, 1): [(0, 0), (-1, 0), (-1, 1), (0, -2), (-1, -2)],
-    (2, 3): [(0, 0), (1, 0), (1, 1), (0, -2), (1, -2)],
-    (3, 2): [(0, 0), (-1, 0), (-1, -1), (0, 2), (-1, 2)],
-    (3, 0): [(0, 0), (-1, 0), (-1, -1), (0, 2), (-1, 2)],
-    (0, 3): [(0, 0), (1, 0), (1, 1), (0, -2), (1, -2)],
-}
-
-SRS_KICKS_I: dict[tuple[int, int], list[tuple[int, int]]] = {
-    (0, 1): [(0, 0), (-2, 0), (1, 0), (-2, -1), (1, 2)],
-    (1, 0): [(0, 0), (2, 0), (-1, 0), (2, 1), (-1, -2)],
-    (1, 2): [(0, 0), (-1, 0), (2, 0), (-1, 2), (2, -1)],
-    (2, 1): [(0, 0), (1, 0), (-2, 0), (1, -2), (-2, 1)],
-    (2, 3): [(0, 0), (2, 0), (-1, 0), (2, 1), (-1, -2)],
-    (3, 2): [(0, 0), (1, 0), (-2, 0), (1, 2), (-2, -1)],
-    (3, 0): [(0, 0), (1, 0), (-2, 0), (1, -2), (-2, 1)],
-    (0, 3): [(0, 0), (-1, 0), (2, 0), (-1, 2), (2, -1)],
-}
+# SRS wall kick tables are defined in settings.py (shared with human play).
+from tetris.settings import SRS_KICKS_I, SRS_KICKS_JLSTZ
 
 
 def _shape_fits(grid: np.ndarray, shape: list[tuple[int, int]], px: int, py: int) -> bool:

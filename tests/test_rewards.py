@@ -31,15 +31,16 @@ def test_count_holes_with_blocks():
     """All empty cells below a filled cell in a column are holes."""
     grid = _empty_grid()
     grid[5, 3] = 1  # filled at row 5, column 3
-    # All 14 cells from row 6 to row 19 in column 3 are holes
-    assert count_holes(grid) == 14
+    # Holes from row 6 to last row in column 3
+    assert count_holes(grid) == BOARD_HEIGHT - 5 - 1
 
 
 def test_count_holes_multiple():
     grid = _empty_grid()
-    grid[2, 0] = 1  # block at row 2, col 0 → 17 holes (rows 3-19)
-    grid[2, 5] = 1  # block at row 2, col 5 → 17 holes (rows 3-19)
-    assert count_holes(grid) == 34
+    grid[2, 0] = 1  # block at row 2, col 0
+    grid[2, 5] = 1  # block at row 2, col 5
+    holes_per_col = BOARD_HEIGHT - 2 - 1
+    assert count_holes(grid) == 2 * holes_per_col
 
 
 # --- aggregate_height -----------------------------------------------
@@ -132,11 +133,11 @@ def test_column_heights_empty():
 
 def test_column_heights_with_blocks():
     grid = _empty_grid()
-    grid[10, 0] = 1  # height 10
-    grid[5, 3] = 1    # height 15
+    grid[10, 0] = 1
+    grid[5, 3] = 1
     h = column_heights(grid)
-    assert int(h[0]) == 10
-    assert int(h[3]) == 15
+    assert int(h[0]) == BOARD_HEIGHT - 10
+    assert int(h[3]) == BOARD_HEIGHT - 5
     assert int(h[1]) == 0
 
 
@@ -150,7 +151,7 @@ def test_max_height_with_blocks():
     grid = _empty_grid()
     grid[10, 0] = 1
     grid[5, 3] = 1
-    assert max_height(grid) == 15
+    assert max_height(grid) == BOARD_HEIGHT - 5
 
 
 # --- row_transitions -----------------------------------------------
@@ -203,8 +204,8 @@ def test_hole_depth_empty():
 
 def test_hole_depth_with_holes():
     grid = _empty_grid()
-    grid[5, 3] = 1  # filled at row 5 → holes from row 6-19 (14 holes)
-    assert hole_depth(grid) == 14
+    grid[5, 3] = 1  # filled at row 5 → holes from row 6 to last row
+    assert hole_depth(grid) == BOARD_HEIGHT - 5 - 1
 
 
 # --- rows_with_holes -----------------------------------------------
@@ -215,8 +216,8 @@ def test_rows_with_holes_empty():
 
 def test_rows_with_holes_with_holes():
     grid = _empty_grid()
-    grid[5, 3] = 1  # hole in every row 6-19 in column 3
-    assert rows_with_holes(grid) == 14
+    grid[5, 3] = 1  # hole in every row 6 to last row in column 3
+    assert rows_with_holes(grid) == BOARD_HEIGHT - 5 - 1
 
 
 # --- extract_features ----------------------------------------------
@@ -252,20 +253,22 @@ def test_dellacherie_value_bad_board():
 # --- hard_drop_y ---------------------------------------------------
 
 def test_hard_drop_y_empty():
-    """O-piece dropped on empty board should land at y=18 (row 18-19)."""
+    """O-piece dropped on empty board lands at the bottom row."""
     shape = SHAPES["O"][0]
     py = hard_drop_y(_empty_grid(), shape, 0)
-    assert py == 18
+    # O occupies rows py and py+1; bottom row is BOARD_HEIGHT-1
+    assert py == BOARD_HEIGHT - 2
 
 
 def test_hard_drop_y_with_blocks():
     """O-piece dropped above existing blocks lands on top of them."""
     grid = _empty_grid()
-    grid[18, 0] = 1  # block at bottom of column 0
-    grid[18, 1] = 1  # block at bottom of column 1
+    block_row = BOARD_HEIGHT - 4
+    grid[block_row, 0] = 1
+    grid[block_row, 1] = 1
     shape = SHAPES["O"][0]  # occupies (0,0),(1,0),(0,1),(1,1)
     py = hard_drop_y(grid, shape, 0)
-    assert py == 16
+    assert py == block_row - 2
 
 
 # --- place_and_clear ------------------------------------------------

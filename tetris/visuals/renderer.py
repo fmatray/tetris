@@ -27,12 +27,17 @@ from tetris.settings import (
     GAME_OVER_PARTICLE_COUNT,
     GHOST_OUTLINE_WIDTH,
     GRAY,
+    HOLD_PANEL_X,
+    HOLD_PANEL_Y,
     HUD_POSITIONS,
     NEXT_PANEL_X,
     NEXT_PANEL_Y,
+    PREVIEW_PANEL_X,
+    PREVIEW_PANEL_Y,
     SCREEN_HEIGHT,
     SCREEN_WIDTH,
     SHAPES_COLORS,
+    VISIBLE_ROWS,
     WHITE,
 )
 from tetris.visuals.fonts import get_large_font
@@ -62,12 +67,15 @@ class Renderer:
         self.draw_tetromino(game.current_piece)
         self._draw_text(f"SCORE: {game.stats.score}", HUD_POSITIONS["score"])
         self._draw_text(f"TETROMINOS: {game.stats.piece_count}", HUD_POSITIONS["tetrominos"])
-        self._draw_text(f"LINES: {game.stats.total_lines}", HUD_POSITIONS["lines"])
-        self._draw_text(f"LEVEL: {game.stats.level}", HUD_POSITIONS["level"])
-        if game.debug:
-            self._draw_text(f"SPEED: {int(game.current_speed * 1000)}ms", HUD_POSITIONS["speed"])
+        self._draw_text("HOLD:", HUD_POSITIONS["hold"])
+        if game.hold_piece is not None:
+            self.draw_hold_piece(game.hold_piece, game._can_hold)
         self._draw_text("NEXT:", HUD_POSITIONS["next"])
         self.draw_next_piece(game.next_piece)
+        for i, piece in enumerate(getattr(game, "preview_pieces", [])):
+            self.draw_preview_piece(piece, i)
+        if game.debug:
+            self._draw_text(f"SPEED: {int(game.current_speed * 1000)}ms", HUD_POSITIONS["speed"])
         if game.debug and game.pieces.generator in ("7bag", "35bag"):
             self._draw_debug_bag(game)
         # Bottom-left: mode and generator
@@ -106,13 +114,15 @@ class Renderer:
             letter = self.font.render(piece_type, True, WHITE)
             self.screen.blit(letter, (x + 2, y + 2))
             x += BLOCK_SIZE + 2
-
     @staticmethod
     def _cell_rect(x: int, y: int, ox: int, oy: int) -> pygame.Rect:
-        return pygame.Rect(x * BLOCK_SIZE + ox, y * BLOCK_SIZE + oy, BLOCK_SIZE, BLOCK_SIZE)
+        # y is a grid row; offset by hidden rows so only visible rows are drawn
+        screen_y = y - (BOARD_HEIGHT - VISIBLE_ROWS)
+        return pygame.Rect(x * BLOCK_SIZE + ox, screen_y * BLOCK_SIZE + oy, BLOCK_SIZE, BLOCK_SIZE)
 
     def draw_grid(self, board: Board) -> None:
-        for y in range(BOARD_HEIGHT):
+        hidden = BOARD_HEIGHT - VISIBLE_ROWS
+        for y in range(hidden, BOARD_HEIGHT):
             for x in range(BOARD_WIDTH):
                 rect = self._cell_rect(x, y, BOARD_OFFSET_X, BOARD_OFFSET_Y)
                 pygame.draw.rect(self.screen, GRAY, rect, 1)
@@ -121,6 +131,7 @@ class Renderer:
                     pygame.draw.rect(self.screen, color, rect)
 
     def draw_ghost(self, tetromino: Tetromino, board: Board) -> None:
+        hidden = BOARD_HEIGHT - VISIBLE_ROWS
         drop = 0
         while board.is_valid_move(tetromino, dy=drop + 1):
             drop += 1
@@ -128,13 +139,14 @@ class Renderer:
             return
         for x, y in tetromino.get_blocks():
             gy = y + drop
-            if gy >= 0:
+            if gy >= hidden:
                 rect = self._cell_rect(x, gy, BOARD_OFFSET_X, BOARD_OFFSET_Y)
                 pygame.draw.rect(self.screen, tetromino.color, rect, GHOST_OUTLINE_WIDTH)
 
     def draw_tetromino(self, tetromino: Tetromino) -> None:
+        hidden = BOARD_HEIGHT - VISIBLE_ROWS
         for x, y in tetromino.get_blocks():
-            if y >= 0:
+            if y >= hidden:
                 rect = self._cell_rect(x, y, BOARD_OFFSET_X, BOARD_OFFSET_Y)
                 pygame.draw.rect(self.screen, tetromino.color, rect)
 
@@ -143,17 +155,37 @@ class Renderer:
             rect = self._cell_rect(x, y, NEXT_PANEL_X, NEXT_PANEL_Y)
             pygame.draw.rect(self.screen, tetromino.color, rect)
 
+    def draw_hold_piece(self, tetromino: Tetromino, can_hold: bool = True) -> None:
+        """Draw the held piece. Dimmed if hold is unavailable."""
+        color = tetromino.color if can_hold else GRAY
+        for x, y in tetromino.get_blocks():
+            rect = self._cell_rect(x, y, HOLD_PANEL_X, HOLD_PANEL_Y)
+            pygame.draw.rect(self.screen, color, rect)
+
+    def draw_preview_piece(self, tetromino: Tetromino, index: int) -> None:
+        """Draw a preview piece below the next-piece panel."""
+        y_offset = PREVIEW_PANEL_Y + index * 3 * BLOCK_SIZE
+        for x, y in tetromino.get_blocks():
+            rect = pygame.Rect(
+                x * BLOCK_SIZE + PREVIEW_PANEL_X,
+                y * BLOCK_SIZE + y_offset,
+                BLOCK_SIZE, BLOCK_SIZE,
+            )
+            pygame.draw.rect(self.screen, tetromino.color, rect)
+
     # --- Game-over animation --------------------------------------------
 
     def _render_glitch_board(self, game: GameState, shake_x: int, shake_y: int, glitch: float) -> pygame.Surface:
+        hidden = BOARD_HEIGHT - VISIBLE_ROWS
         board_surf = pygame.Surface(
-            (BOARD_WIDTH * BLOCK_SIZE, BOARD_HEIGHT * BLOCK_SIZE)
+            (BOARD_WIDTH * BLOCK_SIZE, VISIBLE_ROWS * BLOCK_SIZE)
         )
         board_surf.set_colorkey(BLACK)
-        for y in range(BOARD_HEIGHT):
+        for y in range(hidden, BOARD_HEIGHT):
             for x in range(BOARD_WIDTH):
+                sy = y - hidden
                 rect = pygame.Rect(
-                    x * BLOCK_SIZE, y * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE
+                    x * BLOCK_SIZE, sy * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE
                 )
                 pygame.draw.rect(board_surf, GRAY, rect, 1)
                 if game.board.grid[y][x]:
@@ -169,11 +201,12 @@ class Renderer:
                     if color:
                         pygame.draw.rect(board_surf, color, rect)
         for x, y in game.current_piece.get_blocks():
-            if y >= 0:
+            if y >= hidden:
+                sy = y - hidden
                 pygame.draw.rect(
                     board_surf,
                     game.current_piece.color,
-                    (x * BLOCK_SIZE, y * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE),
+                    (x * BLOCK_SIZE, sy * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE),
                 )
         self.screen.blit(board_surf, (BOARD_OFFSET_X + shake_x, BOARD_OFFSET_Y + shake_y))
         return board_surf
@@ -204,7 +237,7 @@ class Renderer:
             particles.append(
                 Particle(
                     random.randint(BOARD_OFFSET_X, BOARD_OFFSET_X + BOARD_WIDTH * BLOCK_SIZE),
-                    random.randint(BOARD_OFFSET_Y, BOARD_OFFSET_Y + BOARD_HEIGHT * BLOCK_SIZE),
+                    random.randint(BOARD_OFFSET_Y, BOARD_OFFSET_Y + VISIBLE_ROWS * BLOCK_SIZE),
                     random.choice(self._GLITCH_COLORS),
                 )
             )

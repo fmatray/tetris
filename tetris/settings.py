@@ -18,7 +18,8 @@ GHOST_OUTLINE_WIDTH = 2  # pixel width of ghost piece outline
 
 # Game board dimensions
 BOARD_WIDTH = 10
-BOARD_HEIGHT = 20
+BOARD_HEIGHT = 22   # total rows (2 hidden buffer + 20 visible)
+VISIBLE_ROWS = 20   # rows rendered on screen (rows 0-1 are hidden)
 
 # Colors
 BLACK = (0, 0, 0)
@@ -37,9 +38,15 @@ SHAPES_COLORS = {
     "L": (255, 165, 0),  # Orange
 }
 
-# Tetromino shapes
+# Tetromino shapes — SRS rotation states (0=spawn, 1=CW, 2=180, 3=CCW).
+# Coordinate convention: (col, row) within a 4×4 (I) or 3×3 (others) box.
 SHAPES = {
-    "I": [[(0, 1), (1, 1), (2, 1), (3, 1)], [(2, 0), (2, 1), (2, 2), (2, 3)]],
+    "I": [
+        [(0, 1), (1, 1), (2, 1), (3, 1)],
+        [(2, 0), (2, 1), (2, 2), (2, 3)],
+        [(0, 2), (1, 2), (2, 2), (3, 2)],
+        [(1, 0), (1, 1), (1, 2), (1, 3)],
+    ],
     "O": [[(0, 0), (1, 0), (0, 1), (1, 1)]],
     "T": [
         [(1, 0), (0, 1), (1, 1), (2, 1)],
@@ -47,8 +54,18 @@ SHAPES = {
         [(0, 1), (1, 1), (2, 1), (1, 2)],
         [(0, 1), (1, 1), (1, 0), (1, 2)],
     ],
-    "S": [[(1, 0), (2, 0), (0, 1), (1, 1)], [(1, 0), (1, 1), (2, 1), (2, 2)]],
-    "Z": [[(0, 0), (1, 0), (1, 1), (2, 1)], [(2, 0), (2, 1), (1, 1), (1, 2)]],
+    "S": [
+        [(1, 0), (2, 0), (0, 1), (1, 1)],
+        [(1, 0), (1, 1), (2, 1), (2, 2)],
+        [(1, 1), (2, 1), (0, 2), (1, 2)],
+        [(0, 0), (0, 1), (1, 1), (1, 2)],
+    ],
+    "Z": [
+        [(0, 0), (1, 0), (1, 1), (2, 1)],
+        [(2, 0), (2, 1), (1, 1), (1, 2)],
+        [(0, 1), (1, 1), (1, 2), (2, 2)],
+        [(1, 0), (1, 1), (0, 1), (0, 2)],
+    ],
     "J": [
         [(0, 0), (0, 1), (1, 1), (2, 1)],
         [(1, 0), (2, 0), (1, 1), (1, 2)],
@@ -65,6 +82,42 @@ SHAPES = {
 
 # Line-clear base points (× level at clear time)
 LINE_CLEAR_POINTS = {1: 100, 2: 300, 3: 500, 4: 800}
+
+# T-Spin base points (× level at clear time). 0 lines = T-Spin Mini.
+TSPIN_POINTS = {0: 100, 1: 200, 2: 400, 3: 800, 4: 1200}
+
+# Back-to-Back: consecutive T-Spin or Tetris (4-line clear) gets ×1.5
+B2B_MULTIPLIER = 1.5
+
+# --- SRS wall kick data (https://tetris.wiki/Super_Rotation_System) ---------
+# Format: {(from_state, to_state): [(dx, dy), ...]}
+# dx: horizontal offset, dy: vertical offset (positive = up, screen y inverted)
+SRS_KICKS_JLSTZ: dict[tuple[int, int], list[tuple[int, int]]] = {
+    (0, 1): [(0, 0), (-1, 0), (-1, 1), (0, -2), (-1, -2)],
+    (1, 0): [(0, 0), (1, 0), (1, -1), (0, 2), (1, 2)],
+    (1, 2): [(0, 0), (1, 0), (1, -1), (0, 2), (1, 2)],
+    (2, 1): [(0, 0), (-1, 0), (-1, 1), (0, -2), (-1, -2)],
+    (2, 3): [(0, 0), (1, 0), (1, 1), (0, -2), (1, -2)],
+    (3, 2): [(0, 0), (-1, 0), (-1, -1), (0, 2), (-1, 2)],
+    (3, 0): [(0, 0), (-1, 0), (-1, -1), (0, 2), (-1, 2)],
+    (0, 3): [(0, 0), (1, 0), (1, 1), (0, -2), (1, -2)],
+}
+SRS_KICKS_I: dict[tuple[int, int], list[tuple[int, int]]] = {
+    (0, 1): [(0, 0), (-2, 0), (1, 0), (-2, -1), (1, 2)],
+    (1, 0): [(0, 0), (2, 0), (-1, 0), (2, 1), (-1, -2)],
+    (1, 2): [(0, 0), (-1, 0), (2, 0), (-1, 2), (2, -1)],
+    (2, 1): [(0, 0), (1, 0), (-2, 0), (1, -2), (-2, 1)],
+    (2, 3): [(0, 0), (2, 0), (-1, 0), (2, 1), (-1, -2)],
+    (3, 2): [(0, 0), (1, 0), (-2, 0), (1, 2), (-2, -1)],
+    (3, 0): [(0, 0), (1, 0), (-2, 0), (1, -2), (-2, 1)],
+    (0, 3): [(0, 0), (-1, 0), (2, 0), (-1, 2), (2, -1)],
+}
+
+# --- Lock delay & DAS ----------------------------------------------------
+LOCK_DELAY_MS = 500        # ms before a grounded piece locks
+LOCK_DELAY_RESETS = 15    # max move/rotate resets before forced lock
+DAS_DELAY_MS = 170        # initial auto-shift delay (ms)
+DAS_REPEAT_MS = 50         # auto-shift repeat interval (ms)
 
 # Drop speed: Tetris Guideline formula (seconds per row at given level).
 # Super-exponential: (DROP_BASE - level×DROP_STEP)^level.
@@ -96,7 +149,15 @@ HUD_POSITIONS = {
     "ai_stats": (570, 180),
     "mode": (20, 700),
     "generator": (20, 740),
+    "hold": (20, 220),
 }
+
+# Hold piece panel position (left side, below HUD)
+HOLD_PANEL_X = 20
+HOLD_PANEL_Y = 250
+# Preview pieces panel position (right side, below next piece)
+PREVIEW_PANEL_X = 570
+PREVIEW_PANEL_Y = 160
 
 # Game-over animation
 GAME_OVER_DURATION_MS = 4000
@@ -164,6 +225,7 @@ DEFAULT_KEYBINDS: dict[str, int] = {
     "rotate_ccw": pygame.K_s,
     "soft_drop": pygame.K_DOWN,
     "hard_drop": pygame.K_SPACE,
+    "hold": pygame.K_c,
     "pause": pygame.K_p,
     "mute": pygame.K_m,
 }
@@ -176,6 +238,7 @@ KEYBIND_LABELS: dict[str, str] = {
     "rotate_ccw": "Rotation anti-horaire",
     "soft_drop": "Chute douce",
     "hard_drop": "Chute rapide",
+    "hold": "Réserve",
     "pause": "Pause",
     "mute": "Muet",
 }

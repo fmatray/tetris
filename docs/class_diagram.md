@@ -231,16 +231,26 @@ classDiagram
             +pieces: PieceProvider
             +current_piece: Tetromino
             +next_piece: Tetromino
+            +preview_pieces: list~Tetromino~
             +drop_time: int
             +stats: GameStats
             +current_speed: float
             +game_over: bool
             +paused: bool
             +down_pressed: bool
+            +hold_piece: Tetromino | None
+            - _can_hold: bool
+            - _lock_timer: float
+            - _lock_resets: int
+            - _grounded: bool
+            - _das_held: dict~int, float~
             +input_map: dict~int, Callable~
             - _mute_key: int
             - _pause_key: int
             - _soft_drop_key: int
+            - _left_key: int
+            - _right_key: int
+            - _hold_key: int
             +__init__(screen, font, audio, handicap, sound_volume, music_volume, music_song, piece_provider, menu, debug, ghost_piece) None
             - _setup_keybinds(menu) None
             - _move_left() None
@@ -249,6 +259,8 @@ classDiagram
             - _rotate_ccw() None
             - _toggle_down_true() None
             - _hard_drop() None
+            - _hold() None
+            - _on_piece_moved() None
             - _lock_and_spawn(hard_drop: bool) tuple~int, list~
             - _do_game_over() State
             - _return_to_menu() State
@@ -342,6 +354,9 @@ classDiagram
             +grid: list~list~tuple~int, int, int~ | None~~
             +__init__() None
             +is_valid_move(tetromino: Tetromino, dx: int, dy: int, rotation: int | None) bool
+            +try_rotate(tetromino: Tetromino, direction: int) bool
+            - _shape_fits(shape, x: int, y: int) bool
+            +is_tspin(tetromino: Tetromino) bool
             +lock_tetromino(tetromino: Tetromino) tuple~int, list~
             +hard_drop(tetromino: Tetromino) int
             +apply_handicap(level: int) None
@@ -393,6 +408,10 @@ classDiagram
             +soft_drop_points(cells: int) int
             %% static
             +hard_drop_points(cells: int) int
+            %% static
+            +tspin_points(lines_cleared: int, level: int) int
+            %% static
+            +b2b_bonus(base_points: int) int
         }
 
         class GameStats {
@@ -401,8 +420,9 @@ classDiagram
             +level: int
             +piece_count: int
             +combo: int
+            +b2b: bool
             +__init__() None
-            +on_piece_locked(lines_cleared: int) None
+            +on_piece_locked(lines_cleared: int, tspin: bool) None
             +add_soft_drop(cells: int) None
             +add_hard_drop(cells: int) None
         }
@@ -510,6 +530,8 @@ classDiagram
             +draw_ghost(tetromino: Tetromino, board: Board) None
             +draw_tetromino(tetromino: Tetromino) None
             +draw_next_piece(tetromino: Tetromino) None
+            +draw_hold_piece(tetromino: Tetromino, can_hold: bool) None
+            +draw_preview_piece(tetromino: Tetromino, index: int) None
             - _render_glitch_board(game: GameState, shake_x: int, shake_y: int, glitch: float) pygame.Surface
             - _render_game_over_text(elapsed: int) None
             +play_game_over_animation(game: GameState, audio) None
