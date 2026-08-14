@@ -97,6 +97,13 @@ class MenuBase(State):
     # --- Event handling (template method) ----------------------------
 
     def handle_event(self, event: pygame.event.Event) -> State | None:
+        """Template-method event handler for menu navigation.
+
+        Dispatches arrow keys (up/down navigate, left/right toggle),
+        Enter (select), and Escape (back) to subclass hooks.
+
+        Returns a new :class:`State` on transition, or ``None`` to stay.
+        """
         if event.type != pygame.KEYDOWN:
             return None
         if event.key == pygame.K_UP:

@@ -45,6 +45,15 @@ class PieceProvider:
         allowed_types: list[str] | None = None,
         generator: str = "random",  # "random", "7bag", or "35bag"
     ) -> None:
+        """Initialize the piece provider.
+
+        Args:
+            mode: ``"normal"`` (record spawns) or ``"replay"`` (serve from
+                a saved sequence, falling back to random when exhausted).
+            path: Path to the replay/record JSON file.
+            allowed_types: Optional restriction on the piece pool (curriculum).
+            generator: ``"random"``, ``"7bag"``, or ``"35bag"`` spawn strategy.
+        """
         self.mode = mode
         self.path = Path(path)
         self.allowed_types: list[str] | None = allowed_types
@@ -70,6 +79,7 @@ class PieceProvider:
         self._bag = []
 
     def next_type(self) -> str:
+        """Return the next piece type, applying generator and first-piece rules."""
         if self.mode == "replay" and self._replay_idx < len(self._replay_queue):
             piece_type = self._replay_queue[self._replay_idx]
             self._replay_idx += 1
@@ -95,6 +105,11 @@ class PieceProvider:
         return piece_type
 
     def set_allowed_types(self, types: list[str]) -> None:
+        """Restrict the spawn pool and clear the current bag.
+
+        Args:
+            types: Piece types to allow (e.g. ``["O"]`` for curriculum level 0).
+        """
         self.allowed_types = types
         self._bag = []  # force refill with new pool
 

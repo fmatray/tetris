@@ -51,12 +51,14 @@ class Renderer:
     _GLITCH_COLORS = (WHITE, GRAY, (255, 0, 0), (0, 255, 0), (0, 0, 255), (255, 255, 0), (255, 0, 255))
 
     def __init__(self, screen: pygame.Surface, font: pygame.font.Font) -> None:
+        """Store the target surface and font for all rendering methods."""
         self.screen = screen
         self.font = font
 
     # --- In-game frame --------------------------------------------------
 
     def render_frame(self, game: GameState, particles: ParticleSystem) -> None:
+        """Draw a complete game frame: board, ghost, current piece, HUD, panels."""
         self.screen.fill(BLACK)
         self.draw_grid(game.board)
         if game.ghost_piece:
@@ -73,9 +75,10 @@ class Renderer:
         self._draw_text("HOLD:", HUD_POSITIONS["hold"])
         if game.hold_piece is not None:
             self.draw_panel_pieces([game.hold_piece], HOLD_PANEL_X, HOLD_PANEL_Y, dim=not game._can_hold)
-        self._draw_text("NEXT:", HUD_POSITIONS["next"])
-        next_queue = [game.next_piece] + getattr(game, "preview_pieces", [])
-        self.draw_panel_pieces(next_queue, NEXT_PANEL_X, HUD_POSITIONS["next"][1] + 30)
+        if getattr(game, "preview_count", 3) > 0:
+            self._draw_text("NEXT:", HUD_POSITIONS["next"])
+            next_queue = [game.next_piece] + getattr(game, "preview_pieces", [])
+            self.draw_panel_pieces(next_queue, NEXT_PANEL_X, HUD_POSITIONS["next"][1] + 30)
         if game.debug:
             self._draw_text(f"SPEED: {int(game.current_speed * 1000)}ms", HUD_POSITIONS["speed"])
         if game.debug and game.pieces.generator in ("7bag", "35bag"):
@@ -123,6 +126,7 @@ class Renderer:
         return pygame.Rect(x * BLOCK_SIZE + ox, screen_y * BLOCK_SIZE + oy, BLOCK_SIZE, BLOCK_SIZE)
 
     def draw_grid(self, board: Board) -> None:
+        """Draw the visible portion of the board grid with locked blocks."""
         hidden = BOARD_HEIGHT - VISIBLE_ROWS
         for y in range(hidden, BOARD_HEIGHT):
             for x in range(BOARD_WIDTH):
@@ -133,6 +137,7 @@ class Renderer:
                     pygame.draw.rect(self.screen, color, rect)
 
     def draw_ghost(self, tetromino: Tetromino, board: Board) -> None:
+        """Draw the ghost piece at the piece's hard-drop landing position."""
         hidden = BOARD_HEIGHT - VISIBLE_ROWS
         drop = 0
         while board.is_valid_move(tetromino, dy=drop + 1):
@@ -146,6 +151,7 @@ class Renderer:
                 pygame.draw.rect(self.screen, tetromino.color, rect, GHOST_OUTLINE_WIDTH)
 
     def draw_tetromino(self, tetromino: Tetromino) -> None:
+        """Draw the active piece on the board (visible rows only)."""
         hidden = BOARD_HEIGHT - VISIBLE_ROWS
         for x, y in tetromino.get_blocks():
             if y >= hidden:
@@ -170,7 +176,7 @@ class Renderer:
         pieces: list[Tetromino],
         ox: int,
         oy: int,
-        spacing: int = 4,
+        spacing: int = 3,
         dim: bool | list[bool] = False,
     ) -> None:
         """Draw a vertical list of tetrominos in a side panel.

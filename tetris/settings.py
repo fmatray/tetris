@@ -135,7 +135,7 @@ BOARD_OFFSET_X = 250
 BOARD_OFFSET_Y = 50
 
 # Next-piece panel position
-NEXT_PANEL_X = 550
+NEXT_PANEL_X = 570
 NEXT_PANEL_Y = 100
 
 # HUD text positions

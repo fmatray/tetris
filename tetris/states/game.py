@@ -67,7 +67,27 @@ class GameState(State):
         menu: MenuState | None = None,
         debug: bool = False,
         ghost_piece: bool = True,
+        preview_count: int = 3,
     ) -> None:
+        """Initialize a human gameplay session.
+
+        Sets up the board (with handicap), piece provider, keybinds, lock-delay
+        state, DAS state, and the preview/hold piece queues.
+
+        Args:
+            screen: Pygame display surface.
+            font: Font for HUD text.
+            audio: Audio manager.
+            handicap: Number of pre-filled bottom rows (0–5).
+            sound_volume: SFX volume (0–3).
+            music_volume: Music volume (0–3).
+            music_song: Song key (``"korobeiniki"`` or ``"kalinka"``).
+            piece_provider: Spawn controller (created if ``None``).
+            menu: Parent :class:`MenuState` for settings access.
+            debug: Enable debug overlays (7-bag viz, speed).
+            ghost_piece: Show the ghost piece.
+            preview_count: Number of next pieces to show (0, 1, or 3).
+        """
         self.screen, self.font, self.audio = screen, font, audio
         self.audio.apply_settings(sound_volume, music_volume, music_song)
         self._last_level = 0
@@ -75,13 +95,14 @@ class GameState(State):
         self.menu = menu
         self.debug = debug
         self.ghost_piece = ghost_piece
+        self.preview_count = preview_count
         self.renderer = Renderer(screen, font)
         self.board = Board()
         self.board.apply_handicap(handicap)
         self.pieces = piece_provider or PieceProvider()
         self.current_piece = Tetromino(self.pieces.next_type())
         self.next_piece = Tetromino(self.pieces.next_type())
-        self.preview_pieces = [Tetromino(self.pieces.next_type()) for _ in range(2)]
+        self.preview_pieces = [Tetromino(self.pieces.next_type()) for _ in range(max(0, preview_count - 1))]
         self.drop_time = 0
         self.stats = GameStats()
         self.current_speed = _drop_interval(0)
@@ -167,8 +188,11 @@ class GameState(State):
         if self.hold_piece is None:
             self.hold_piece = Tetromino(self.current_piece.type)
             self.current_piece = self.next_piece
-            self.next_piece = self.preview_pieces.pop(0)
-            self.preview_pieces.append(Tetromino(self.pieces.next_type()))
+            if self.preview_pieces:
+                self.next_piece = self.preview_pieces.pop(0)
+                self.preview_pieces.append(Tetromino(self.pieces.next_type()))
+            else:
+                self.next_piece = Tetromino(self.pieces.next_type())
         else:
             held_type = self.hold_piece.type
             self.hold_piece = Tetromino(self.current_piece.type)
@@ -201,8 +225,11 @@ class GameState(State):
         else:
             self.audio.play("spawn")
         self.current_piece = self.next_piece
-        self.next_piece = self.preview_pieces.pop(0)
-        self.preview_pieces.append(Tetromino(self.pieces.next_type()))
+        if self.preview_pieces:
+            self.next_piece = self.preview_pieces.pop(0)
+            self.preview_pieces.append(Tetromino(self.pieces.next_type()))
+        else:
+            self.next_piece = Tetromino(self.pieces.next_type())
         self.down_pressed = False
         self._can_hold = True
         self._lock_timer = 0.0
@@ -235,6 +262,10 @@ class GameState(State):
         return MenuState(self.screen, self.font, self.audio)
 
     def handle_event(self, event: pygame.event.Event) -> State | None:
+        """Process keyboard input: pause, mute, ESC, movement, hold, DAS.
+
+        Returns a new :class:`State` on ESC (back to menu), or ``None``.
+        """
         if event.type == pygame.KEYDOWN:
             if event.key == self._pause_key:
                 self.paused = not self.paused
@@ -257,6 +288,10 @@ class GameState(State):
         return None
 
     def update(self, dt: float, particles: ParticleSystem) -> State | None:
+        """Advance gravity, DAS auto-shift, lock delay, and level-up SFX.
+
+        Returns a new :class:`State` on game-over, or ``None`` to stay.
+        """
         if self.game_over:
             return self._do_game_over()
         if self.paused:
@@ -341,5 +376,6 @@ class GameState(State):
                 )
 
     def draw(self, screen: pygame.Surface, *, particles: ParticleSystem | None = None) -> None:
+        """Delegate rendering to :meth:`Renderer.render_frame`."""
         if particles is not None:
             self.renderer.render_frame(self, particles)

@@ -22,6 +22,14 @@ class PrioritizedReplayBuffer:
         beta: float = 0.4,
         beta_increment: float = 0.001,
     ) -> None:
+        """Initialize the PER buffer.
+
+        Args:
+            capacity: Maximum number of stored transitions.
+            alpha: Priority exponent (0 = uniform, 1 = full priority).
+            beta: Initial importance-sampling correction (anneals to 1.0).
+            beta_increment: Per-sample beta increment.
+        """
         self.capacity = capacity
         self.alpha = alpha  # 0=uniform, 1=full priority
         self.beta = beta    # IS correction (anneals to 1.0)
@@ -37,6 +45,15 @@ class PrioritizedReplayBuffer:
         next_state: np.ndarray,
         done: bool,
     ) -> None:
+        """Store a transition with max-priority (assumed high TD-error).
+
+        Args:
+            state: Pre-placement feature vector.
+            action: Candidate index chosen.
+            reward: Reward received.
+            next_state: Post-placement feature vector.
+            done: Whether the episode ended.
+        """
         self.buffer.append((state, action, reward, next_state, done))
         max_prio = max(self.priorities) if self.priorities else 1.0
         self.priorities.append(max_prio)
@@ -57,8 +74,15 @@ class PrioritizedReplayBuffer:
         return samples, weights, indices
 
     def update_priorities(self, indices: np.ndarray, td_errors: np.ndarray) -> None:
+        """Update transition priorities from TD errors.
+
+        Args:
+            indices: Buffer indices returned by :meth:`sample`.
+            td_errors: Absolute TD errors (priority = ``|error| + 1e-5``).
+        """
         for idx, error in zip(indices, td_errors, strict=False):
             self.priorities[idx] = abs(error) + 1e-5
 
     def __len__(self) -> int:
+        """Return the number of stored transitions."""
         return len(self.buffer)

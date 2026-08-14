@@ -31,6 +31,12 @@ AI_INTERVAL = 80.0
 
 
 def run_training(n_episodes: int) -> None:
+    """Run ``n_episodes`` headless AI training episodes and print progress.
+
+    Args:
+        n_episodes: Number of new episodes to train (appended to any
+            existing log).
+    """
     screen = pygame.display.set_mode((800, 700))
     font = get_small_font()
     audio = AudioManager(sound_volume=0, music_volume=0)

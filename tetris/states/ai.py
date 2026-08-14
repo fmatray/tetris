@@ -98,12 +98,48 @@ class AIState(GameState):
         learn_per_action: int = LEARN_PER_ACTION,
         lookahead: bool = True,
         soft_drop: bool = True,
+        preview_count: int = 3,
         debug: bool = False,
     ) -> None:
+        """Initialize the AI gameplay/training state.
+
+        Calls ``super().__init__`` to set up the board and pieces, then
+        creates the :class:`DQNAgent`, loads any existing model, and
+        configures curriculum learning if enabled.
+
+        Args:
+            screen: Pygame display surface.
+            font: Font for HUD text.
+            audio: Audio manager.
+            handicap: Pre-filled bottom rows (0–5).
+            sound_volume: SFX volume (0–3).
+            music_volume: Music volume (0–3).
+            music_song: Song key.
+            piece_provider: Spawn controller.
+            speed: ``"fast"`` (act immediately) or ``"normal"`` (80ms delay).
+            menu: Parent :class:`MenuState`.
+            epsilon_decay: Per-episode exploration decay.
+            epsilon_end: Minimum exploration rate.
+            lr: Learning rate.
+            gamma: Discount factor.
+            batch_size: Training mini-batch size.
+            buffer_size: Replay buffer capacity.
+            ai_mode: ``"learning"`` (train + log) or ``"playing"`` (greedy).
+            curriculum: Restrict piece pool progressively.
+            curriculum_freq: Episodes between curriculum level-ups.
+            curriculum_epsilon: Epsilon policy on level-up (``"reset"``,
+                ``"boost"``, ``"decay"``).
+            warm_start: Use Dellacherie values for warm-start selection.
+            learn_per_action: Gradient updates per locked piece.
+            lookahead: Enable chained look-ahead through preview pieces.
+            soft_drop: Use soft-drop BFS for candidate generation.
+            preview_count: Number of next pieces (0, 1, or 3).
+            debug: Enable debug overlays.
+        """
         # Curriculum: restrict piece pool BEFORE super().__init__() spawns pieces
         if curriculum and ai_mode == "learning" and piece_provider is not None:
             piece_provider.set_allowed_types(["O"])
-        super().__init__(screen, font, audio, handicap, sound_volume, music_volume, music_song, piece_provider, menu, debug=debug)
+        super().__init__(screen, font, audio, handicap, sound_volume, music_volume, music_song, piece_provider, menu, preview_count=preview_count, debug=debug)
         self.ghost_piece = False  # AI never shows ghost piece
         self.agent = DQNAgent(
             epsilon_decay=epsilon_decay,
@@ -202,13 +238,15 @@ class AIState(GameState):
                     best_grid = sim_grid
         return best_grid
 
-    def _add_candidate(self, base_grid, shape, px, py, rot, next_piece_type,
+    def _add_candidate(self, base_grid, shape, px, py, rot, upcoming_types,
                        candidates, actions, dellacherie_values):
         """Simulate placement, extract features, append to candidate lists."""
         sim_grid, lines_cleared = place_and_clear(base_grid, shape, px, py)
         if self.lookahead:
-            sim_grid = self._best_next_placement(sim_grid, next_piece_type)
+            for pt in upcoming_types:
+                sim_grid = self._best_next_placement(sim_grid, pt)
         mask, first_row, heights = compute_height_metrics(sim_grid)
+        next_piece_type = upcoming_types[0] if upcoming_types else "I"
         candidates.append(
             extract_features(sim_grid, lines_cleared, next_piece_type, mask, first_row, heights)
         )
@@ -225,7 +263,7 @@ class AIState(GameState):
         """
         piece = self.current_piece
         base_grid = board_to_grid(self.board)
-        next_piece_type = self.next_piece.type
+        upcoming_types = [self.next_piece.type] + [p.type for p in self.preview_pieces]
 
         candidates = []
         actions = []
@@ -235,7 +273,7 @@ class AIState(GameState):
         if self.soft_drop:
             placements = soft_drop_placements(base_grid, piece.type)
             for shape, px, py, rot in placements:
-                self._add_candidate(base_grid, shape, px, py, rot, next_piece_type,
+                self._add_candidate(base_grid, shape, px, py, rot, upcoming_types,
                                     candidates, actions, dellacherie_values)
         else:
             num_rots = len(SHAPES[piece.type])
@@ -254,7 +292,7 @@ class AIState(GameState):
                     py = hard_drop_y(base_grid, shape, px)
                     if py < 0:
                         continue
-                    self._add_candidate(base_grid, shape, px, py, rot, next_piece_type,
+                    self._add_candidate(base_grid, shape, px, py, rot, upcoming_types,
                                         candidates, actions, dellacherie_values)
 
         if not candidates:
@@ -362,6 +400,13 @@ class AIState(GameState):
 
     # --- Update: AI macro-action per piece ------------------------------
     def update(self, dt: float, particles: ParticleSystem) -> State | None:
+        """Select and execute one AI macro-action per piece, then run gravity.
+
+        In ``"normal"`` speed, throttles decisions to ~80ms. In ``"fast"``,
+        acts immediately. Calls ``super().update`` for gravity/lock-delay.
+
+        Returns a new :class:`State` on episode end, or ``None``.
+        """
         if self.paused or self.game_over:
             return self._on_episode_end()
 
@@ -455,7 +500,7 @@ class AIState(GameState):
         # Fresh board for learning diversity — no handicap carried over
         self.current_piece = Tetromino(self.pieces.next_type())
         self.next_piece = Tetromino(self.pieces.next_type())
-        self.preview_pieces = [Tetromino(self.pieces.next_type()) for _ in range(2)]
+        self.preview_pieces = [Tetromino(self.pieces.next_type()) for _ in range(max(0, self.preview_count - 1))]
         self.hold_piece = None
         self.stats = type(self.stats)()
 
@@ -484,6 +529,7 @@ class AIState(GameState):
     # --- Rendering with AI HUD overlay ----------------------------------
 
     def draw(self, screen: pygame.Surface, *, particles: ParticleSystem | None = None) -> None:
+        """Render the game frame plus the AI training HUD overlay."""
         if particles is not None:
             self.renderer.render_frame(self, particles)
             self._draw_ai_hud()
@@ -589,6 +635,7 @@ class AIState(GameState):
     # --- ESC handling (return to menu) -----------------------------------
 
     def handle_event(self, event: pygame.event.Event) -> State | None:
+        """Handle ESC (save + return to menu) and mute. Ignore all other keys."""
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_ESCAPE:
                 self.audio.stop_music()

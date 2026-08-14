@@ -23,10 +23,20 @@ class State:
     """Base FSM state. Subclasses override the hooks they need."""
 
     def handle_event(self, event: pygame.event.Event) -> State | None:
+        """Process a pygame event.
+
+        Returns a new :class:`State` to transition, or ``None`` to stay.
+        Base implementation ignores all events.
+        """
         return None
 
     def update(self, dt: float, particles: ParticleSystem) -> State | None:
+        """Advance the state by ``dt`` milliseconds.
+
+        Returns a new :class:`State` to transition, or ``None`` to stay.
+        Base implementation does nothing.
+        """
         return None
 
     def draw(self, screen: pygame.Surface, *, particles: ParticleSystem | None = None) -> None:
-        pass
+        """Render the state to ``screen``. Base implementation does nothing."""

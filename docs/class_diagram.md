@@ -78,6 +78,7 @@ classDiagram
             +mode: str
             +piece_generator: str
             +ghost_piece: bool
+            +preview_count: int
             +debug: bool
             +ai_speed: str
             +ai_epsilon_decay: float
@@ -170,6 +171,19 @@ classDiagram
             # _on_select() State | None
         }
 
+        class GameRulesMenuState {
+            # _OPTIONS: tuple~str, ...~ ClassVar
+            # _toggle_indices: frozenset~int~ ClassVar
+            # _title: str ClassVar
+            +menu: MenuState
+            +__init__(screen, font, audio, menu) None
+            # _value_label(i: int) str
+            # _toggle(direction: int) None
+            # _save() None
+            # _on_back() State | None
+            # _on_select() State | None
+        }
+
         class KeybindState {
             +screen: pygame.Surface
             +font: pygame.font.Font
@@ -226,6 +240,7 @@ classDiagram
             +menu: MenuState | None
             +debug: bool
             +ghost_piece: bool
+            +preview_count: int
             +renderer: Renderer
             +board: Board
             +pieces: PieceProvider
@@ -250,8 +265,7 @@ classDiagram
             - _soft_drop_key: int
             - _left_key: int
             - _right_key: int
-            - _hold_key: int
-            +__init__(screen, font, audio, handicap, sound_volume, music_volume, music_song, piece_provider, menu, debug, ghost_piece) None
+            +__init__(screen, font, audio, handicap, sound_volume, music_volume, music_song, piece_provider, menu, debug, ghost_piece, preview_count) None
             - _setup_keybinds(menu) None
             - _move_left() None
             - _move_right() None
@@ -298,10 +312,10 @@ classDiagram
             - _curriculum_types: list~str~ | None
             - _curriculum_level: int
             - _curriculum_episode_count: int
-            +__init__(screen, font, audio, handicap, sound_volume, music_volume, music_song, piece_provider, speed, menu, epsilon_decay, epsilon_end, lr, gamma, batch_size, buffer_size, ai_mode, curriculum, curriculum_freq, curriculum_epsilon, warm_start, learn_per_action, lookahead, soft_drop, debug) None
+            +__init__(screen, font, audio, handicap, sound_volume, music_volume, music_song, piece_provider, speed, menu, epsilon_decay, epsilon_end, lr, gamma, batch_size, buffer_size, ai_mode, curriculum, curriculum_freq, curriculum_epsilon, warm_start, learn_per_action, lookahead, soft_drop, preview_count, debug) None
             - _is_valid_placement(piece, rotation: int, column: int) bool
             - _best_next_placement(grid: np.ndarray, piece_type: str) np.ndarray
-            - _add_candidate(base_grid, shape, px, py, rot, next_piece_type, candidates, actions, dellacherie_values) None
+            - _add_candidate(base_grid, shape, px, py, rot, upcoming_types, candidates, actions, dellacherie_values) None
             - _get_candidate_states() tuple~np.ndarray, list~int~, np.ndarray~
             - _execute_macro_action(action: int) None
             - _lock_and_spawn(hard_drop: bool) tuple~int, list~
@@ -674,6 +688,7 @@ classDiagram
     MenuBase <|-- AIMenuState
     MenuBase <|-- HyperparamMenuState
     MenuBase <|-- AudioMenuState
+    MenuBase <|-- GameRulesMenuState
 
     GameState <|-- AIState
 
@@ -733,6 +748,7 @@ classDiagram
     %% ====================================================================
     %%  Relationships — Navigation (FSM transitions)
     %% ====================================================================
+    MenuState "1" --> "0..1" GameRulesMenuState : navigates
     MenuState "1" --> "0..1" AudioMenuState : navigates
     MenuState "1" --> "0..1" HumanMenuState : navigates
     MenuState "1" --> "0..1" AIMenuState : navigates
@@ -747,6 +763,7 @@ classDiagram
     AIMenuState "1" --> "0..1" StatsState : navigates
 
     KeybindState "1" --> "1" HumanMenuState : returns_to
+    GameRulesMenuState "1" --> "1" MenuState : returns_to
     HumanStatsState "1" --> "1" HumanMenuState : returns_to
     StatsState "1" --> "1" AIMenuState : returns_to
     LeaderboardState "1" --> "0..1" MenuState : returns_to

@@ -27,6 +27,7 @@ class TrainingLog:
     _SAVE_INTERVAL = 10
 
     def __init__(self, path: str = LOG_PATH) -> None:
+        """Load the training log from disk (or start empty if missing)."""
         self.path = path
         self.episodes: list[dict] = []
         self._load()
@@ -79,64 +80,76 @@ class TrainingLog:
 
     @property
     def total_episodes(self) -> int:
+        """Total number of logged episodes."""
         return len(self.episodes)
 
     @property
     def avg_score(self) -> float:
+        """Mean score across all episodes (0 if empty)."""
         if not self.episodes:
             return 0.0
         return sum(e["score"] for e in self.episodes) / len(self.episodes)
 
     @property
     def best_score(self) -> int:
+        """Highest single-episode score (0 if empty)."""
         if not self.episodes:
             return 0
         return max(e["score"] for e in self.episodes)
 
     @property
     def total_lines(self) -> int:
+        """Sum of lines cleared across all episodes."""
         return sum(e["lines"] for e in self.episodes)
 
     @property
     def total_steps(self) -> int:
+        """Sum of piece-placements across all episodes."""
         return sum(e["steps"] for e in self.episodes)
 
     @property
     def avg_level(self) -> float:
+        """Mean final level across all episodes (0 if empty)."""
         if not self.episodes:
             return 0.0
         return sum(e["level"] for e in self.episodes) / len(self.episodes)
 
     @property
     def best_level(self) -> int:
+        """Highest final level reached (0 if empty)."""
         if not self.episodes:
             return 0
         return max(e["level"] for e in self.episodes)
 
     @property
     def total_score(self) -> int:
+        """Sum of scores across all episodes."""
         return sum(e["score"] for e in self.episodes)
 
     @property
     def best_lines(self) -> int:
+        """Most lines cleared in a single episode (0 if empty)."""
         if not self.episodes:
             return 0
         return max(e["lines"] for e in self.episodes)
 
     @property
     def avg_lines(self) -> float:
+        """Mean lines cleared per episode (0 if empty)."""
         if not self.episodes:
             return 0.0
         return sum(e["lines"] for e in self.episodes) / len(self.episodes)
 
     @property
     def best_steps(self) -> int:
+        """Most piece-placements in a single episode (0 if empty)."""
         if not self.episodes:
             return 0
         return max(e["steps"] for e in self.episodes)
 
     @property
     def avg_steps(self) -> float:
+        """Mean piece-placements per episode (0 if empty)."""
         if not self.episodes:
             return 0.0
         return sum(e["steps"] for e in self.episodes) / len(self.episodes)
@@ -151,6 +164,7 @@ class TrainingLog:
 
     @property
     def last_100_avg_lines(self) -> float:
+        """Mean lines cleared over the last 100 episodes (0 if empty)."""
         recent = self.episodes[-100:]
         if not recent:
             return 0.0
@@ -158,6 +172,7 @@ class TrainingLog:
 
     @property
     def last_100_avg_level(self) -> float:
+        """Mean final level over the last 100 episodes (0 if empty)."""
         recent = self.episodes[-100:]
         if not recent:
             return 0.0
@@ -165,6 +180,7 @@ class TrainingLog:
 
     @property
     def last_100_avg_steps(self) -> float:
+        """Mean piece-placements over the last 100 episodes (0 if empty)."""
         recent = self.episodes[-100:]
         if not recent:
             return 0.0

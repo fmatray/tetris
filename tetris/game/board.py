@@ -22,6 +22,7 @@ class Board:
     """
 
     def __init__(self) -> None:
+        """Create an empty board with ``BOARD_HEIGHT`` rows × ``BOARD_WIDTH`` cols."""
         self.grid: list[list[tuple[int, int, int] | None]] = [
             [None for _ in range(BOARD_WIDTH)] for _ in range(BOARD_HEIGHT)
         ]

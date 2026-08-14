@@ -53,6 +53,19 @@ class DQNAgent:
         buffer_size: int = 50_000,
         device: str = "cpu",
     ) -> None:
+        """Initialize the DQN agent: network, target network, optimizer, buffer.
+
+        Args:
+            state_size: Input feature dimension.
+            lr: Learning rate for the Adam optimizer.
+            gamma: Discount factor.
+            epsilon_start: Initial exploration rate.
+            epsilon_end: Minimum exploration rate.
+            epsilon_decay: Per-episode multiplicative decay.
+            batch_size: Mini-batch size for learning.
+            buffer_size: Replay buffer capacity.
+            device: Torch device (``"cpu"`` or ``"cuda"``).
+        """
         self.state_size = state_size
         self.gamma = gamma
         self.epsilon = epsilon_start

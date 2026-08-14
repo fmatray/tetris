@@ -13,6 +13,11 @@ class DQNetwork(nn.Module):
         Input (17) → Dense(128, ReLU) → Dense(64, ReLU) → Output (1, Linear)
     """
     def __init__(self, state_size: int = 17) -> None:
+        """Build the 3-layer MLP.
+
+        Args:
+            state_size: Input feature dimension (default 17 for DT-20 features).
+        """
         super().__init__()
         self.net = nn.Sequential(
             nn.Linear(state_size, 128),
@@ -23,4 +28,5 @@ class DQNetwork(nn.Module):
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """Return the V-value (board quality) for a batch of state vectors."""
         return self.net(x)

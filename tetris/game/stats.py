@@ -8,6 +8,7 @@ class GameStats:
     """Tracks score, total lines, level, combo, and piece count."""
 
     def __init__(self) -> None:
+        """Initialize all stats to zero/defaults."""
         self.score = 0
         self.total_lines = 0
         self.level = 0
@@ -16,6 +17,15 @@ class GameStats:
         self.b2b = False  # True if last clear was Tetris or T-Spin
 
     def on_piece_locked(self, lines_cleared: int, tspin: bool = False) -> None:
+        """Update score, lines, level, combo, and B2B after a piece locks.
+
+        Applies T-Spin bonus, B2B chain multiplier, and combo points via
+        :class:`~tetris.game.scoring.ScoreEngine`.
+
+        Args:
+            lines_cleared: Number of lines cleared by this placement (0–4).
+            tspin: Whether the placement was a T-Spin.
+        """
         self.total_lines += lines_cleared
         self.level = self.total_lines // LINES_PER_LEVEL
         # Determine if this clear is a B2B-eligible clear (Tetris or T-Spin)
@@ -39,7 +49,17 @@ class GameStats:
         self.piece_count += 1
 
     def add_soft_drop(self, cells: int) -> None:
+        """Award soft-drop bonus points.
+
+        Args:
+            cells: Number of cells the piece was soft-dropped.
+        """
         self.score += ScoreEngine.soft_drop_points(cells)
 
     def add_hard_drop(self, cells: int) -> None:
+        """Award hard-drop bonus points.
+
+        Args:
+            cells: Number of cells the piece was hard-dropped.
+        """
         self.score += ScoreEngine.hard_drop_points(cells)

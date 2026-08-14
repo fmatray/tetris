@@ -26,6 +26,7 @@ class TetrisApp:
     """Owns pygame initialization and the FSM main loop."""
 
     def __init__(self) -> None:
+        """Initialize pygame, create the display, and start at the root menu."""
         os.makedirs(DATA_DIR, exist_ok=True)
         configure_logging(False)
         pygame.init()
@@ -39,6 +40,7 @@ class TetrisApp:
         self.state: State = MenuState(self.screen, self.font, self.audio)
 
     def run(self) -> None:
+        """Run the 60 FPS FSM loop until an exception or QUIT event."""
         logger = get_logger("app")
         logger.info("Starting Tetris...")
         while True:

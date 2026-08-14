@@ -26,7 +26,7 @@ class MenuState(MenuBase):
     _OPTIONS = (
         "Joueur",          # 0
         "Audio",           # 1
-        "Générateur",      # 2
+        "Règles du jeu",  # 2
         "Débogage",        # 3
         "Humain",          # 4
         "IA",              # 5
@@ -35,12 +35,17 @@ class MenuState(MenuBase):
         "Quitter",         # 8
     )
     _GENERATOR_CYCLE: ClassVar[tuple[str, ...]] = ("random", "7bag", "35bag")
-    _toggle_indices = frozenset({0, 2, 3})  # Joueur, Générateur, Débogage
+    _toggle_indices = frozenset({0, 3})  # Joueur, Débogage
     _title = "TETRIS"
 
     _instructions = "Flèches: Navigation | Entrée: Valider | Échap: Quitter"
 
     def __init__(self, screen, font, audio) -> None:
+        """Initialize the root menu and load persisted settings.
+
+        Sets all defaults first, then overrides from ``data/settings.json``
+        if it exists. Configures logging based on the loaded debug flag.
+        """
         self.ai_speed = "normal"
         super().__init__(screen, font, audio)
         # Defaults — overridden by _load_settings() if a file exists
@@ -52,6 +57,7 @@ class MenuState(MenuBase):
         self.mode = "Normal"
         self.piece_generator = "7bag"
         self.ghost_piece = True
+        self.preview_count = 3
         self.debug = False
         self.ai_epsilon_decay = 0.999
         self.ai_epsilon_end = 0.1
@@ -97,8 +103,8 @@ class MenuState(MenuBase):
         "ai_learn_per_action": "ai_learn_per_action",
         "ai_lookahead": "ai_lookahead",
         "ai_soft_drop": "ai_soft_drop",
-        "piece_generator": "piece_generator",
         "ghost_piece": "ghost_piece",
+        "preview_count": "preview_count",
         "debug": "debug",
     }
 
@@ -138,9 +144,6 @@ class MenuState(MenuBase):
     def _value_label(self, i: int) -> str:
         if i == 0:
             return self.player
-        if i == 2:
-            labels = {"random": "Aléatoire", "7bag": "7-bag", "35bag": "35-bag"}
-            return labels.get(self.piece_generator, "Aléatoire")
         if i == 3:
             return "ON" if self.debug else "OFF"
         return ""
@@ -151,9 +154,6 @@ class MenuState(MenuBase):
     def _toggle(self, direction: int) -> None:
         if self.selection == 0:  # Joueur
             self.player = "IA" if self.player == "Humain" else "Humain"
-        elif self.selection == 2:  # Générateur
-            idx = self._GENERATOR_CYCLE.index(self.piece_generator)
-            self.piece_generator = self._GENERATOR_CYCLE[(idx + direction) % len(self._GENERATOR_CYCLE)]
         elif self.selection == 3:  # Débogage
             self.debug = not self.debug
             configure_logging(self.debug)
@@ -171,6 +171,10 @@ class MenuState(MenuBase):
             from tetris.states.audio_menu import AudioMenuState
 
             return AudioMenuState(self.screen, self.font, self.audio, self)
+        if sel == 2:  # Règles du jeu submenu
+            from tetris.states.game_rules_menu import GameRulesMenuState
+
+            return GameRulesMenuState(self.screen, self.font, self.audio, self)
         if sel == 4:  # Humain sub-menu
             from tetris.states.human_menu import HumanMenuState
 
@@ -193,6 +197,7 @@ class MenuState(MenuBase):
                 self.screen, self.font, self.audio, self.handicap,
                 self.sound_volume, self.music_volume, self.music_song, provider, self,
                 ghost_piece=self.ghost_piece,
+                preview_count=self.preview_count,
                 debug=self.debug,
             )
         if sel == 7:  # Leaderboard
@@ -224,8 +229,8 @@ class MenuState(MenuBase):
             curriculum_freq=self.ai_curriculum_freq,
             curriculum_epsilon=self.ai_curriculum_epsilon,
             warm_start=self.ai_warm_start,
-            learn_per_action=self.ai_learn_per_action,
             lookahead=self.ai_lookahead,
             soft_drop=self.ai_soft_drop,
+            preview_count=self.preview_count,
             debug=self.debug,
         )
