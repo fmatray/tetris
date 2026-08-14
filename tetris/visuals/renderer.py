@@ -161,22 +161,30 @@ class Renderer:
         """Rect for side-panel pieces (no hidden-row offset)."""
         return pygame.Rect(x * BLOCK_SIZE + ox, y * BLOCK_SIZE + oy, BLOCK_SIZE, BLOCK_SIZE)
 
+    @staticmethod
+    def _normalized_blocks(tetromino: Tetromino) -> list[tuple[int, int]]:
+        """Block coords shifted so the piece's top-left cell is at (0, 0)."""
+        blocks = tetromino.get_blocks()
+        min_x = min(x for x, _ in blocks)
+        min_y = min(y for _, y in blocks)
+        return [(x - min_x, y - min_y) for x, y in blocks]
+
     def draw_next_piece(self, tetromino: Tetromino) -> None:
-        for x, y in tetromino.get_blocks():
+        for x, y in self._normalized_blocks(tetromino):
             rect = self._panel_rect(x, y, NEXT_PANEL_X, NEXT_PANEL_Y)
             pygame.draw.rect(self.screen, tetromino.color, rect)
 
     def draw_hold_piece(self, tetromino: Tetromino, can_hold: bool = True) -> None:
         """Draw the held piece. Dimmed if hold is unavailable."""
         color = tetromino.color if can_hold else GRAY
-        for x, y in tetromino.get_blocks():
+        for x, y in self._normalized_blocks(tetromino):
             rect = self._panel_rect(x, y, HOLD_PANEL_X, HOLD_PANEL_Y)
             pygame.draw.rect(self.screen, color, rect)
 
     def draw_preview_piece(self, tetromino: Tetromino, index: int) -> None:
         """Draw a preview piece below the next-piece panel."""
-        y_offset = PREVIEW_PANEL_Y + index * 3 * BLOCK_SIZE
-        for x, y in tetromino.get_blocks():
+        y_offset = PREVIEW_PANEL_Y + index * 4 * BLOCK_SIZE
+        for x, y in self._normalized_blocks(tetromino):
             rect = self._panel_rect(x, y, PREVIEW_PANEL_X, y_offset)
             pygame.draw.rect(self.screen, tetromino.color, rect)
 

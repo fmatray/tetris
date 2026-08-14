@@ -528,6 +528,8 @@ classDiagram
             +_cell_rect(x: int, y: int, ox: int, oy: int) pygame.Rect
             %% static
             +_panel_rect(x: int, y: int, ox: int, oy: int) pygame.Rect
+            %% static
+            +_normalized_blocks(tetromino: Tetromino) list~tuple~int, int~~
             +draw_grid(board: Board) None
             +draw_ghost(tetromino: Tetromino, board: Board) None
             +draw_tetromino(tetromino: Tetromino) None
