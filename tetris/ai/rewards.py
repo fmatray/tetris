@@ -51,6 +51,17 @@ FEATURE_STDS = np.array([
 # PBRS scaling: cap potential-based reward shaping contribution.
 PBRS_SCALE = 0.1
 
+# Reward weights (AI.md §4) — named for readability, values unchanged.
+LINE_CLEAR_REWARD = 50.0
+LINE_CLEAR_BONUS = 5.0
+HOLE_CREATED_PENALTY = 5.0
+HOLE_TOTAL_PENALTY = 0.1
+HEIGHT_PENALTY = 0.5
+BUMPINESS_PENALTY = 0.3
+WELL_PENALTY = 0.5
+SURVIVAL_REWARD = 1.0
+GAME_OVER_PENALTY = 50.0
+
 # Dellacherie feature weights for PBRS potential function (AI.md §4).
 # Excludes landing_height/eroded_cells (placement-specific, not board-state).
 DELLACHERIE_WEIGHTS: dict[str, float] = {
@@ -93,33 +104,54 @@ def column_heights(grid: np.ndarray) -> np.ndarray:
     return (BOARD_HEIGHT - first_row) * mask.any(axis=0)
 
 
-def max_height(grid: np.ndarray) -> int:
+def compute_height_metrics(grid: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Compute column-level data once for all height-dependent heuristics.
+
+    Returns (mask, first_row, heights):
+      - mask: (H, W) boolean grid
+      - first_row: (W,) row index of topmost filled cell per column (0 if empty)
+      - heights: (W,) column heights (0 if empty)
+    """
+    mask = grid > 0
+    first_row = np.argmax(mask, axis=0)
+    heights = (BOARD_HEIGHT - first_row) * mask.any(axis=0)
+    return mask, first_row, heights
+
+
+def max_height(grid: np.ndarray, heights: np.ndarray | None = None) -> int:
     """Height of the tallest column."""
-    return int(column_heights(grid).max())
+    if heights is None:
+        heights = column_heights(grid)
+    return int(heights.max())
 
 
-def count_holes(grid: np.ndarray) -> int:
+def count_holes(grid: np.ndarray, mask: np.ndarray | None = None,
+                first_row: np.ndarray | None = None) -> int:
     """Empty cells with at least one filled cell above them."""
-    holes = 0
+    if mask is None:
+        mask = grid > 0
+    if first_row is None:
+        first_row = np.argmax(mask, axis=0)
+    # Vectorized: for each column, count empty cells below the topmost filled cell.
+    total = 0
     for x in range(BOARD_WIDTH):
-        col = grid[:, x]
-        found_block = False
-        for y in range(BOARD_HEIGHT):
-            if col[y] > 0:
-                found_block = True
-            elif found_block:
-                holes += 1
-    return holes
+        if not mask[:, x].any():
+            continue
+        total += int((~mask[first_row[x]:, x]).sum())
+    return total
 
 
-def aggregate_height(grid: np.ndarray) -> int:
+def aggregate_height(grid: np.ndarray, heights: np.ndarray | None = None) -> int:
     """Sum of column heights (topmost filled cell per column)."""
-    return int(column_heights(grid).sum())
+    if heights is None:
+        heights = column_heights(grid)
+    return int(heights.sum())
 
 
-def bumpiness(grid: np.ndarray) -> int:
+def bumpiness(grid: np.ndarray, heights: np.ndarray | None = None) -> int:
     """Sum of absolute height differences between adjacent columns."""
-    heights = column_heights(grid)
+    if heights is None:
+        heights = column_heights(grid)
     return int(np.abs(np.diff(heights)).sum())
 
 
@@ -143,13 +175,14 @@ def column_transitions(grid: np.ndarray) -> int:
     return int(np.abs(np.diff(padded, axis=0)).sum())
 
 
-def wells(grid: np.ndarray) -> int:
+def wells(grid: np.ndarray, heights: np.ndarray | None = None) -> int:
     """Cumulative well depth: Σ depth*(depth+1)//2 per column.
 
     A well is a column lower than both neighbors. Edge columns treat
     the wall as BOARD_HEIGHT (infinite height).
     """
-    heights = column_heights(grid)
+    if heights is None:
+        heights = column_heights(grid)
     total = 0
     for i in range(BOARD_WIDTH):
         left = heights[i - 1] if i > 0 else BOARD_HEIGHT
@@ -159,30 +192,36 @@ def wells(grid: np.ndarray) -> int:
     return total
 
 
-def hole_depth(grid: np.ndarray) -> int:
+def hole_depth(grid: np.ndarray, mask: np.ndarray | None = None,
+               first_row: np.ndarray | None = None) -> int:
     """Max holes in any single column below the first filled cell."""
-    mask = grid > 0
+    if mask is None:
+        mask = grid > 0
+    if first_row is None:
+        first_row = np.argmax(mask, axis=0)
     max_depth = 0
     for x in range(BOARD_WIDTH):
         col_mask = mask[:, x]
         if not col_mask.any():
             continue
-        top = np.argmax(col_mask)  # first filled row
-        depth = int((~col_mask[top:]).sum())  # empty cells below first filled
+        depth = int((~col_mask[first_row[x]:]).sum())
         max_depth = max(max_depth, depth)
     return max_depth
 
 
-def rows_with_holes(grid: np.ndarray) -> int:
+def rows_with_holes(grid: np.ndarray, mask: np.ndarray | None = None,
+                    first_row: np.ndarray | None = None) -> int:
     """Count rows containing at least one hole cell."""
-    mask = grid > 0
+    if mask is None:
+        mask = grid > 0
+    if first_row is None:
+        first_row = np.argmax(mask, axis=0)
     holes_per_col = np.zeros_like(mask)
     for x in range(BOARD_WIDTH):
         col_mask = mask[:, x]
         if not col_mask.any():
             continue
-        top = np.argmax(col_mask)
-        holes_per_col[top:, x] = ~col_mask[top:]
+        holes_per_col[first_row[x]:, x] = ~col_mask[first_row[x]:]
     return int(np.any(holes_per_col, axis=1).sum())
 
 
@@ -194,30 +233,47 @@ def normalize_features(features: np.ndarray) -> np.ndarray:
 
 
 def extract_features(
-    grid: np.ndarray, lines_cleared: int, next_piece_type: str
+    grid: np.ndarray,
+    lines_cleared: int,
+    next_piece_type: str,
+    mask: np.ndarray | None = None,
+    first_row: np.ndarray | None = None,
+    heights: np.ndarray | None = None,
 ) -> np.ndarray:
     """Build the 17-dim DT-20 feature vector (AI.md §2).
 
     Layout: [lines_cleared, holes, aggregate_height, bumpiness, max_height,
              row_transitions, column_transitions, wells, hole_depth,
              rows_with_holes, *one_hot_piece(next_piece_type)]
+
+    Optional precomputed metrics (mask, first_row, heights) avoid redundant
+    passes when the caller already has them from ``compute_height_metrics``.
     """
+    if mask is None or first_row is None or heights is None:
+        m, fr, h = compute_height_metrics(grid)
+        mask = m if mask is None else mask
+        first_row = fr if first_row is None else first_row
+        heights = h if heights is None else heights
     features = np.array([
         lines_cleared,
-        count_holes(grid),
-        aggregate_height(grid),
-        bumpiness(grid),
-        max_height(grid),
+        count_holes(grid, mask, first_row),
+        aggregate_height(grid, heights),
+        bumpiness(grid, heights),
+        max_height(grid, heights),
         row_transitions(grid),
         column_transitions(grid),
-        wells(grid),
-        hole_depth(grid),
-        rows_with_holes(grid),
+        wells(grid, heights),
+        hole_depth(grid, mask, first_row),
+        rows_with_holes(grid, mask, first_row),
     ], dtype=np.float32)
     return normalize_features(np.concatenate([features, one_hot_piece(next_piece_type)]))
 
-
-def dellacherie_value(grid: np.ndarray) -> float:
+def dellacherie_value(
+    grid: np.ndarray,
+    heights: np.ndarray | None = None,
+    mask: np.ndarray | None = None,
+    first_row: np.ndarray | None = None,
+) -> float:
     """Weighted sum of board features using Dellacherie weights (AI.md §4).
 
     Excludes landing_height/eroded_cells (placement-specific, not
@@ -225,13 +281,18 @@ def dellacherie_value(grid: np.ndarray) -> float:
     """
     if not (grid > 0).any():
         return 0.0
+    if heights is None or mask is None or first_row is None:
+        m, fr, h = compute_height_metrics(grid)
+        heights = h if heights is None else heights
+        mask = m if mask is None else mask
+        first_row = fr if first_row is None else first_row
     return (
         DELLACHERIE_WEIGHTS["row_transitions"] * row_transitions(grid)
         + DELLACHERIE_WEIGHTS["column_transitions"] * column_transitions(grid)
-        + DELLACHERIE_WEIGHTS["holes"] * count_holes(grid)
-        + DELLACHERIE_WEIGHTS["wells"] * wells(grid)
-        + DELLACHERIE_WEIGHTS["hole_depth"] * hole_depth(grid)
-        + DELLACHERIE_WEIGHTS["rows_with_holes"] * rows_with_holes(grid)
+        + DELLACHERIE_WEIGHTS["holes"] * count_holes(grid, mask, first_row)
+        + DELLACHERIE_WEIGHTS["wells"] * wells(grid, heights)
+        + DELLACHERIE_WEIGHTS["hole_depth"] * hole_depth(grid, mask, first_row)
+        + DELLACHERIE_WEIGHTS["rows_with_holes"] * rows_with_holes(grid, mask, first_row)
     )
 
 
@@ -306,34 +367,38 @@ def compute_reward(
         # PBRS applies even on game_over
         phi_prev = dellacherie_value(prev_grid)
         phi_new = dellacherie_value(new_grid)
-        return -50.0 + PBRS_SCALE * (gamma * phi_new - phi_prev)
+        return -GAME_OVER_PENALTY + PBRS_SCALE * (gamma * phi_new - phi_prev)
+
+    # Compute column-level data once per grid — reused by all height-dependent heuristics.
+    prev_mask, prev_fr, _ = compute_height_metrics(prev_grid)
+    new_mask, new_fr, new_heights = compute_height_metrics(new_grid)
 
     reward = 0.0
-    reward += 50.0 * lines_cleared
-    reward += 5.0 * lines_cleared * lines_cleared
+    reward += LINE_CLEAR_REWARD * lines_cleared
+    reward += LINE_CLEAR_BONUS * lines_cleared * lines_cleared
 
     # Delta-based hole penalty: punish only NEW holes created
-    old_holes = count_holes(prev_grid)
-    new_holes = count_holes(new_grid)
+    old_holes = count_holes(prev_grid, prev_mask, prev_fr)
+    new_holes = count_holes(new_grid, new_mask, new_fr)
     holes_created = max(0, new_holes - old_holes)
-    reward -= 5.0 * holes_created
+    reward -= HOLE_CREATED_PENALTY * holes_created
 
     # Small residual on absolute holes so the agent still wants to clear
     # existing holes over time, but the signal is dominated by delta
-    reward -= 0.1 * new_holes
+    reward -= HOLE_TOTAL_PENALTY * new_holes
 
-    height = aggregate_height(new_grid)
-    bumps = bumpiness(new_grid)
+    height = aggregate_height(new_grid, new_heights)
+    bumps = bumpiness(new_grid, new_heights)
 
-    reward -= 0.5 * height
-    reward -= 0.3 * bumps
-    reward -= 0.5 * wells(new_grid)
+    reward -= HEIGHT_PENALTY * height
+    reward -= BUMPINESS_PENALTY * bumps
+    reward -= WELL_PENALTY * wells(new_grid, new_heights)
     if step_survived:
-        reward += 1.0
+        reward += SURVIVAL_REWARD
 
     # PBRS shaping term
-    phi_prev = dellacherie_value(prev_grid)
-    phi_new = dellacherie_value(new_grid)
+    phi_prev = dellacherie_value(prev_grid, mask=prev_mask, first_row=prev_fr)
+    phi_new = dellacherie_value(new_grid, new_heights, new_mask, new_fr)
     reward += PBRS_SCALE * (gamma * phi_new - phi_prev)
 
     return reward

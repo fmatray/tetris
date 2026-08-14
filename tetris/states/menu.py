@@ -188,29 +188,7 @@ class MenuState(MenuBase):
                 generator=self.piece_generator,
             )
             if self.player == "IA":
-                from tetris.states.ai import AIState
-
-                ai_provider = PieceProvider(mode="normal", generator=self.piece_generator)
-                return AIState(
-                    self.screen, self.font, self.audio, self.handicap,
-                    self.sound_volume, self.music_volume, self.music_song,
-                    ai_provider, self.ai_speed, self,
-                    epsilon_decay=self.ai_epsilon_decay,
-                    epsilon_end=self.ai_epsilon_end,
-                    lr=self.ai_lr,
-                    gamma=self.ai_gamma,
-                    batch_size=self.ai_batch_size,
-                    buffer_size=self.ai_buffer_size,
-                    ai_mode=self.ai_mode,
-                    curriculum=self.ai_curriculum,
-                    curriculum_freq=self.ai_curriculum_freq,
-                    curriculum_epsilon=self.ai_curriculum_epsilon,
-                    warm_start=self.ai_warm_start,
-                    learn_per_action=self.ai_learn_per_action,
-                    lookahead=self.ai_lookahead,
-                    soft_drop=self.ai_soft_drop,
-                    debug=self.debug,
-                )
+                return self._build_ai_state()
             return GameState(
                 self.screen, self.font, self.audio, self.handicap,
                 self.sound_volume, self.music_volume, self.music_song, provider, self,
@@ -225,3 +203,29 @@ class MenuState(MenuBase):
             pygame.quit()
             sys.exit()
         return None
+
+    def _build_ai_state(self) -> State:
+        from tetris.game.piece_provider import PieceProvider
+        from tetris.states.ai import AIState
+
+        ai_provider = PieceProvider(mode="normal", generator=self.piece_generator)
+        return AIState(
+            self.screen, self.font, self.audio, self.handicap,
+            self.sound_volume, self.music_volume, self.music_song,
+            ai_provider, self.ai_speed, self,
+            epsilon_decay=self.ai_epsilon_decay,
+            epsilon_end=self.ai_epsilon_end,
+            lr=self.ai_lr,
+            gamma=self.ai_gamma,
+            batch_size=self.ai_batch_size,
+            buffer_size=self.ai_buffer_size,
+            ai_mode=self.ai_mode,
+            curriculum=self.ai_curriculum,
+            curriculum_freq=self.ai_curriculum_freq,
+            curriculum_epsilon=self.ai_curriculum_epsilon,
+            warm_start=self.ai_warm_start,
+            learn_per_action=self.ai_learn_per_action,
+            lookahead=self.ai_lookahead,
+            soft_drop=self.ai_soft_drop,
+            debug=self.debug,
+        )

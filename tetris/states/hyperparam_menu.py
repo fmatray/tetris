@@ -8,7 +8,7 @@ max, step, explanation).
 
 from __future__ import annotations
 
-from typing import ClassVar
+from typing import Any, ClassVar
 
 import pygame
 
@@ -94,35 +94,27 @@ class HyperparamMenuState(MenuBase):
 
     # --- Hooks ----------------------------------------------------------
 
+    _VALUE_SPECS: ClassVar[list[tuple[str, Any]]] = [
+        ("ai_epsilon_decay", lambda v: f"{v:.4f}"),
+        ("ai_epsilon_end", lambda v: f"{v:.2f}"),
+        ("ai_lr", lambda v: f"{v:.1e}"),
+        ("ai_gamma", lambda v: f"{v:.3f}"),
+        ("ai_batch_size", str),
+        ("ai_buffer_size", lambda v: f"{v:,}"),
+        ("ai_curriculum", lambda v: "ON" if v else "OFF"),
+        ("ai_curriculum_freq", str),
+        ("ai_curriculum_epsilon", str),
+        ("ai_warm_start", lambda v: "ON" if v else "OFF"),
+        ("ai_learn_per_action", str),
+        ("ai_lookahead", lambda v: "ON" if v else "OFF"),
+        ("ai_soft_drop", lambda v: "ON" if v else "OFF"),
+    ]
+
     def _value_label(self, i: int) -> str:
-        m = self.menu
-        if i == 0:
-            return f"{m.ai_epsilon_decay:.4f}"
-        if i == 1:
-            return f"{m.ai_epsilon_end:.2f}"
-        if i == 2:
-            return f"{m.ai_lr:.1e}"
-        if i == 3:
-            return f"{m.ai_gamma:.3f}"
-        if i == 4:
-            return str(m.ai_batch_size)
-        if i == 5:
-            return f"{m.ai_buffer_size:,}"
-        if i == 6:
-            return "ON" if m.ai_curriculum else "OFF"
-        if i == 7:
-            return str(m.ai_curriculum_freq)
-        if i == 8:
-            return m.ai_curriculum_epsilon
-        if i == 9:
-            return "ON" if m.ai_warm_start else "OFF"
-        if i == 10:
-            return str(m.ai_learn_per_action)
-        if i == 11:
-            return "ON" if m.ai_lookahead else "OFF"
-        if i == 12:
-            return "ON" if m.ai_soft_drop else "OFF"
-        return ""
+        if i >= len(self._VALUE_SPECS):
+            return ""
+        attr, fmt = self._VALUE_SPECS[i]
+        return fmt(getattr(self.menu, attr))
 
     def _toggle(self, direction: int) -> None:
         m = self.menu

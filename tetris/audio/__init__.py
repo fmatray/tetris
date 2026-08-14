@@ -120,6 +120,17 @@ class AudioManager:
         notes.sort(key=lambda n: n[0])
         return notes
 
+    @staticmethod
+    def _apply_envelope(n: int, attack_max: int, release_max: int) -> np.ndarray:
+        envelope = np.ones(n)
+        attack = min(attack_max, n)
+        release = min(release_max, n)
+        if attack > 0:
+            envelope[:attack] = np.linspace(0, 1, attack)
+        if release > 0:
+            envelope[-release:] = np.linspace(1, 0, release)
+        return envelope
+
     def _generate_music(self) -> None:
         """Synthesize the raw music buffer at 1.0x speed from the MIDI file."""
         path = MUSIC_SONG_PATHS.get(self.song)
@@ -141,13 +152,7 @@ class AudioManager:
             if n <= 0:
                 continue
             t = np.arange(n) / self._SAMPLE_RATE
-            envelope = np.ones(n)
-            attack = min(200, n)
-            release = min(200, n)
-            if attack > 0:
-                envelope[:attack] = np.linspace(0, 1, attack)
-            if release > 0:
-                envelope[-release:] = np.linspace(1, 0, release)
+            envelope = self._apply_envelope(n, 200, 200)
             buffer[s0:s1] += np.sin(2 * np.pi * freq * t) * envelope
         # Normalize to prevent clipping with polyphony
         peak = np.max(np.abs(buffer))
@@ -201,13 +206,7 @@ class AudioManager:
             for freq, duration in notes:
                 n = int(self._SAMPLE_RATE * duration)
                 t = np.arange(n) / self._SAMPLE_RATE
-                envelope = np.ones(n)
-                attack = min(100, n)
-                release = min(100, n)
-                if attack > 0:
-                    envelope[:attack] = np.linspace(0, 1, attack)
-                if release > 0:
-                    envelope[-release:] = np.linspace(1, 0, release)
+                envelope = self._apply_envelope(n, 100, 100)
                 wave = 32767 * np.sin(2 * np.pi * freq * t) * envelope
                 buf = np.column_stack([wave, wave]).astype(np.int16)
                 buffers.append(buf)

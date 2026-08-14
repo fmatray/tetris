@@ -107,15 +107,14 @@ class Renderer:
             self.screen.blit(letter, (x + 2, y + 2))
             x += BLOCK_SIZE + 2
 
+    @staticmethod
+    def _cell_rect(x: int, y: int, ox: int, oy: int) -> pygame.Rect:
+        return pygame.Rect(x * BLOCK_SIZE + ox, y * BLOCK_SIZE + oy, BLOCK_SIZE, BLOCK_SIZE)
+
     def draw_grid(self, board: Board) -> None:
         for y in range(BOARD_HEIGHT):
             for x in range(BOARD_WIDTH):
-                rect = pygame.Rect(
-                    x * BLOCK_SIZE + BOARD_OFFSET_X,
-                    y * BLOCK_SIZE + BOARD_OFFSET_Y,
-                    BLOCK_SIZE,
-                    BLOCK_SIZE,
-                )
+                rect = self._cell_rect(x, y, BOARD_OFFSET_X, BOARD_OFFSET_Y)
                 pygame.draw.rect(self.screen, GRAY, rect, 1)
                 color = board.grid[y][x]
                 if color:
@@ -130,36 +129,72 @@ class Renderer:
         for x, y in tetromino.get_blocks():
             gy = y + drop
             if gy >= 0:
-                rect = pygame.Rect(
-                    x * BLOCK_SIZE + BOARD_OFFSET_X,
-                    gy * BLOCK_SIZE + BOARD_OFFSET_Y,
-                    BLOCK_SIZE,
-                    BLOCK_SIZE,
-                )
+                rect = self._cell_rect(x, gy, BOARD_OFFSET_X, BOARD_OFFSET_Y)
                 pygame.draw.rect(self.screen, tetromino.color, rect, GHOST_OUTLINE_WIDTH)
 
     def draw_tetromino(self, tetromino: Tetromino) -> None:
         for x, y in tetromino.get_blocks():
             if y >= 0:
-                rect = pygame.Rect(
-                    x * BLOCK_SIZE + BOARD_OFFSET_X,
-                    y * BLOCK_SIZE + BOARD_OFFSET_Y,
-                    BLOCK_SIZE,
-                    BLOCK_SIZE,
-                )
+                rect = self._cell_rect(x, y, BOARD_OFFSET_X, BOARD_OFFSET_Y)
                 pygame.draw.rect(self.screen, tetromino.color, rect)
 
     def draw_next_piece(self, tetromino: Tetromino) -> None:
         for x, y in tetromino.get_blocks():
-            rect = pygame.Rect(
-                x * BLOCK_SIZE + NEXT_PANEL_X,
-                y * BLOCK_SIZE + NEXT_PANEL_Y,
-                BLOCK_SIZE,
-                BLOCK_SIZE,
-            )
+            rect = self._cell_rect(x, y, NEXT_PANEL_X, NEXT_PANEL_Y)
             pygame.draw.rect(self.screen, tetromino.color, rect)
 
     # --- Game-over animation --------------------------------------------
+
+    def _render_glitch_board(self, game: GameState, shake_x: int, shake_y: int, glitch: float) -> pygame.Surface:
+        board_surf = pygame.Surface(
+            (BOARD_WIDTH * BLOCK_SIZE, BOARD_HEIGHT * BLOCK_SIZE)
+        )
+        board_surf.set_colorkey(BLACK)
+        for y in range(BOARD_HEIGHT):
+            for x in range(BOARD_WIDTH):
+                rect = pygame.Rect(
+                    x * BLOCK_SIZE, y * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE
+                )
+                pygame.draw.rect(board_surf, GRAY, rect, 1)
+                if game.board.grid[y][x]:
+                    color = (
+                        game.board.grid[y][x]
+                        if glitch <= 0.95
+                        else (
+                            random.randint(0, 255),
+                            random.randint(0, 255),
+                            random.randint(0, 255),
+                        )
+                    )
+                    if color:
+                        pygame.draw.rect(board_surf, color, rect)
+        for x, y in game.current_piece.get_blocks():
+            if y >= 0:
+                pygame.draw.rect(
+                    board_surf,
+                    game.current_piece.color,
+                    (x * BLOCK_SIZE, y * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE),
+                )
+        self.screen.blit(board_surf, (BOARD_OFFSET_X + shake_x, BOARD_OFFSET_Y + shake_y))
+        return board_surf
+
+    def _render_game_over_text(self, elapsed: int) -> None:
+        r = int(127 + 127 * math.sin(elapsed * 0.01))
+        g = int(127 + 127 * math.sin(elapsed * 0.01 + 2 * math.pi / 3))
+        b = int(127 + 127 * math.sin(elapsed * 0.01 + 4 * math.pi / 3))
+        txt = get_large_font().render("!!! GAME OVER !!!", True, (r, g, b))
+        dx, dy = (
+            (random.randint(-10, 10), random.randint(-10, 10))
+            if elapsed < 2000
+            else (0, 0)
+        )
+        self.screen.blit(
+            txt,
+            (
+                SCREEN_WIDTH // 2 - txt.get_width() // 2 + dx,
+                SCREEN_HEIGHT // 2 - txt.get_height() // 2 + dy,
+            ),
+        )
 
     def play_game_over_animation(self, game: GameState, audio) -> None:
         """Run the chaotic 4-second game-over sequence (blocking)."""
@@ -187,37 +222,8 @@ class Renderer:
             shake_y = (
                 random.randint(-15, 15) if elapsed < 1500 else random.randint(-3, 3)
             )
-            board_surf = pygame.Surface(
-                (BOARD_WIDTH * BLOCK_SIZE, BOARD_HEIGHT * BLOCK_SIZE)
-            )
-            board_surf.set_colorkey(BLACK)
             glitch = random.random()
-            for y in range(BOARD_HEIGHT):
-                for x in range(BOARD_WIDTH):
-                    rect = pygame.Rect(
-                        x * BLOCK_SIZE, y * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE
-                    )
-                    pygame.draw.rect(board_surf, GRAY, rect, 1)
-                    if game.board.grid[y][x]:
-                        color = (
-                            game.board.grid[y][x]
-                            if glitch <= 0.95
-                            else (
-                                random.randint(0, 255),
-                                random.randint(0, 255),
-                                random.randint(0, 255),
-                            )
-                        )
-                        if color:
-                            pygame.draw.rect(board_surf, color, rect)
-            for x, y in game.current_piece.get_blocks():
-                if y >= 0:
-                    pygame.draw.rect(
-                        board_surf,
-                        game.current_piece.color,
-                        (x * BLOCK_SIZE, y * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE),
-                    )
-            self.screen.blit(board_surf, (BOARD_OFFSET_X + shake_x, BOARD_OFFSET_Y + shake_y))
+            self._render_glitch_board(game, shake_x, shake_y, glitch)
             if random.random() < 0.3:
                 particles.append(
                     Particle(
@@ -231,22 +237,7 @@ class Renderer:
                 p.draw(self.screen)
                 if p.life <= 0:
                     particles.remove(p)
-            r = int(127 + 127 * math.sin(elapsed * 0.01))
-            g = int(127 + 127 * math.sin(elapsed * 0.01 + 2 * math.pi / 3))
-            b = int(127 + 127 * math.sin(elapsed * 0.01 + 4 * math.pi / 3))
-            txt = get_large_font().render("!!! GAME OVER !!!", True, (r, g, b))
-            dx, dy = (
-                (random.randint(-10, 10), random.randint(-10, 10))
-                if elapsed < 2000
-                else (0, 0)
-            )
-            self.screen.blit(
-                txt,
-                (
-                    SCREEN_WIDTH // 2 - txt.get_width() // 2 + dx,
-                    SCREEN_HEIGHT // 2 - txt.get_height() // 2 + dy,
-                ),
-            )
+            self._render_game_over_text(elapsed)
             pygame.display.flip()
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:

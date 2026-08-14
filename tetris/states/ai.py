@@ -24,6 +24,7 @@ import pygame
 from tetris.ai.agent import DQNAgent
 from tetris.ai.rewards import (
     board_to_grid,
+    compute_height_metrics,
     compute_reward,
     dellacherie_value,
     extract_features,
@@ -201,6 +202,20 @@ class AIState(GameState):
                     best_grid = sim_grid
         return best_grid
 
+    def _add_candidate(self, base_grid, shape, px, py, rot, next_piece_type,
+                       candidates, actions, dellacherie_values):
+        """Simulate placement, extract features, append to candidate lists."""
+        sim_grid, lines_cleared = place_and_clear(base_grid, shape, px, py)
+        if self.lookahead:
+            sim_grid = self._best_next_placement(sim_grid, next_piece_type)
+        mask, first_row, heights = compute_height_metrics(sim_grid)
+        candidates.append(
+            extract_features(sim_grid, lines_cleared, next_piece_type, mask, first_row, heights)
+        )
+        actions.append(len(self._candidate_placements))
+        self._candidate_placements.append((rot, px, py))
+        dellacherie_values.append(dellacherie_value(sim_grid, heights, mask, first_row))
+
     def _get_candidate_states(self) -> tuple[np.ndarray, list[int], np.ndarray]:
         """Enumerate valid placements, simulate drop + line clear, extract features.
 
@@ -220,14 +235,8 @@ class AIState(GameState):
         if self.soft_drop:
             placements = soft_drop_placements(base_grid, piece.type)
             for shape, px, py, rot in placements:
-                sim_grid, lines_cleared = place_and_clear(base_grid, shape, px, py)
-                if self.lookahead:
-                    sim_grid = self._best_next_placement(sim_grid, next_piece_type)
-                features = extract_features(sim_grid, lines_cleared, next_piece_type)
-                candidates.append(features)
-                actions.append(len(self._candidate_placements))
-                self._candidate_placements.append((rot, px, py))
-                dellacherie_values.append(dellacherie_value(sim_grid))
+                self._add_candidate(base_grid, shape, px, py, rot, next_piece_type,
+                                    candidates, actions, dellacherie_values)
         else:
             num_rots = len(SHAPES[piece.type])
             for rot in range(NUM_ROTATIONS):
@@ -245,14 +254,8 @@ class AIState(GameState):
                     py = hard_drop_y(base_grid, shape, px)
                     if py < 0:
                         continue
-                    sim_grid, lines_cleared = place_and_clear(base_grid, shape, px, py)
-                    if self.lookahead:
-                        sim_grid = self._best_next_placement(sim_grid, next_piece_type)
-                    features = extract_features(sim_grid, lines_cleared, next_piece_type)
-                    candidates.append(features)
-                    actions.append(len(self._candidate_placements))
-                    self._candidate_placements.append((rot, px, py))
-                    dellacherie_values.append(dellacherie_value(sim_grid))
+                    self._add_candidate(base_grid, shape, px, py, rot, next_piece_type,
+                                        candidates, actions, dellacherie_values)
 
         if not candidates:
             return np.empty((0, 17), dtype=np.float32), [], np.empty(0, dtype=np.float32)
@@ -394,35 +397,39 @@ class AIState(GameState):
         """Log episode, save model, and restart a new episode."""
         if not self.game_over:
             return None
-
-        # Only log and learn in learning mode
         if self.ai_mode == "learning":
-            # Record episode stats
-            self.log.record(
-                episode=self.episode,
-                score=self.stats.score,
-                lines=self.stats.total_lines,
-                level=self.stats.level,
-                steps=self.episode_steps,
-                epsilon=self.agent.epsilon,
-                loss=self.agent.last_loss,
-            )
-            logger.debug("Episode %d ended | score=%d, eps=%.4f", self.episode, self.stats.score, self.agent.epsilon)
-            # Decay epsilon once per episode (not per transition)
-            self.agent.decay_epsilon()
+            self._log_and_learn()
+        self._reset_episode()
+        return None
 
-            # Curriculum: add next piece type if enough episodes elapsed
-            if self.curriculum and self._maybe_advance_curriculum():
-                self._apply_epsilon_policy()
-            if self.episode % AI_MODEL_SAVE_INTERVAL == 0:
-                try:
-                    self.agent.save(MODEL_PATH)
-                except (OSError, RuntimeError) as e:
-                    logger.error("Failed to save AI model: %s", e)
-            # Flush remaining n-step transitions before new episode
-            self.agent.flush_n_step()
+    def _log_and_learn(self) -> None:
+        """Record episode stats, decay epsilon, advance curriculum, save model."""
+        self.log.record(
+            episode=self.episode,
+            score=self.stats.score,
+            lines=self.stats.total_lines,
+            level=self.stats.level,
+            steps=self.episode_steps,
+            epsilon=self.agent.epsilon,
+            loss=self.agent.last_loss,
+        )
+        logger.debug("Episode %d ended | score=%d, eps=%.4f", self.episode, self.stats.score, self.agent.epsilon)
+        # Decay epsilon once per episode (not per transition)
+        self.agent.decay_epsilon()
 
-        # Start new episode (reset game state)
+        # Curriculum: add next piece type if enough episodes elapsed
+        if self.curriculum and self._maybe_advance_curriculum():
+            self._apply_epsilon_policy()
+        if self.episode % AI_MODEL_SAVE_INTERVAL == 0:
+            try:
+                self.agent.save(MODEL_PATH)
+            except (OSError, RuntimeError) as e:
+                logger.error("Failed to save AI model: %s", e)
+        # Flush remaining n-step transitions before new episode
+        self.agent.flush_n_step()
+
+    def _reset_episode(self) -> None:
+        """Reset game state for a new episode."""
         self.episode = self.log.total_episodes
         self.episode_steps = 0
         self.game_over = False
@@ -446,8 +453,6 @@ class AIState(GameState):
         self.next_piece = Tetromino(self.pieces.next_type())
         self.stats = type(self.stats)()
         self.episode_start_grid = board_to_grid(self.board)
-
-        return None  # Stay in AIState — keep playing
 
     def _maybe_advance_curriculum(self) -> bool:
         """Add next piece from CURRICULUM_ORDER if enough episodes elapsed."""
