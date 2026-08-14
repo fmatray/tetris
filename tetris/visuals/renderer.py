@@ -67,6 +67,12 @@ class Renderer:
         self.draw_tetromino(game.current_piece)
         self._draw_text(f"SCORE: {game.stats.score}", HUD_POSITIONS["score"])
         self._draw_text(f"TETROMINOS: {game.stats.piece_count}", HUD_POSITIONS["tetrominos"])
+        self._draw_text(f"LIGNES: {game.stats.total_lines}", HUD_POSITIONS["lines"])
+        self._draw_text(f"NIVEAU: {game.stats.level}", HUD_POSITIONS["level"])
+        if game.stats.combo > 0:
+            self._draw_text(f"COMBO: x{game.stats.combo}", HUD_POSITIONS["speed"])
+        elif game.debug:
+            self._draw_text(f"SPEED: {int(game.current_speed * 1000)}ms", HUD_POSITIONS["speed"])
         self._draw_text("HOLD:", HUD_POSITIONS["hold"])
         if game.hold_piece is not None:
             self.draw_hold_piece(game.hold_piece, game._can_hold)
