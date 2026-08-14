@@ -155,9 +155,6 @@ HUD_POSITIONS = {
 # Hold piece panel position (left side, below HUD)
 HOLD_PANEL_X = 20
 HOLD_PANEL_Y = 250
-# Preview pieces panel position (right side, below next piece)
-PREVIEW_PANEL_X = 550
-PREVIEW_PANEL_Y = 160
 
 # Game-over animation
 GAME_OVER_DURATION_MS = 4000

@@ -31,9 +31,6 @@ from tetris.settings import (
     HOLD_PANEL_Y,
     HUD_POSITIONS,
     NEXT_PANEL_X,
-    NEXT_PANEL_Y,
-    PREVIEW_PANEL_X,
-    PREVIEW_PANEL_Y,
     SCREEN_HEIGHT,
     SCREEN_WIDTH,
     SHAPES_COLORS,
@@ -75,11 +72,10 @@ class Renderer:
             self._draw_text(f"SPEED: {int(game.current_speed * 1000)}ms", HUD_POSITIONS["speed"])
         self._draw_text("HOLD:", HUD_POSITIONS["hold"])
         if game.hold_piece is not None:
-            self.draw_hold_piece(game.hold_piece, game._can_hold)
+            self.draw_panel_pieces([game.hold_piece], HOLD_PANEL_X, HOLD_PANEL_Y, dim=not game._can_hold)
         self._draw_text("NEXT:", HUD_POSITIONS["next"])
-        self.draw_next_piece(game.next_piece)
-        for i, piece in enumerate(getattr(game, "preview_pieces", [])):
-            self.draw_preview_piece(piece, i)
+        next_queue = [game.next_piece] + getattr(game, "preview_pieces", [])
+        self.draw_panel_pieces(next_queue, NEXT_PANEL_X, HUD_POSITIONS["next"][1] + 30)
         if game.debug:
             self._draw_text(f"SPEED: {int(game.current_speed * 1000)}ms", HUD_POSITIONS["speed"])
         if game.debug and game.pieces.generator in ("7bag", "35bag"):
@@ -169,24 +165,29 @@ class Renderer:
         min_y = min(y for _, y in blocks)
         return [(x - min_x, y - min_y) for x, y in blocks]
 
-    def draw_next_piece(self, tetromino: Tetromino) -> None:
-        for x, y in self._normalized_blocks(tetromino):
-            rect = self._panel_rect(x, y, NEXT_PANEL_X, NEXT_PANEL_Y)
-            pygame.draw.rect(self.screen, tetromino.color, rect)
+    def draw_panel_pieces(
+        self,
+        pieces: list[Tetromino],
+        ox: int,
+        oy: int,
+        spacing: int = 4,
+        dim: bool | list[bool] = False,
+    ) -> None:
+        """Draw a vertical list of tetrominos in a side panel.
 
-    def draw_hold_piece(self, tetromino: Tetromino, can_hold: bool = True) -> None:
-        """Draw the held piece. Dimmed if hold is unavailable."""
-        color = tetromino.color if can_hold else GRAY
-        for x, y in self._normalized_blocks(tetromino):
-            rect = self._panel_rect(x, y, HOLD_PANEL_X, HOLD_PANEL_Y)
-            pygame.draw.rect(self.screen, color, rect)
-
-    def draw_preview_piece(self, tetromino: Tetromino, index: int) -> None:
-        """Draw a preview piece below the next-piece panel."""
-        y_offset = PREVIEW_PANEL_Y + index * 4 * BLOCK_SIZE
-        for x, y in self._normalized_blocks(tetromino):
-            rect = self._panel_rect(x, y, PREVIEW_PANEL_X, y_offset)
-            pygame.draw.rect(self.screen, tetromino.color, rect)
+        Args:
+            pieces: tetrominos to draw (top to bottom).
+            ox, oy: top-left pixel of the first piece slot.
+            spacing: vertical gap between slots, in BLOCK_SIZE units.
+            dim: True to dim all, or a per-piece list of dim flags.
+        """
+        dim_flags = [dim] * len(pieces) if isinstance(dim, bool) else dim
+        for i, piece in enumerate(pieces):
+            y = oy + i * spacing * BLOCK_SIZE
+            color = GRAY if (i < len(dim_flags) and dim_flags[i]) else piece.color
+            for bx, by in self._normalized_blocks(piece):
+                rect = self._panel_rect(bx, by, ox, y)
+                pygame.draw.rect(self.screen, color, rect)
 
     # --- Game-over animation --------------------------------------------
 

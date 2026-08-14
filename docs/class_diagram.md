@@ -533,9 +533,7 @@ classDiagram
             +draw_grid(board: Board) None
             +draw_ghost(tetromino: Tetromino, board: Board) None
             +draw_tetromino(tetromino: Tetromino) None
-            +draw_next_piece(tetromino: Tetromino) None
-            +draw_hold_piece(tetromino: Tetromino, can_hold: bool) None
-            +draw_preview_piece(tetromino: Tetromino, index: int) None
+            +draw_panel_pieces(pieces: list~Tetromino~, ox: int, oy: int, spacing: int, dim: bool | list~bool~) None
             - _render_glitch_board(game: GameState, shake_x: int, shake_y: int, glitch: float) pygame.Surface
             - _render_game_over_text(elapsed: int) None
             +play_game_over_animation(game: GameState, audio) None
