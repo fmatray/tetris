@@ -6,7 +6,7 @@ Verify that identical game rules apply to human and AI play, identify
 duplicated game-rule code between the two paths, propose a refactoring
 architecture, and present an implementation plan.
 
-**Scope: analysis only — no implementation.**
+**Status: Implemented.** All divergences fixed and duplicated code extracted to `tetris/game/rules.py`. See git history for details.
 
 ---
 

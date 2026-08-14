@@ -2,14 +2,13 @@
 
 import random
 
+from tetris.game import rules
 from tetris.game.tetromino import Tetromino
 from tetris.settings import (
     BOARD_HEIGHT,
     BOARD_WIDTH,
     GRAY,
     SHAPES,
-    SRS_KICKS_I,
-    SRS_KICKS_JLSTZ,
 )
 
 
@@ -34,52 +33,21 @@ class Board:
             shape = shapes[rotation % len(shapes)]
         else:
             shape = tetromino.shape
-        for bx, by in shape:
-            x = tetromino.x + bx + dx
-            y = tetromino.y + by + dy
-            if x < 0 or x >= BOARD_WIDTH or y >= BOARD_HEIGHT:
-                return False
-            if y >= 0 and self.grid[y][x] is not None:
-                return False
-        return True
+        return rules.shape_fits(self.grid, shape, tetromino.x + dx, tetromino.y + dy)
 
     def try_rotate(self, tetromino: Tetromino, direction: int) -> bool:
         """Attempt rotation with SRS wall kicks. Returns True if rotated."""
-        piece_type = tetromino.type
-        shapes = SHAPES[piece_type]
+        shapes = SHAPES[tetromino.type]
         from_rot = tetromino.rotation % len(shapes)
         to_rot = (from_rot + direction) % len(shapes)
-        new_shape = shapes[to_rot]
-        # O-piece doesn't kick
-        if piece_type == "O":
-            if self.is_valid_move(tetromino, rotation=to_rot):
-                tetromino.rotation = to_rot
-                tetromino.shape = new_shape
-                return True
-            return False
-        kicks = SRS_KICKS_I if piece_type == "I" else SRS_KICKS_JLSTZ
-        key = (from_rot, to_rot)
-        for dx, dy in kicks.get(key, [(0, 0)]):
-            nx = tetromino.x + dx
-            ny = tetromino.y - dy  # screen y inverted: positive kick_dy = up
-            if self._shape_fits(new_shape, nx, ny):
-                tetromino.x = nx
-                tetromino.y = ny
-                tetromino.rotation = to_rot
-                tetromino.shape = new_shape
-                return True
+        result = rules.try_rotation(self.grid, tetromino.type, from_rot, to_rot,
+                                    tetromino.x, tetromino.y)
+        if result is not None:
+            tetromino.x, tetromino.y = result
+            tetromino.rotation = to_rot
+            tetromino.shape = shapes[to_rot]
+            return True
         return False
-
-    def _shape_fits(self, shape, x: int, y: int) -> bool:
-        """Check if shape fits at (x, y) without collision."""
-        for bx, by in shape:
-            cx = x + bx
-            cy = y + by
-            if cx < 0 or cx >= BOARD_WIDTH or cy >= BOARD_HEIGHT:
-                return False
-            if cy >= 0 and self.grid[cy][cx] is not None:
-                return False
-        return True
 
     def is_tspin(self, tetromino: Tetromino) -> bool:
         """Detect T-Spin using the 3-corner T rule.
@@ -106,17 +74,14 @@ class Board:
         Returns ``(lines_cleared, cleared_rows_data)`` where each row datum
         is ``(row_index, list_of_cell_colors)`` for particle effects.
         """
-        for x, y in tetromino.get_blocks():
-            if y >= 0:
-                self.grid[y][x] = tetromino.color
+        rules.place_cells(self.grid, tetromino.shape, tetromino.x, tetromino.y, tetromino.color)
         return self.clear_lines()
 
     def hard_drop(self, tetromino: Tetromino) -> int:
         """Drop *tetromino* to the lowest valid position. Returns distance fallen."""
-        distance = 0
-        while self.is_valid_move(tetromino, dy=1):
-            tetromino.move(0, 1)
-            distance += 1
+        py = rules.hard_drop_y(self.grid, tetromino.shape, tetromino.x)
+        distance = py - tetromino.y
+        tetromino.y = py
         return distance
 
     def apply_handicap(self, level: int) -> None:
@@ -140,10 +105,8 @@ class Board:
 
         Returns ``(lines_cleared, cleared_rows_data)``.
         """
-        cleared_rows_data: list[tuple[int, list]] = []
-        for y in range(BOARD_HEIGHT):
-            if all(self.grid[y][x] is not None for x in range(BOARD_WIDTH)):
-                cleared_rows_data.append((y, list(self.grid[y])))
+        full_rows = rules.find_full_rows(self.grid)
+        cleared_rows_data = [(y, list(self.grid[y])) for y in full_rows]
 
         lines_cleared = len(cleared_rows_data)
         if lines_cleared > 0:

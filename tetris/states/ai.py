@@ -28,20 +28,19 @@ from tetris.ai.rewards import (
     compute_reward,
     dellacherie_value,
     extract_features,
-    hard_drop_y,
     place_and_clear,
-    soft_drop_placements,
 )
 from tetris.ai.trainer import TrainingLog
 from tetris.audio import AudioManager
+from tetris.game import rules
 from tetris.game.board import Board
 from tetris.game.piece_provider import PieceProvider
+from tetris.game.rules import hard_drop_y, soft_drop_placements
 from tetris.game.tetromino import Tetromino
 from tetris.logger import get_logger
 from tetris.settings import (
     AI_ACTION_DELAY_MS,
     AI_MODEL_SAVE_INTERVAL,
-    BOARD_HEIGHT,
     BOARD_WIDTH,
     CURRICULUM_ORDER,
     HUD_POSITIONS,
@@ -140,6 +139,7 @@ class AIState(GameState):
         if curriculum and ai_mode == "learning" and piece_provider is not None:
             piece_provider.set_allowed_types(["O"])
         super().__init__(screen, font, audio, handicap, sound_volume, music_volume, music_song, piece_provider, menu, preview_count=preview_count, debug=debug)
+        self._handicap = handicap
         self.ghost_piece = False  # AI never shows ghost piece
         self.agent = DQNAgent(
             epsilon_decay=epsilon_decay,
@@ -156,8 +156,8 @@ class AIState(GameState):
         self.learn_per_action = learn_per_action
         self.lookahead = lookahead
         self.soft_drop = soft_drop
-        # Candidate placements for soft-drop: [(rot, px, py), ...]
-        self._candidate_placements: list[tuple[int, int, int]] = []
+        # Candidate placements: [(rot, px, py, hold), ...]
+        self._candidate_placements: list[tuple[int, int, int, bool]] = []
         # Per-episode tracking
         self.episode_steps = 0
         self.episode_start_grid: np.ndarray = board_to_grid(self.board)
@@ -196,21 +196,12 @@ class AIState(GameState):
             self._curriculum_types = None
 
     # --- Candidate generation -------------------------------------------
-
     def _is_valid_placement(self, piece, rotation: int, column: int) -> bool:
         """Check if piece can be placed at (column, rotation) at spawn height."""
-        shapes = SHAPES[piece.type]
-        shape = shapes[rotation % len(shapes)]
+        shape = SHAPES[piece.type][rotation % len(SHAPES[piece.type])]
         min_bx = min(bx for bx, _ in shape)
         px = column - min_bx
-        py = 0
-        for bx, by in shape:
-            x, y = px + bx, py + by
-            if x < 0 or x >= BOARD_WIDTH or y >= BOARD_HEIGHT:
-                return False
-            if y >= 0 and self.board.grid[y][x] is not None:
-                return False
-        return True
+        return rules.shape_fits(self.board.grid, shape, px, 0)
 
     def _best_next_placement(self, grid: np.ndarray, piece_type: str) -> np.ndarray:
         """Simulate best placement of next piece on grid (2-piece look-ahead).
@@ -239,7 +230,7 @@ class AIState(GameState):
         return best_grid
 
     def _add_candidate(self, base_grid, shape, px, py, rot, upcoming_types,
-                       candidates, actions, dellacherie_values):
+                       candidates, actions, dellacherie_values, hold=False):
         """Simulate placement, extract features, append to candidate lists."""
         sim_grid, lines_cleared = place_and_clear(base_grid, shape, px, py)
         if self.lookahead:
@@ -251,15 +242,44 @@ class AIState(GameState):
             extract_features(sim_grid, lines_cleared, next_piece_type, mask, first_row, heights)
         )
         actions.append(len(self._candidate_placements))
-        self._candidate_placements.append((rot, px, py))
+        self._candidate_placements.append((rot, px, py, hold))
         dellacherie_values.append(dellacherie_value(sim_grid, heights, mask, first_row))
+
+    def _enumerate_placements(self, base_grid, piece_type, upcoming_types, hold,
+                              candidates, actions, dellacherie_values):
+        """Enumerate placements for a piece type and append to candidate lists."""
+        if self.soft_drop:
+            placements = soft_drop_placements(base_grid, piece_type)
+            for shape, px, py, rot in placements:
+                self._add_candidate(base_grid, shape, px, py, rot, upcoming_types,
+                                    candidates, actions, dellacherie_values, hold=hold)
+        else:
+            num_rots = len(SHAPES[piece_type])
+            for rot in range(NUM_ROTATIONS):
+                if rot >= num_rots:
+                    continue
+                shape = SHAPES[piece_type][rot]
+                min_bx = min(bx for bx, _ in shape)
+                max_bx = max(bx for bx, _ in shape)
+                for col in range(BOARD_WIDTH):
+                    px = col - min_bx
+                    if px < 0 or px + max_bx >= BOARD_WIDTH:
+                        continue
+                    if not rules.shape_fits(base_grid, shape, px, 0):
+                        continue
+                    py = hard_drop_y(base_grid, shape, px)
+                    if py < 0:
+                        continue
+                    self._add_candidate(base_grid, shape, px, py, rot, upcoming_types,
+                                        candidates, actions, dellacherie_values, hold=hold)
 
     def _get_candidate_states(self) -> tuple[np.ndarray, list[int], np.ndarray]:
         """Enumerate valid placements, simulate drop + line clear, extract features.
 
         Returns (candidate_states[N,17], action_ids[N], dellacherie_values[N]).
         action_id = placement index (0..N-1). Placements stored in
-        self._candidate_placements as [(rot, px, py), ...].
+        self._candidate_placements as [(rot, px, py, hold), ...].
+        Includes hold candidates when ``_can_hold`` is True.
         """
         piece = self.current_piece
         base_grid = board_to_grid(self.board)
@@ -270,30 +290,23 @@ class AIState(GameState):
         dellacherie_values = []
         self._candidate_placements = []
 
-        if self.soft_drop:
-            placements = soft_drop_placements(base_grid, piece.type)
-            for shape, px, py, rot in placements:
-                self._add_candidate(base_grid, shape, px, py, rot, upcoming_types,
-                                    candidates, actions, dellacherie_values)
-        else:
-            num_rots = len(SHAPES[piece.type])
-            for rot in range(NUM_ROTATIONS):
-                if rot >= num_rots:
-                    continue
-                shape = SHAPES[piece.type][rot]
-                min_bx = min(bx for bx, _ in shape)
-                max_bx = max(bx for bx, _ in shape)
-                for col in range(BOARD_WIDTH):
-                    px = col - min_bx
-                    if px < 0 or px + max_bx >= BOARD_WIDTH:
-                        continue
-                    if not self._is_valid_placement(piece, rot, col):
-                        continue
-                    py = hard_drop_y(base_grid, shape, px)
-                    if py < 0:
-                        continue
-                    self._add_candidate(base_grid, shape, px, py, rot, upcoming_types,
-                                        candidates, actions, dellacherie_values)
+        # Non-hold candidates: place current piece
+        self._enumerate_placements(base_grid, piece.type, upcoming_types, False,
+                                   candidates, actions, dellacherie_values)
+
+        # Hold candidates (if can hold): place the held/next piece instead
+        if self._can_hold:
+            if self.hold_piece is not None:
+                # Swap: current → hold, held → current. Next unchanged.
+                self._enumerate_placements(base_grid, self.hold_piece.type,
+                                           upcoming_types, True,
+                                           candidates, actions, dellacherie_values)
+            else:
+                # No held piece: current → hold, next → current, preview shifts.
+                new_upcoming = [p.type for p in self.preview_pieces]
+                self._enumerate_placements(base_grid, self.next_piece.type,
+                                           new_upcoming, True,
+                                           candidates, actions, dellacherie_values)
 
         if not candidates:
             return np.empty((0, 17), dtype=np.float32), [], np.empty(0, dtype=np.float32)
@@ -307,19 +320,23 @@ class AIState(GameState):
     # --- Macro-action execution -----------------------------------------
 
     def _execute_macro_action(self, action: int) -> None:
-        """Rotate, move to target position, then drop and lock."""
-        rot, px, py = self._candidate_placements[action]
-        piece = self.current_piece
+        """Rotate, move to target position, then drop (and lock if hard-drop)."""
+        rot, px, py, hold = self._candidate_placements[action]
 
-        # Rotate to target rotation
+        if hold:
+            self._hold()  # GameState._hold swaps current with held/next
+
+        piece = self.current_piece  # piece after hold (if any)
+
+        # Rotate to target rotation with SRS wall kicks
         num_rots = len(SHAPES[piece.type])
         target_rot = rot % num_rots
         while piece.rotation != target_rot:
-            piece.rotate(1)
+            if not self.board.try_rotate(piece, 1):
+                break
 
         # Move to target x
-        target_x = px
-        dx = target_x - piece.x
+        dx = px - piece.x
         if dx > 0:
             for _ in range(dx):
                 if self.board.is_valid_move(piece, dx=1):
@@ -341,7 +358,8 @@ class AIState(GameState):
                     piece.move(0, 1)
                     drop_cells += 1
                 self.stats.add_soft_drop(drop_cells)
-                self._lock_and_spawn()
+                # Lock delay: don't lock here. super().update() will detect
+                # the grounded piece and start the lock timer (LOCK_DELAY_MS).
             else:
                 distance = self.board.hard_drop(piece)
                 self.stats.add_hard_drop(distance)
@@ -497,11 +515,12 @@ class AIState(GameState):
         # Reset pieces (re-arm first-piece restriction) and board
         self.pieces.reset()
         self.board = Board()
-        # Fresh board for learning diversity — no handicap carried over
+        self.board.apply_handicap(self._handicap)
         self.current_piece = Tetromino(self.pieces.next_type())
         self.next_piece = Tetromino(self.pieces.next_type())
         self.preview_pieces = [Tetromino(self.pieces.next_type()) for _ in range(max(0, self.preview_count - 1))]
         self.hold_piece = None
+        self._can_hold = True
         self.stats = type(self.stats)()
 
     def _maybe_advance_curriculum(self) -> bool:

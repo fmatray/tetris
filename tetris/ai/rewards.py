@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import numpy as np
 
+from tetris.game.rules import find_full_rows, place_cells
 from tetris.settings import BOARD_HEIGHT, BOARD_WIDTH, SHAPES
 
 PIECE_TYPES = list(SHAPES.keys())  # ["I", "O", "T", "S", "Z", "J", "L"]
@@ -299,23 +300,6 @@ def dellacherie_value(
 # --- Simulation helpers (AI.md §3) -----------------------------------
 
 
-def hard_drop_y(grid: np.ndarray, shape: list[tuple[int, int]], px: int) -> int:
-    """Find the lowest y where *shape* fits at column *px* on *grid*.
-
-    Hard-drop logic: start at y=0, increment y until collision.
-    Returns the y coordinate for placement.
-    """
-    py = 0
-    while True:
-        for bx, by in shape:
-            x, y = px + bx, py + by
-            if x < 0 or x >= BOARD_WIDTH or y >= BOARD_HEIGHT:
-                return py - 1 if py > 0 else 0
-            if y >= 0 and grid[y][x] > 0:
-                return py - 1 if py > 0 else 0
-        py += 1
-
-
 def place_and_clear(
     grid: np.ndarray, shape: list[tuple[int, int]], px: int, py: int
 ) -> tuple[np.ndarray, int]:
@@ -324,13 +308,8 @@ def place_and_clear(
     Returns (new_grid, lines_cleared).
     """
     new_grid = grid.copy()
-    for bx, by in shape:
-        x, y = px + bx, py + by
-        if 0 <= x < BOARD_WIDTH and 0 <= y < BOARD_HEIGHT:
-            new_grid[y][x] = 1.0
-
-    lines_cleared = 0
-    full_rows = [y for y in range(BOARD_HEIGHT) if (new_grid[y] > 0).all()]
+    place_cells(new_grid, shape, px, py, 1.0)
+    full_rows = find_full_rows(new_grid)
     if full_rows:
         lines_cleared = len(full_rows)
         keep = [y for y in range(BOARD_HEIGHT) if y not in full_rows]
@@ -338,6 +317,8 @@ def place_and_clear(
             np.zeros((lines_cleared, BOARD_WIDTH), dtype=grid.dtype),
             new_grid[keep],
         ])
+    else:
+        lines_cleared = 0
     return new_grid, lines_cleared
 
 
@@ -403,89 +384,3 @@ def compute_reward(
 
     return reward
 
-
-# SRS wall kick tables are defined in settings.py (shared with human play).
-from tetris.settings import SRS_KICKS_I, SRS_KICKS_JLSTZ
-
-
-def _shape_fits(grid: np.ndarray, shape: list[tuple[int, int]], px: int, py: int) -> bool:
-    """Check if shape fits at (px, py) on grid without collision."""
-    for bx, by in shape:
-        x, y = px + bx, py + by
-        if x < 0 or x >= BOARD_WIDTH or y >= BOARD_HEIGHT:
-            return False
-        if y >= 0 and grid[y][x] > 0:
-            return False
-    return True
-
-
-def _try_rotation(
-    grid: np.ndarray, piece_type: str, from_rot: int, to_rot: int, x: int, y: int
-) -> tuple[int, int] | None:
-    """Try SRS wall kicks for rotation. Returns (x, y) of first valid kick, or None."""
-    if piece_type == "O":
-        return (x, y) if _shape_fits(grid, SHAPES[piece_type][to_rot], x, y) else None
-    kicks = SRS_KICKS_I if piece_type == "I" else SRS_KICKS_JLSTZ
-    key = (from_rot % 4, to_rot % 4)
-    for dx, dy in kicks.get(key, [(0, 0)]):
-        nx, ny = x + dx, y - dy  # screen y inverted: positive kick_dy = up
-        if _shape_fits(grid, SHAPES[piece_type][to_rot], nx, ny):
-            return (nx, ny)
-    return None
-
-
-def soft_drop_placements(
-    grid: np.ndarray, piece_type: str
-) -> list[tuple[list[tuple[int, int]], int, int, int]]:
-    """Enumerate ALL reachable placements via BFS over (x, y, rotation).
-
-    Returns list of (shape, px, py, rotation) tuples — every position the
-    piece can reach by moving left/right, soft-dropping, and rotating (with
-    SRS wall kicks). This includes placements under overhangs that hard-drop
-    cannot reach.
-    """
-    num_rots = len(SHAPES[piece_type])
-    spawn_x = BOARD_WIDTH // 2 - 2
-    spawn_y = 0
-    # ponytail: BFS frontier — state = (x, y, rot). O(W*H*4) states.
-    visited: set[tuple[int, int, int]] = set()
-    frontier: list[tuple[int, int, int]] = [(spawn_x, spawn_y, 0)]
-    visited.add((spawn_x, spawn_y, 0))
-    placements: list[tuple[list[tuple[int, int]], int, int, int]] = []
-    seen_placements: set[tuple[int, int, int]] = set()
-
-    while frontier:
-        x, y, rot = frontier.pop()
-        shape = SHAPES[piece_type][rot]
-
-        # Try left
-        if _shape_fits(grid, shape, x - 1, y) and (x - 1, y, rot) not in visited:
-            visited.add((x - 1, y, rot))
-            frontier.append((x - 1, y, rot))
-
-        # Try right
-        if _shape_fits(grid, shape, x + 1, y) and (x + 1, y, rot) not in visited:
-            visited.add((x + 1, y, rot))
-            frontier.append((x + 1, y, rot))
-
-        # Try soft drop (y+1)
-        if _shape_fits(grid, shape, x, y + 1):
-            if (x, y + 1, rot) not in visited:
-                visited.add((x, y + 1, rot))
-                frontier.append((x, y + 1, rot))
-        else:
-            # Can't drop further — this is a landing position
-            key = (x, y, rot)
-            if key not in seen_placements:
-                seen_placements.add(key)
-                placements.append((shape, x, y, rot))
-
-        # Try rotations CW and CCW
-        for direction in (1, -1):
-            to_rot = (rot + direction) % num_rots
-            result = _try_rotation(grid, piece_type, rot, to_rot, x, y)
-            if result and (*result, to_rot) not in visited:
-                visited.add((*result, to_rot))
-                frontier.append((*result, to_rot))
-
-    return placements

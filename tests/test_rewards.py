@@ -113,13 +113,18 @@ from tetris.ai.rewards import (
     column_transitions,
     dellacherie_value,
     extract_features,
-    hard_drop_y,
     hole_depth,
     max_height,
     place_and_clear,
     row_transitions,
     rows_with_holes,
     wells,
+)
+from tetris.game.rules import (
+    hard_drop_y,
+    shape_fits,
+    soft_drop_placements,
+    try_rotation,
 )
 from tetris.settings import SHAPES
 
@@ -337,7 +342,7 @@ def test_normalize_features():
 
 def test_soft_drop_placements_empty():
     """Empty board: all standard hard-drop positions reachable."""
-    from tetris.ai.rewards import soft_drop_placements
+    # soft_drop_placements is imported from tetris.game.rules at top level
     placements = soft_drop_placements(_empty_grid(), "O")
     assert len(placements) > 0
     # O-piece has 1 rotation, spans 2 columns → 9 positions on empty board
@@ -346,7 +351,7 @@ def test_soft_drop_placements_empty():
 
 def test_soft_drop_placements_overhang():
     """Board with overhang: placement under overhang is reachable."""
-    from tetris.ai.rewards import soft_drop_placements
+    # soft_drop_placements is imported from tetris.game.rules at top level
     grid = _empty_grid()
     # Create overhang: fill row 17 cols 0-3, leave gap at col 0-1 below
     grid[17, 0] = 1
@@ -363,11 +368,9 @@ def test_soft_drop_placements_overhang():
 
 def test_srs_wall_kick():
     """Rotation with SRS kick succeeds when basic rotation would fail."""
-    from tetris.ai.rewards import _shape_fits, _try_rotation
+    # shape_fits and try_rotation are imported from tetris.game.rules at top level
     grid = _empty_grid()
-    # J-piece: spawn state 0 → rotation 1. On empty board, basic rotation
-    # should succeed (no kick needed). Test that kick is attempted.
-    result = _try_rotation(grid, "J", 0, 1, 3, 0)
+    result = try_rotation(grid, "J", 0, 1, 3, 0)
     assert result is not None
     nx, ny = result
-    assert _shape_fits(grid, SHAPES["J"][1], nx, ny)
+    assert shape_fits(grid, SHAPES["J"][1], nx, ny)
