@@ -146,7 +146,7 @@ HUD_POSITIONS = {
     "level": (20, 140),
     "speed": (20, 180),
     "next": (570, 50),
-    "ai_stats": (570, 180),
+    "ai_stats": (570, 350),
     "mode": (20, 700),
     "generator": (20, 740),
     "hold": (20, 220),
