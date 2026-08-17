@@ -136,7 +136,6 @@ BOARD_OFFSET_Y = 50
 
 # Next-piece panel position
 NEXT_PANEL_X = 570
-NEXT_PANEL_Y = 100
 
 # HUD text positions
 HUD_POSITIONS = {
@@ -170,7 +169,6 @@ CURRICULUM_ORDER: list[str] = ["O", "I", "L", "J", "T", "S", "Z"]
 # First piece of each game must be from this set (avoids forced overhang
 # on an empty board: S/Z/O create awkward gaps right from the start).
 FIRST_PIECE_TYPES: list[str] = ["I", "J", "L", "T"]
-CURRICULUM_EPSILON_POLICIES: list[str] = ["reset", "boost", "decay"]
 
 # Leaderboard
 LEADERBOARD_SIZE = 10

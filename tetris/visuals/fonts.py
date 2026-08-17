@@ -27,7 +27,7 @@ _SMALL_SIZE = 24
 # --- Layout constants (pixels) ------------------------------------------
 TITLE_Y = 50
 CONTENT_Y = 120
-LINE_HEIGHT_LARGE = 40
+
 LINE_HEIGHT_SMALL = 32
 INSTRUCTIONS_Y = SCREEN_HEIGHT - 50
 

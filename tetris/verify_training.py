@@ -26,8 +26,6 @@ os.makedirs(DATA_DIR, exist_ok=True)
 
 # Step duration in ms (matches 60fps game loop)
 DT = 16.67
-# AI acts every 80ms, so each step is ~5 frames
-AI_INTERVAL = 80.0
 
 
 def run_training(n_episodes: int) -> None:
