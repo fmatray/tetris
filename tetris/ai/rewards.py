@@ -296,6 +296,56 @@ def dellacherie_value(
         + DELLACHERIE_WEIGHTS["rows_with_holes"] * rows_with_holes(grid, mask, first_row)
     )
 
+def dellacherie_value_batch(grids: np.ndarray) -> np.ndarray:
+    """Batch Dellacherie evaluation for N grids at once.
+
+    Vectorized version of :func:`dellacherie_value` — computes all 6
+    board heuristics in a single numpy pass over stacked grids.
+
+    Args:
+        grids: ``(N, H, W)`` array of board states.
+
+    Returns:
+        ``(N,)`` float array of Dellacherie values. Empty grids → 0.0.
+    """
+    N = grids.shape[0]
+    mask = grids > 0                                   # (N, H, W)
+    non_empty = mask.any(axis=(1, 2))                   # (N,)
+    if not non_empty.any():
+        return np.zeros(N, dtype=np.float64)
+    any_filled = mask.any(axis=1)                       # (N, W)
+    first_row = np.argmax(mask, axis=1)                # (N, W)
+    heights = (BOARD_HEIGHT - first_row) * any_filled    # (N, W)
+    row_idx = np.arange(BOARD_HEIGHT).reshape(1, BOARD_HEIGHT, 1)
+    below_first = row_idx >= first_row[:, None, :]      # (N, H, W)
+    holes = below_first & ~mask & any_filled[:, None, :]
+    holes_count = holes.sum(axis=(1, 2))                # (N,)
+    binary = mask.astype(np.int8)
+    padded_rt = np.pad(binary, ((0, 0), (0, 0), (1, 1)), constant_values=1)
+    row_trans = np.abs(np.diff(padded_rt, axis=2)).sum(axis=(1, 2))
+    padded_ct = np.pad(binary, ((0, 0), (0, 1), (0, 0)), constant_values=1)
+    col_trans = np.abs(np.diff(padded_ct, axis=1)).sum(axis=(1, 2))
+    left_h = np.empty_like(heights)
+    right_h = np.empty_like(heights)
+    left_h[:, 0] = BOARD_HEIGHT
+    left_h[:, 1:] = heights[:, :-1]
+    right_h[:, -1] = BOARD_HEIGHT
+    right_h[:, :-1] = heights[:, 1:]
+    well_depth = np.maximum(0, np.minimum(left_h, right_h) - heights)
+    wells_score = (well_depth * (well_depth + 1) // 2).sum(axis=1)
+    holes_per_col = holes.sum(axis=1)                   # (N, W)
+    hole_depth_score = holes_per_col.max(axis=1)         # (N,)
+    rows_with_holes_count = holes.any(axis=2).sum(axis=1)
+    vals = (
+        DELLACHERIE_WEIGHTS["row_transitions"] * row_trans
+        + DELLACHERIE_WEIGHTS["column_transitions"] * col_trans
+        + DELLACHERIE_WEIGHTS["holes"] * holes_count
+        + DELLACHERIE_WEIGHTS["wells"] * wells_score
+        + DELLACHERIE_WEIGHTS["hole_depth"] * hole_depth_score
+        + DELLACHERIE_WEIGHTS["rows_with_holes"] * rows_with_holes_count
+    )
+    return vals * non_empty
+
 
 # --- Simulation helpers (AI.md §3) -----------------------------------
 
@@ -320,6 +370,36 @@ def place_and_clear(
     else:
         lines_cleared = 0
     return new_grid, lines_cleared
+
+def place_and_clear_batch(
+    grid: np.ndarray,
+    shapes: list[list[tuple[int, int]]],
+    x_positions: list[int],
+    y_positions: list[int],
+) -> tuple[np.ndarray, np.ndarray]:
+    """Batch place + line-clear for N placements on the same base grid.
+
+    Returns ``(grids[N, H, W], lines_cleared[N])``.
+    """
+    N = len(shapes)
+    batch = np.repeat(grid[np.newaxis], N, axis=0)
+    for i in range(N):
+        place_cells(batch[i], shapes[i], x_positions[i], y_positions[i], 1.0)
+    mask = batch > 0
+    full = mask.all(axis=2)                                # (N, H)
+    lines = full.sum(axis=1).astype(np.int32)               # (N,)
+    grids_out = np.empty_like(batch)
+    for i in range(N):
+        if lines[i] == 0:
+            grids_out[i] = batch[i]
+        else:
+            keep = ~full[i]
+            cleared = np.vstack([
+                np.zeros((int(lines[i]), BOARD_WIDTH), dtype=batch.dtype),
+                batch[i][keep],
+            ])
+            grids_out[i] = cleared
+    return grids_out, lines
 
 
 # --- Reward (AI.md §4) -----------------------------------------------

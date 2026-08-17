@@ -374,3 +374,97 @@ def test_srs_wall_kick():
     assert result is not None
     nx, ny = result
     assert shape_fits(grid, SHAPES["J"][1], nx, ny)
+
+
+# --- dellacherie_value_batch -----------------------------------------
+
+from tetris.ai.rewards import dellacherie_value_batch
+
+
+def _diverse_grids(n=36, seed=42):
+    """Generate n diverse board states for equivalence testing."""
+    rng = np.random.default_rng(seed)
+    grids = [np.zeros((BOARD_HEIGHT, BOARD_WIDTH), dtype=np.float32)]
+    grids.append(np.ones((BOARD_HEIGHT, BOARD_WIDTH), dtype=np.float32))
+    g = np.zeros((BOARD_HEIGHT, BOARD_WIDTH), dtype=np.float32)
+    g[BOARD_HEIGHT // 2:, :] = 1.0
+    grids.append(g)
+    for _ in range(n - 3):
+        g = np.zeros((BOARD_HEIGHT, BOARD_WIDTH), dtype=np.float32)
+        fill_rows = rng.integers(1, 10)
+        for y in range(BOARD_HEIGHT - fill_rows, BOARD_HEIGHT):
+            for x in range(BOARD_WIDTH):
+                if rng.random() > 0.3:
+                    g[y, x] = 1.0
+        grids.append(g)
+    return grids
+
+
+def test_dellacherie_value_batch_empty():
+    """All-empty batch → all zeros."""
+    grids = np.zeros((3, BOARD_HEIGHT, BOARD_WIDTH), dtype=np.float32)
+    vals = dellacherie_value_batch(grids)
+    assert vals.shape == (3,)
+    assert np.allclose(vals, 0.0)
+
+
+def test_dellacherie_value_batch_single():
+    """N=1 matches scalar."""
+    grids = _diverse_grids(1)
+    stacked = np.stack(grids)
+    batch = dellacherie_value_batch(stacked)
+    scalar = np.array([dellacherie_value(g) for g in grids])
+    assert np.allclose(batch, scalar, atol=1e-5)
+
+
+def test_dellacherie_value_batch_matches_scalar():
+    """Batch matches scalar across 36 diverse grids."""
+    grids = _diverse_grids(36)
+    stacked = np.stack(grids)
+    batch = dellacherie_value_batch(stacked)
+    scalar = np.array([dellacherie_value(g) for g in grids])
+    assert np.allclose(batch, scalar, atol=1e-5), f"max diff={np.max(np.abs(batch - scalar))}"
+
+
+def test_dellacherie_value_batch_empty_grid_in_batch():
+    """One empty grid among non-empty → 0.0 for that entry."""
+    grids = _diverse_grids(5)
+    grids[2] = np.zeros((BOARD_HEIGHT, BOARD_WIDTH), dtype=np.float32)
+    stacked = np.stack(grids)
+    vals = dellacherie_value_batch(stacked)
+    assert vals[2] == 0.0
+    assert not np.allclose(vals, 0.0)
+
+
+def test_dellacherie_value_batch_shape():
+    """Returns (N,) float array."""
+    grids = _diverse_grids(7)
+    stacked = np.stack(grids)
+    vals = dellacherie_value_batch(stacked)
+    assert vals.shape == (7,)
+
+
+def test_dellacherie_value_batch_full_board():
+    """All-filled board."""
+    grids = np.ones((2, BOARD_HEIGHT, BOARD_WIDTH), dtype=np.float32)
+    vals = dellacherie_value_batch(grids)
+    scalar = np.array([dellacherie_value(g) for g in grids])
+    assert np.allclose(vals, scalar, atol=1e-5)
+
+
+def test_dellacherie_value_batch_half_board():
+    """Half-filled board."""
+    g = np.zeros((BOARD_HEIGHT, BOARD_WIDTH), dtype=np.float32)
+    g[BOARD_HEIGHT // 2:, :] = 1.0
+    stacked = np.stack([g])
+    vals = dellacherie_value_batch(stacked)
+    assert np.isclose(vals[0], dellacherie_value(g), atol=1e-5)
+
+
+def test_dellacherie_value_batch_preserves_input():
+    """Input array not mutated."""
+    grids = _diverse_grids(5)
+    stacked = np.stack(grids).copy()
+    dellacherie_value_batch(stacked)
+    grids2 = np.stack(grids)
+    assert np.array_equal(stacked, grids2)

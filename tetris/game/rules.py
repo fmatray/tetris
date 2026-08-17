@@ -7,6 +7,8 @@ Works for both ``list[list[tuple|None]]`` (Board) and ``np.ndarray`` (AI sim).
 
 from __future__ import annotations
 
+import numpy as np
+
 from tetris.settings import (
     BOARD_HEIGHT,
     BOARD_WIDTH,
@@ -58,6 +60,33 @@ def hard_drop_y(grid, shape, x: int) -> int:
         if not shape_fits(grid, shape, x, py):
             return py - 1 if py > 0 else 0
         py += 1
+
+def hard_drop_y_batch(
+    grid: np.ndarray, shapes: list[list[tuple[int, int]]], x_positions: list[int],
+) -> np.ndarray:
+    """Batch hard-drop: landing y for N (shape, x) pairs on the same grid.
+
+    Replaces the per-piece while-loop with a column-height lookup. Returns
+    ``(N,)`` int array. Matches :func:`hard_drop_y` for all valid placements.
+    """
+    mask = np.asarray(grid) > 0
+    # Row index of topmost filled cell per column (BOARD_HEIGHT if empty).
+    col_tops = np.argmax(mask, axis=0).astype(np.int32)
+    col_tops[~mask.any(axis=0)] = BOARD_HEIGHT
+    results = np.empty(len(shapes), dtype=np.int32)
+    for i, (shape, x) in enumerate(zip(shapes, x_positions)):
+        # Landing y = min over cells of (col_top[cx] - by - 1): the most
+        # constraining cell (highest top) determines the rest position.
+        min_y = BOARD_HEIGHT
+        for bx, by in shape:
+            cx = x + bx
+            if cx < 0 or cx >= BOARD_WIDTH:
+                min_y = -1
+                break
+            cell_y = int(col_tops[cx]) - by - 1
+            min_y = min(min_y, cell_y)
+        results[i] = max(min_y, 0)
+    return results
 
 
 def soft_drop_placements(

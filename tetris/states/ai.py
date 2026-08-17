@@ -27,15 +27,17 @@ from tetris.ai.rewards import (
     compute_height_metrics,
     compute_reward,
     dellacherie_value,
+    dellacherie_value_batch,
     extract_features,
     place_and_clear,
+    place_and_clear_batch,
 )
 from tetris.ai.trainer import TrainingLog
 from tetris.audio import AudioManager
 from tetris.game import rules
 from tetris.game.board import Board
 from tetris.game.piece_provider import PieceProvider
-from tetris.game.rules import hard_drop_y, soft_drop_placements
+from tetris.game.rules import hard_drop_y, hard_drop_y_batch, soft_drop_placements
 from tetris.game.tetromino import Tetromino
 from tetris.logger import get_logger
 from tetris.settings import (
@@ -210,9 +212,11 @@ class AIState(GameState):
         """Simulate best placement of next piece on grid (2-piece look-ahead).
 
         Uses hard-drop for speed — look-ahead only needs approximate board quality.
+        Batches all (rotation, column) candidates and evaluates Dellacherie
+        in one vectorized pass.
         """
-        best_grid = grid
-        best_val = float("inf")  # Dellacherie is negative; lower = better
+        shapes: list[list[tuple[int, int]]] = []
+        x_positions: list[int] = []
         num_rots = len(SHAPES[piece_type])
         for rot in range(num_rots):
             shape = SHAPES[piece_type][rot]
@@ -222,15 +226,21 @@ class AIState(GameState):
                 px = col - min_bx
                 if px < 0 or px + max_bx >= BOARD_WIDTH:
                     continue
-                py = hard_drop_y(grid, shape, px)
-                if py < 0:
-                    continue
-                sim_grid, _ = place_and_clear(grid, shape, px, py)
-                val = dellacherie_value(sim_grid)
-                if val < best_val:
-                    best_val = val
-                    best_grid = sim_grid
-        return best_grid
+                shapes.append(shape)
+                x_positions.append(px)
+        if not shapes:
+            return grid
+        py_batch = hard_drop_y_batch(grid, shapes, x_positions)
+        valid = py_batch >= 0
+        if not valid.any():
+            return grid
+        v_shapes = [s for s, v in zip(shapes, valid) if v]
+        v_xs = [x for x, v in zip(x_positions, valid) if v]
+        v_pys = [int(y) for y, v in zip(py_batch, valid) if v]
+        sim_grids, _ = place_and_clear_batch(grid, v_shapes, v_xs, v_pys)
+        vals = dellacherie_value_batch(sim_grids)
+        best_idx = int(np.argmin(vals))
+        return sim_grids[best_idx]
 
     def _add_candidate(self, base_grid, shape, px, py, rot, upcoming_types,
                        candidates, actions, dellacherie_values, hold=False):

@@ -1,7 +1,6 @@
 """Tests for leaderboard storage: save_score with generator/mode, legacy normalization."""
 
 import json
-from pathlib import Path
 
 from tetris.storage import load_leaderboard, save_score
 
