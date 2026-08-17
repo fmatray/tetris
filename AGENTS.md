@@ -46,7 +46,7 @@ MenuState (root, owns settings)
 
 | Directory | Purpose |
 |---|---|
-| `tetris/game/` | Pure domain: `Board`, `Tetromino`, `PieceProvider`, `ScoreEngine`, `GameStats`, `rules` (grid-agnostic game-rule functions) |
+| `tetris/game/` | Pure domain: `Board`, `Tetromino`, `PieceProvider` facade + `PieceGenerator` hierarchy (`RandomGenerator`, `BagGenerator`→`SevenBagGenerator`/`ThirtyFiveBagGenerator`, `ReplayGenerator`), `ScoreEngine`, `GameStats`, `rules` (grid-agnostic game-rule functions) |
 | `tetris/states/` | FSM states (`State` base + 15 concrete states) |
 | `tetris/ai/` | V-network DQN: `DQNetwork` (V-function), `DQNAgent` (per-candidate eval), `PrioritizedReplayBuffer`, DT-20 features + PBRS reward, `TrainingLog`. Game-rule functions (SRS kicks, soft-drop BFS) extracted to `tetris/game/rules.py` |
 | `tetris/visuals/` | `Renderer`, `ParticleSystem`, leaderboard/graph views |
@@ -115,6 +115,7 @@ python -m tetris.verify_training
 | `tetris/ai/agent.py` | `DQNAgent` — `select_action`, `store`, `learn`, `save`, `load` |
 | `tetris/ai/rewards.py` | `extract_features` (17-dim DT-20, normalized) + `compute_reward` (PBRS scale 0.1) + `dellacherie_value`. Game-rule functions (SRS kicks, soft-drop BFS, `hard_drop_y`, `shape_fits`) extracted to `tetris/game/rules.py` |
 | `tetris/game/rules.py` | Grid-agnostic pure game-rule functions (`shape_fits`, `try_rotation`, `hard_drop_y`, `soft_drop_placements`, `place_cells`, `find_full_rows`) — shared by `Board` (list grid) and AI simulation (numpy grid) |
+| `tetris/game/piece_provider.py` | `PieceProvider` facade + `PieceGenerator` hierarchy (`RandomGenerator`, `BagGenerator`→`SevenBagGenerator`/`ThirtyFiveBagGenerator`, `ReplayGenerator`) — tetromino spawning with record/replay, curriculum, first-piece safety |
 | `tetris/ai/network.py` | `DQNetwork` — 17→128→64→1 V-network MLP |
 | `tetris/verify_training.py` | Headless training validation script |
 | `data/settings.json` | Persisted menu settings + keybinds |

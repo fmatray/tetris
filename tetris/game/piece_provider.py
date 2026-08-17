@@ -1,128 +1,110 @@
-"""Piece provider: records and replays tetromino spawn sequences.
+"""Piece provider: tetromino spawn strategies with record/replay support.
+
+Class hierarchy:
+
+- ``PieceGenerator`` — abstract base for all spawn strategies.
+- ``RandomGenerator`` — uniform random spawns.
+- ``BagGenerator`` — generic bag generator (N copies of each tetromino).
+  - ``SevenBagGenerator`` — 7-bag (1 copy each).
+  - ``ThirtyFiveBagGenerator`` — 35-bag (5 copies each).
+- ``ReplayGenerator`` — serve from a saved sequence, exhaustible.
+- ``PieceProvider`` — facade that owns curriculum state, first-piece
+  safety, replay recording, and delegates to a generator.
 
 Normal mode: every spawned piece type is appended to the recorded
 sequence and saved to disk on game exit.
 
 Replay mode: piece types are served from a previously saved sequence.
-When the saved sequence is exhausted, the provider falls back to
-random spawns (just like Normal mode), and also begins recording so
-the session's pieces are captured for future replays.
+When the saved sequence is exhausted, the provider switches to the
+configured fallback generator (random/7-bag/35-bag) and begins
+recording so the session's pieces are captured for future replays.
 """
 
 from __future__ import annotations
 
 import json
 import random
+from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import ClassVar
 
 from tetris.logger import get_logger
 from tetris.settings import FIRST_PIECE_TYPES, REPLAY_PATH, SHAPES
 
 _logger = get_logger("piece_provider")
 
-class PieceProvider:
-    """Controls tetromino spawning: random, recorded, or replayed.
 
-    Bag generators repeat each pool piece a fixed number of times:
-    7-bag = 1 copy, 35-bag = 5 copies. Everything else (shuffle, pop,
-    first-piece swap) is shared.
+# ---------------------------------------------------------------------------
+# Generators
+# ---------------------------------------------------------------------------
 
-    Parameters
-    ----------
-    mode : str
-        ``"normal"`` — random spawns, record each piece.
-        ``"replay"`` — serve from saved sequence, then random + record.
-    path : Path
-        File path for the recorded/replayed piece sequence.
+
+class PieceGenerator(ABC):
+    """Abstract tetromino spawn strategy.
+
+    Generators receive ``(pool, is_first)`` from the facade and own only
+    their own generation internals (bag, queue, etc.). Curriculum and
+    first-piece state live on :class:`PieceProvider`.
     """
 
-    _BAG_MULTIPLIERS: ClassVar[dict[str, int]] = {"7bag": 1, "35bag": 5}
-
-    def __init__(
-        self,
-        mode: str = "normal",
-        path: Path | str = REPLAY_PATH,
-        allowed_types: list[str] | None = None,
-        generator: str = "random",  # "random", "7bag", or "35bag"
-    ) -> None:
-        """Initialize the piece provider.
+    @abstractmethod
+    def next(self, pool: list[str], is_first: bool) -> str | None:
+        """Return the next piece type from ``pool``.
 
         Args:
-            mode: ``"normal"`` (record spawns) or ``"replay"`` (serve from
-                a saved sequence, falling back to random when exhausted).
-            path: Path to the replay/record JSON file.
-            allowed_types: Optional restriction on the piece pool (curriculum).
-            generator: ``"random"``, ``"7bag"``, or ``"35bag"`` spawn strategy.
+            pool: Active piece pool (``allowed_types`` or all SHAPES keys).
+            is_first: ``True`` if this is the first piece of a game — apply
+                the first-piece safety restriction (I, J, L, T only).
+
+        Returns:
+            Piece type string, or ``None`` if the generator is exhausted
+            (replay-only; bag and random never return ``None``).
         """
-        self.mode = mode
-        self.path = Path(path)
-        self.allowed_types: list[str] | None = allowed_types
-        self.generator = generator
-        self._bag: list[str] = []
-        self._recorded: list[str] = []
-        self._first_piece = True
-        self._replay_queue: list[str] = []
-        self._replay_idx = 0
 
-        if mode == "replay":
-            self._load_replay()
+    @abstractmethod
+    def reset(self) -> None:
+        """Clear internal state (bag, etc.) for a new game."""
 
-    # --- Public API ----------------------------------------------------
+    @property
+    @abstractmethod
+    def bag_remaining(self) -> list[str]:
+        """Pieces left in the current bag (empty for non-bag generators)."""
+
+
+class RandomGenerator(PieceGenerator):
+    """Uniform random spawns with first-piece safety filter."""
+
+    def next(self, pool: list[str], is_first: bool) -> str:
+        if is_first:
+            safe = [t for t in pool if t in FIRST_PIECE_TYPES]
+            if safe:
+                return random.choice(safe)
+        return random.choice(pool)
 
     def reset(self) -> None:
-        """Re-arm the first-piece restriction and clear the bag.
+        pass
 
-        Called by AIState between episodes so each game starts with a
-        safe piece (I, J, L, or T).
-        """
-        self._first_piece = True
-        self._bag = []
-
-    def next_type(self) -> str:
-        """Return the next piece type, applying generator and first-piece rules."""
-        if self.mode == "replay" and self._replay_idx < len(self._replay_queue):
-            piece_type = self._replay_queue[self._replay_idx]
-            self._replay_idx += 1
-            # Curriculum: skip pieces outside allowed_types
-            if self.allowed_types is not None and piece_type not in self.allowed_types:
-                return self.next_type()
-            # First-piece restriction: skip queue pieces not in the safe set
-            if self._first_piece and piece_type not in FIRST_PIECE_TYPES:
-                return self.next_type()
-            self._first_piece = False
-            self._recorded.append(piece_type)
-            return piece_type
-
-        # Normal mode, or replay exhausted → generator-based spawn
-        pool = self.allowed_types if self.allowed_types is not None else list(SHAPES.keys())
-        if self.generator in self._BAG_MULTIPLIERS:
-            piece_type = self._bag_next(pool)
-        else:
-            piece_type = self._first_piece_choice(pool)
-        self._first_piece = False
-        self._recorded.append(piece_type)
-        _logger.debug("Spawned %s | bag=%s", piece_type, self._bag)
-        return piece_type
-
-    def set_allowed_types(self, types: list[str]) -> None:
-        """Restrict the spawn pool and clear the current bag.
-
-        Args:
-            types: Piece types to allow (e.g. ``["O"]`` for curriculum level 0).
-        """
-        self.allowed_types = types
-        self._bag = []  # force refill with new pool
+    @property
+    def bag_remaining(self) -> list[str]:
+        return []
 
 
-    def _bag_next(self, pool: list[str]) -> str:
+class BagGenerator(PieceGenerator):
+    """Generic bag generator: ``pool * copies`` pieces, shuffled.
+
+    The first-piece swap keeps the bag complete: if the popped piece is
+    not in the safe set, swap it with an eligible piece still in the bag.
+    """
+
+    def __init__(self, copies: int) -> None:
+        self._copies = copies
+        self._bag: list[str] = []
+
+    def next(self, pool: list[str], is_first: bool) -> str:
         if not self._bag:
-            self._bag = pool * self._BAG_MULTIPLIERS[self.generator]
+            self._bag = pool * self._copies
             random.shuffle(self._bag)
         piece = self._bag.pop()
-        if self._first_piece and piece not in FIRST_PIECE_TYPES:
-            # Swap the popped piece with an eligible one still in the bag
-            # so the 7-bag stays complete (no duplicates, no missing pieces).
+        if is_first and piece not in FIRST_PIECE_TYPES:
             for i, t in enumerate(self._bag):
                 if t in FIRST_PIECE_TYPES:
                     self._bag[i] = piece
@@ -130,13 +112,155 @@ class PieceProvider:
                     break
         return piece
 
-    def _first_piece_choice(self, pool: list[str]) -> str:
-        """Pick a piece, restricting the first to the safe set when possible."""
-        if self._first_piece:
-            safe = [t for t in pool if t in FIRST_PIECE_TYPES]
-            if safe:
-                return random.choice(safe)
-        return random.choice(pool)
+    def reset(self) -> None:
+        self._bag = []
+
+    @property
+    def bag_remaining(self) -> list[str]:
+        return self._bag[:]
+
+
+class SevenBagGenerator(BagGenerator):
+    """7-bag: each tetromino appears once per bag."""
+
+    def __init__(self) -> None:
+        super().__init__(copies=1)
+
+
+class ThirtyFiveBagGenerator(BagGenerator):
+    """35-bag: each tetromino appears 5 times per bag."""
+
+    def __init__(self) -> None:
+        super().__init__(copies=5)
+
+
+class ReplayGenerator(PieceGenerator):
+    """Serve piece types from a saved JSON sequence.
+
+    Once the queue is exhausted, ``next`` returns ``None`` so the facade
+    can switch to the fallback generator. Curriculum and first-piece
+    filters are applied internally by skipping queue pieces that don't
+    match.
+    """
+
+    def __init__(self, path: Path | str) -> None:
+        self._queue = self._load(path)
+        self._idx = 0
+
+    def next(self, pool: list[str], is_first: bool) -> str | None:
+        while self._idx < len(self._queue):
+            piece = self._queue[self._idx]
+            self._idx += 1
+            if piece not in pool:
+                continue
+            if is_first and piece not in FIRST_PIECE_TYPES:
+                continue
+            return piece
+        return None
+
+    def reset(self) -> None:
+        pass
+
+    @property
+    def bag_remaining(self) -> list[str]:
+        return []
+
+    @staticmethod
+    def _load(path: Path | str) -> list[str]:
+        p = Path(path)
+        if not p.exists():
+            return []
+        try:
+            return json.loads(p.read_text())
+        except (json.JSONDecodeError, OSError):
+            return []
+
+
+def _make_generator(name: str) -> PieceGenerator:
+    """Factory: map a settings string to a concrete generator."""
+    if name == "7bag":
+        return SevenBagGenerator()
+    if name == "35bag":
+        return ThirtyFiveBagGenerator()
+    return RandomGenerator()
+
+
+# ---------------------------------------------------------------------------
+# Facade
+# ---------------------------------------------------------------------------
+
+
+class PieceProvider:
+    """Facade controlling tetromino spawning.
+
+    Owns curriculum state (``allowed_types``), first-piece safety, and
+    replay recording. Delegates piece generation to a
+    :class:`PieceGenerator`. In replay mode, delegates to
+    :class:`ReplayGenerator` until exhausted, then switches to the
+    configured fallback generator.
+
+    Parameters
+    ----------
+    mode : str
+        ``"normal"`` — random/bag spawns, record each piece.
+        ``"replay"`` — serve from saved sequence, then fallback + record.
+    path : Path
+        File path for the recorded/replayed piece sequence.
+    allowed_types : list[str] | None
+        Optional restriction on the piece pool (curriculum).
+    generator : str
+        ``"random"``, ``"7bag"``, or ``"35bag"`` spawn strategy.
+    """
+
+    def __init__(
+        self,
+        mode: str = "normal",
+        path: Path | str = REPLAY_PATH,
+        allowed_types: list[str] | None = None,
+        generator: str = "random",
+    ) -> None:
+        self.mode = mode
+        self.path = Path(path)
+        self.allowed_types: list[str] | None = allowed_types
+        self._generator_name = generator
+        self._recorded: list[str] = []
+        self._first_piece = True
+        self._all_types = list(SHAPES.keys())
+        self._fallback = _make_generator(generator)
+        self._generator: PieceGenerator = (
+            ReplayGenerator(path) if mode == "replay" else self._fallback
+        )
+
+    def reset(self) -> None:
+        """Re-arm the first-piece restriction and clear the active generator.
+
+        Called by AIState between episodes so each game starts with a
+        safe piece (I, J, L, or T).
+        """
+        self._first_piece = True
+        self._generator.reset()
+
+    def next_type(self) -> str:
+        """Return the next piece type, applying generator and first-piece rules."""
+        pool = self.allowed_types if self.allowed_types is not None else self._all_types
+        piece = self._generator.next(pool, self._first_piece)
+        if piece is None:  # replay exhausted → switch to fallback
+            self._generator = self._fallback
+            piece = self._generator.next(pool, self._first_piece)
+            assert piece is not None  # fallback generators never exhaust
+        self._first_piece = False
+        self._recorded.append(piece)
+        _logger.debug("Spawned %s | bag=%s", piece, self._generator.bag_remaining)
+        return piece
+
+    def set_allowed_types(self, types: list[str]) -> None:
+        """Restrict the spawn pool and reset the active generator.
+
+        Args:
+            types: Piece types to allow (e.g. ``["O"]`` for curriculum level 0).
+        """
+        self.allowed_types = types
+        self._generator.reset()
 
     def save(self) -> None:
         """Persist the recorded piece sequence to disk."""
@@ -144,19 +268,12 @@ class PieceProvider:
             return
         self.path.write_text(json.dumps(self._recorded))
 
-
     @property
     def bag_remaining(self) -> list[str]:
         """Remaining pieces in the current bag (empty if random or bag exhausted)."""
-        return self._bag[:]
+        return self._generator.bag_remaining
 
-    # --- Internal -----------------------------------------------------
-
-    def _load_replay(self) -> None:
-        """Load the saved piece sequence for replay mode."""
-        if not self.path.exists():
-            return
-        try:
-            self._replay_queue = json.loads(self.path.read_text())
-        except (json.JSONDecodeError, OSError):
-            self._replay_queue = []
+    @property
+    def generator(self) -> str:
+        """Configured generator name (``"random"``, ``"7bag"``, ``"35bag"``)."""
+        return self._generator_name

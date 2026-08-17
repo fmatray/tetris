@@ -396,27 +396,66 @@ classDiagram
             +get_blocks() list~tuple~int, int~~
         }
 
+        class PieceGenerator {
+            <<abstract>>
+            +next(pool: list~str~, is_first: bool) str | None
+            +reset() None
+            +bag_remaining: list~str~
+        }
+
+        class RandomGenerator {
+            +next(pool: list~str~, is_first: bool) str
+            +reset() None
+            +bag_remaining: list~str~
+        }
+
+        class BagGenerator {
+            - _copies: int
+            - _bag: list~str~
+            +__init__(copies: int) None
+            +next(pool: list~str~, is_first: bool) str
+            +reset() None
+            +bag_remaining: list~str~
+        }
+
+        class SevenBagGenerator {
+            +__init__() None
+        }
+
+        class ThirtyFiveBagGenerator {
+            +__init__() None
+        }
+
+        class ReplayGenerator {
+            - _queue: list~str~
+            - _idx: int
+            +__init__(path: Path | str) None
+            +next(pool: list~str~, is_first: bool) str | None
+            +reset() None
+            +bag_remaining: list~str~
+            %% static
+            - _load(path: Path | str) list~str~
+        }
+
         class PieceProvider {
-            # _BAG_MULTIPLIERS: dict~str, int~ ClassVar
             +mode: str
             +path: Path
             +allowed_types: list~str~ | None
             +generator: str
-            - _bag: list~str~
+            - _generator_name: str
             - _recorded: list~str~
             - _first_piece: bool
-            - _replay_queue: list~str~
-            - _replay_idx: int
+            - _all_types: list~str~
+            - _fallback: PieceGenerator
+            - _generator: PieceGenerator
             +bag_remaining: list~str~
-            +__init__(mode: str, generator: str, path: str | None) None
+            +__init__(mode: str, path: str | Path, allowed_types: list~str~ | None, generator: str) None
             +reset() None
             +next_type() str
             +set_allowed_types(types: list~str~) None
-            - _bag_next(pool: list~str~) str
-            - _first_piece_choice(pool: list~str~) str
             +save() None
-            - _load_replay() None
         }
+        %% Module-level function: _make_generator(name: str) -> PieceGenerator
 
         class ScoreEngine {
             %% static
@@ -698,6 +737,11 @@ classDiagram
     GameState <|-- AIState
 
     nn_Module <|-- DQNetwork
+    PieceGenerator <|-- RandomGenerator
+    PieceGenerator <|-- BagGenerator
+    PieceGenerator <|-- ReplayGenerator
+    BagGenerator <|-- SevenBagGenerator
+    BagGenerator <|-- ThirtyFiveBagGenerator
 
     %% ====================================================================
     %%  Relationships — Composition
@@ -708,6 +752,7 @@ classDiagram
 
     MenuBase "1" *-- "1" MenuBackgroundAnimation : owns
 
+    PieceProvider "1" *-- "1" PieceGenerator : delegates
     GameState "1" *-- "1" Board : owns
     GameState "1" *-- "1" PieceProvider : owns
     GameState "1" *-- "1" GameStats : owns

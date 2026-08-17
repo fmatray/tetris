@@ -2,8 +2,14 @@
 
 import json
 
-from tetris.game.piece_provider import PieceProvider
-from tetris.settings import SHAPES
+from tetris.game.piece_provider import (
+    BagGenerator,
+    PieceProvider,
+    RandomGenerator,
+    ReplayGenerator,
+    SevenBagGenerator,
+)
+from tetris.settings import FIRST_PIECE_TYPES, SHAPES
 
 
 def test_normal_mode_returns_valid_types():
@@ -250,3 +256,123 @@ def test_first_piece_replay_skips_unsafe(tmp_path):
     provider = PieceProvider(mode="replay", path=path)
     first = provider.next_type()
     assert first in ("I", "J", "L", "T")
+
+
+# ---------------------------------------------------------------------------
+# Generator unit tests (internal classes)
+# ---------------------------------------------------------------------------
+
+
+def test_random_generator_no_bag():
+    gen = RandomGenerator()
+    assert gen.bag_remaining == []
+    gen.reset()  # no-op, should not raise
+
+
+def test_random_generator_first_piece_safe():
+    gen = RandomGenerator()
+    pool = list(SHAPES.keys())
+    for _ in range(50):
+        assert gen.next(pool, True) in FIRST_PIECE_TYPES
+
+
+def test_random_generator_subsequent_unrestricted():
+    gen = RandomGenerator()
+    pool = list(SHAPES.keys())
+    gen.next(pool, True)
+    assert gen.next(pool, False) in SHAPES
+
+
+def test_bag_generator_copies():
+    gen = BagGenerator(copies=1)
+    pool = list(SHAPES.keys())
+    bag = [gen.next(pool, False) for _ in range(7)]
+    assert sorted(bag) == sorted(SHAPES.keys())
+
+
+def test_bag_generator_reset_clears_bag():
+    gen = SevenBagGenerator()
+    pool = list(SHAPES.keys())
+    gen.next(pool, False)
+    assert len(gen.bag_remaining) == 6
+    gen.reset()
+    assert gen.bag_remaining == []
+
+
+def test_bag_generator_first_piece_swap_keeps_completeness():
+    gen = SevenBagGenerator()
+    pool = list(SHAPES.keys())
+    first = gen.next(pool, True)
+    assert first in FIRST_PIECE_TYPES
+    rest = [gen.next(pool, False) for _ in range(6)]
+    assert sorted([first] + rest) == sorted(SHAPES.keys())
+
+
+def test_replay_generator_serves_queue(tmp_path):
+    path = tmp_path / "r.json"
+    path.write_text(json.dumps(["I", "O", "T"]))
+    gen = ReplayGenerator(path)
+    pool = list(SHAPES.keys())
+    assert gen.next(pool, False) == "I"
+    assert gen.next(pool, False) == "O"
+    assert gen.next(pool, False) == "T"
+    assert gen.next(pool, False) is None  # exhausted
+
+
+def test_replay_generator_curriculum_filter(tmp_path):
+    """ReplayGenerator skips queue pieces not in the pool (curriculum)."""
+    path = tmp_path / "r.json"
+    path.write_text(json.dumps(["I", "S", "O", "Z", "T"]))
+    gen = ReplayGenerator(path)
+    pool = ["I", "O"]
+    assert gen.next(pool, False) == "I"   # S skipped (not in pool)
+    assert gen.next(pool, False) == "O"   # Z, T skipped (not in pool)
+    assert gen.next(pool, False) is None  # exhausted
+
+
+def test_replay_generator_first_piece_filter(tmp_path):
+    """ReplayGenerator skips queue pieces unsafe for first spawn."""
+    path = tmp_path / "r.json"
+    path.write_text(json.dumps(["S", "Z", "I", "T"]))
+    gen = ReplayGenerator(path)
+    pool = list(SHAPES.keys())
+    # S, Z unsafe → skip; I safe → return
+    assert gen.next(pool, True) == "I"
+
+
+def test_replay_generator_reset_does_not_restart_queue(tmp_path):
+    """ReplayGenerator.reset() is a no-op — queue position persists."""
+    path = tmp_path / "r.json"
+    path.write_text(json.dumps(["I", "O"]))
+    gen = ReplayGenerator(path)
+    pool = list(SHAPES.keys())
+    gen.next(pool, False)
+    gen.next(pool, False)
+    gen.reset()
+    assert gen.next(pool, False) is None
+
+
+def test_replay_generator_empty_file(tmp_path):
+    """ReplayGenerator returns None when the file doesn't exist."""
+    path = tmp_path / "nonexistent.json"
+    gen = ReplayGenerator(path)
+    pool = list(SHAPES.keys())
+    assert gen.next(pool, False) is None
+
+
+def test_replay_provider_switches_to_fallback(tmp_path):
+    """PieceProvider switches to fallback generator when replay exhausts."""
+    path = tmp_path / "r.json"
+    path.write_text(json.dumps(["I"]))
+    provider = PieceProvider(mode="replay", path=path, generator="7bag")
+    assert provider.next_type() == "I"
+    # Exhausted → switches to 7bag fallback
+    for _ in range(7):
+        assert provider.next_type() in SHAPES
+
+
+def test_provider_generator_property():
+    """generator property returns the configured name, not the active class."""
+    assert PieceProvider(generator="7bag").generator == "7bag"
+    assert PieceProvider(generator="35bag").generator == "35bag"
+    assert PieceProvider().generator == "random"
