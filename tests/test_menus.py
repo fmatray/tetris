@@ -31,17 +31,22 @@ from tetris.settings import SETTINGS_PATH
 
 @pytest.fixture(autouse=True)
 def _isolate_settings():
-    """Back up and restore data/settings.json so tests don't pollute each other."""
+    """Remove data/settings.json for each test so MenuState uses defaults.
+
+    Backs up and restores the file around the test; tests see defaults,
+    not whatever was persisted from the last manual run.
+    """
     saved = ""
     if os.path.exists(SETTINGS_PATH):
         with open(SETTINGS_PATH) as f:
             saved = f.read()
-    yield
-    if saved:
-        with open(SETTINGS_PATH, "w") as f:
-            f.write(saved)
-    elif os.path.exists(SETTINGS_PATH):
         os.remove(SETTINGS_PATH)
+    try:
+        yield
+    finally:
+        if saved:
+            with open(SETTINGS_PATH, "w") as f:
+                f.write(saved)
 
 # ── Helpers ──────────────────────────────────────────────────────────
 

@@ -46,6 +46,7 @@ def _make_ai(learning: bool = True, **kwargs: object) -> AIState:
     return _make_ai_full(learning=learning, speed=speed, **kwargs)
 
 def _make_ai_full(learning: bool = True, speed: str = "fast", **kwargs: object) -> AIState:
+    soft_drop = bool(kwargs.pop("soft_drop", True))
     audio = AudioManager(sound_volume=0, music_volume=0)
     provider = PieceProvider(generator="7bag", path=_unique_path())
     ai = AIState(
@@ -60,7 +61,7 @@ def _make_ai_full(learning: bool = True, speed: str = "fast", **kwargs: object) 
         ai_mode="learning" if learning else "playing",
         lookahead=True,
         lookahead_depth=1,
-        soft_drop=True,
+        soft_drop=soft_drop,
         preview_count=1,
         warm_start=True,
         learn_per_action=2,
