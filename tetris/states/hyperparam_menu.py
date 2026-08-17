@@ -42,11 +42,12 @@ class HyperparamMenuState(MenuBase):
         "Warm-start",
         "Maj. par pièce",
         "Look-ahead",
+        "Prof. lookahead",
         "Soft-drop",
         "Réinitialiser",
         "Retour",
     )
-    _toggle_indices = frozenset({0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12})
+    _toggle_indices = frozenset({0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13})
 
     # Per-param metadata: (min, max, step, explanation)
     _PARAM_META: ClassVar[tuple[tuple[str, str, str, str, str], ...]] = (
@@ -62,6 +63,7 @@ class HyperparamMenuState(MenuBase):
         ("OFF", "ON", "ON/OFF", "Exploration dirigée par heuristique Dellacherie (warm-start)"),
         ("1", "8", "1", "Mises à jour gradient par pièce verrouillée"),
         ("OFF", "ON", "ON/OFF", "Anticipation 2 pièces: simule le meilleur placement de la pièce suivante"),
+        ("1", "3", "1", "Profondeur d'anticipation: 1=une pièce, 3=trois pièces"),
         ("OFF", "ON", "ON/OFF", "Recherche BFS: placements en glissé (surplombs, T-Spins)"),
         ("", "", "", ""),  # Réinitialiser
         ("", "", "", ""),  # Retour
@@ -78,8 +80,8 @@ class HyperparamMenuState(MenuBase):
         "ai_curriculum_freq": 50,
         "ai_curriculum_epsilon": "reset",
         "ai_warm_start": True,
-        "ai_learn_per_action": 2,
         "ai_lookahead": True,
+        "ai_lookahead_depth": 3,
         "ai_soft_drop": True,
     }
 
@@ -107,6 +109,7 @@ class HyperparamMenuState(MenuBase):
         ("ai_warm_start", lambda v: "ON" if v else "OFF"),
         ("ai_learn_per_action", str),
         ("ai_lookahead", lambda v: "ON" if v else "OFF"),
+        ("ai_lookahead_depth", str),
         ("ai_soft_drop", lambda v: "ON" if v else "OFF"),
     ]
 
@@ -153,7 +156,9 @@ class HyperparamMenuState(MenuBase):
             m.ai_learn_per_action = max(1, min(8, m.ai_learn_per_action + direction))
         elif s == 11:  # Look-ahead
             m.ai_lookahead = not m.ai_lookahead
-        elif s == 12:  # Soft-drop
+        elif s == 12:  # Prof. lookahead
+            m.ai_lookahead_depth = max(1, min(3, m.ai_lookahead_depth + direction))
+        elif s == 13:  # Soft-drop
             m.ai_soft_drop = not m.ai_soft_drop
 
     def _save(self) -> None:
@@ -163,12 +168,12 @@ class HyperparamMenuState(MenuBase):
         return self.ai_menu
 
     def _on_select(self) -> State | None:
-        if self.selection == 13:  # Réinitialiser
+        if self.selection == 14:  # Réinitialiser
             for attr, val in self._DEFAULTS.items():
                 setattr(self.menu, attr, val)
             self.menu.save_settings()
             return None
-        if self.selection == 14:  # Retour
+        if self.selection == 15:  # Retour
             return self.ai_menu
         return None
     # --- Custom table draw ------------------------------------------------

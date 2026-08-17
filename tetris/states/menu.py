@@ -72,7 +72,10 @@ class MenuState(MenuBase):
         self.ai_warm_start = True
         self.ai_learn_per_action = 2
         self.ai_lookahead = True
+        self.ai_lookahead_depth = 3
         self.ai_soft_drop = True
+
+        # DEFAULT_KEYBINDS imported locally to avoid circular import at module load.
         from tetris.settings import DEFAULT_KEYBINDS
 
         self.keybinds: dict[str, int] = dict(DEFAULT_KEYBINDS)
@@ -102,6 +105,7 @@ class MenuState(MenuBase):
         "ai_warm_start": "ai_warm_start",
         "ai_learn_per_action": "ai_learn_per_action",
         "ai_lookahead": "ai_lookahead",
+        "ai_lookahead_depth": "ai_lookahead_depth",
         "ai_soft_drop": "ai_soft_drop",
         "ghost_piece": "ghost_piece",
         "preview_count": "preview_count",
@@ -230,6 +234,7 @@ class MenuState(MenuBase):
             curriculum_epsilon=self.ai_curriculum_epsilon,
             warm_start=self.ai_warm_start,
             lookahead=self.ai_lookahead,
+            lookahead_depth=self.ai_lookahead_depth,
             soft_drop=self.ai_soft_drop,
             preview_count=self.preview_count,
             debug=self.debug,

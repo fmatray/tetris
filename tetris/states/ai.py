@@ -45,6 +45,7 @@ from tetris.settings import (
     CURRICULUM_ORDER,
     HUD_POSITIONS,
     LEARN_PER_ACTION,
+    LOCK_DELAY_MS,
     LOG_PATH,
     MODEL_PATH,
     RED,
@@ -96,6 +97,7 @@ class AIState(GameState):
         warm_start: bool = True,
         learn_per_action: int = LEARN_PER_ACTION,
         lookahead: bool = True,
+        lookahead_depth: int = 3,
         soft_drop: bool = True,
         preview_count: int = 3,
         debug: bool = False,
@@ -131,8 +133,8 @@ class AIState(GameState):
             warm_start: Use Dellacherie values for warm-start selection.
             learn_per_action: Gradient updates per locked piece.
             lookahead: Enable chained look-ahead through preview pieces.
+            lookahead_depth: Number of upcoming pieces to simulate (1–3).
             soft_drop: Use soft-drop BFS for candidate generation.
-            preview_count: Number of next pieces (0, 1, or 3).
             debug: Enable debug overlays.
         """
         # Curriculum: restrict piece pool BEFORE super().__init__() spawns pieces
@@ -155,6 +157,7 @@ class AIState(GameState):
         self.ai_mode = ai_mode
         self.learn_per_action = learn_per_action
         self.lookahead = lookahead
+        self.lookahead_depth = lookahead_depth
         self.soft_drop = soft_drop
         # Candidate placements: [(rot, px, py, hold), ...]
         self._candidate_placements: list[tuple[int, int, int, bool]] = []
@@ -234,7 +237,7 @@ class AIState(GameState):
         """Simulate placement, extract features, append to candidate lists."""
         sim_grid, lines_cleared = place_and_clear(base_grid, shape, px, py)
         if self.lookahead:
-            for pt in upcoming_types:
+            for pt in upcoming_types[:self.lookahead_depth]:
                 sim_grid = self._best_next_placement(sim_grid, pt)
         mask, first_row, heights = compute_height_metrics(sim_grid)
         next_piece_type = upcoming_types[0] if upcoming_types else "I"
@@ -421,7 +424,9 @@ class AIState(GameState):
         """Select and execute one AI macro-action per piece, then run gravity.
 
         In ``"normal"`` speed, throttles decisions to ~80ms. In ``"fast"``,
-        acts immediately. Calls ``super().update`` for gravity/lock-delay.
+        acts immediately. In learning mode, fast-forwards lock delay when the
+        piece is grounded (no re-selection possible). Calls ``super().update``
+        for gravity/lock-delay.
 
         Returns a new :class:`State` on episode end, or ``None``.
         """
@@ -445,6 +450,11 @@ class AIState(GameState):
                 self._prev_action = actions[chosen_idx]
                 self.episode_steps += 1
                 self._execute_macro_action(actions[chosen_idx])
+
+        # Learning mode: fast-forward lock delay — piece is already positioned,
+        # _prev_action blocks re-selection, so 500ms wait is pure overhead.
+        if self.ai_mode == "learning" and self._grounded and self._prev_action is not None:
+            self._lock_timer = LOCK_DELAY_MS
 
         # Natural gravity drop (inherited from GameState.update)
         new_state = super().update(dt, particles)

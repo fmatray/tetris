@@ -94,8 +94,8 @@ classDiagram
             +ai_warm_start: bool
             +ai_learn_per_action: int
             +ai_lookahead: bool
+            +ai_lookahead_depth: int
             +ai_soft_drop: bool
-            +keybinds: dict~str, int~
             +__init__(screen, font, audio) None
             - _load_settings() None
             +save_settings() None
@@ -296,6 +296,7 @@ classDiagram
             +ai_mode: str
             +learn_per_action: int
             +lookahead: bool
+            +lookahead_depth: int
             +soft_drop: bool
             - _candidate_placements: list~tuple~int, int, int, bool~~
             - _handicap: int
@@ -313,7 +314,7 @@ classDiagram
             - _curriculum_types: list~str~ | None
             - _curriculum_level: int
             - _curriculum_episode_count: int
-            +__init__(screen, font, audio, handicap, sound_volume, music_volume, music_song, piece_provider, speed, menu, epsilon_decay, epsilon_end, lr, gamma, batch_size, buffer_size, ai_mode, curriculum, curriculum_freq, curriculum_epsilon, warm_start, learn_per_action, lookahead, soft_drop, preview_count, debug) None
+            +__init__(screen, font, audio, handicap, sound_volume, music_volume, music_song, piece_provider, speed, menu, epsilon_decay, epsilon_end, lr, gamma, batch_size, buffer_size, ai_mode, curriculum, curriculum_freq, curriculum_epsilon, warm_start, learn_per_action, lookahead, lookahead_depth, soft_drop, preview_count, debug) None
             - _is_valid_placement(piece, rotation: int, column: int) bool
             - _best_next_placement(grid: np.ndarray, piece_type: str) np.ndarray
             - _add_candidate(base_grid, shape, px, py, rot, upcoming_types, candidates, actions, dellacherie_values, hold: bool) None

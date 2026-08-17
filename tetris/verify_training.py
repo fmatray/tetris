@@ -41,7 +41,11 @@ def run_training(n_episodes: int) -> None:
     font = get_small_font()
     audio = AudioManager(sound_volume=0, music_volume=0)
 
-    state = AIState(screen, font, audio, 0, sound_volume=0, music_volume=0)
+    state = AIState(
+        screen, font, audio, 0,
+        sound_volume=0, music_volume=0,
+        lookahead_depth=1, preview_count=1,
+    )
     particles = ParticleSystem()
     initial_episodes = state.log.total_episodes
     target = initial_episodes + n_episodes
