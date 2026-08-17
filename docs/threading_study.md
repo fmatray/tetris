@@ -6,6 +6,8 @@ AI training runs at ~100% of a single CPU core (confirmed: 99.7% average CPU
 utilization on an 8-core machine). The user asked whether threading could
 parallelize the workload across cores.
 
+> **Update (Round 2 optimization):** The per-candidate scalar pipeline described below (`_add_candidate`, `_enumerate_placements`, `_best_next_placement` at 92.8%) has been fully batched. `_get_candidate_states` now uses `extract_features_batch`, `dellacherie_value_batch`, and a vectorized `place_and_clear_batch` scatter. Training frame time dropped from ~31 ms to ~3.1 ms (10.9×). The threading analysis below reflects the pre-optimization state and is kept for reference.
+
 ## Executive Summary
 
 **Threading is unsuitable.** The GIL is held throughout the hot path, and

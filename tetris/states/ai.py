@@ -24,12 +24,10 @@ import pygame
 from tetris.ai.agent import DQNAgent
 from tetris.ai.rewards import (
     board_to_grid,
-    compute_height_metrics,
     compute_reward,
-    dellacherie_value,
     dellacherie_value_batch,
     extract_features,
-    place_and_clear,
+    extract_features_batch,
     place_and_clear_batch,
 )
 from tetris.ai.trainer import TrainingLog
@@ -242,30 +240,10 @@ class AIState(GameState):
         best_idx = int(np.argmin(vals))
         return sim_grids[best_idx]
 
-    def _add_candidate(self, base_grid, shape, px, py, rot, upcoming_types,
-                       candidates, actions, dellacherie_values, hold=False):
-        """Simulate placement, extract features, append to candidate lists."""
-        sim_grid, lines_cleared = place_and_clear(base_grid, shape, px, py)
-        if self.lookahead:
-            for pt in upcoming_types[:self.lookahead_depth]:
-                sim_grid = self._best_next_placement(sim_grid, pt)
-        mask, first_row, heights = compute_height_metrics(sim_grid)
-        next_piece_type = upcoming_types[0] if upcoming_types else "I"
-        candidates.append(
-            extract_features(sim_grid, lines_cleared, next_piece_type, mask, first_row, heights)
-        )
-        actions.append(len(self._candidate_placements))
-        self._candidate_placements.append((rot, px, py, hold))
-        dellacherie_values.append(dellacherie_value(sim_grid, heights, mask, first_row))
-
-    def _enumerate_placements(self, base_grid, piece_type, upcoming_types, hold,
-                              candidates, actions, dellacherie_values):
-        """Enumerate placements for a piece type and append to candidate lists."""
+    def _gen_placements(self, base_grid: np.ndarray, piece_type: str):
+        """Yield (shape, px, py, rot) for all valid placements of a piece type."""
         if self.soft_drop:
-            placements = soft_drop_placements(base_grid, piece_type)
-            for shape, px, py, rot in placements:
-                self._add_candidate(base_grid, shape, px, py, rot, upcoming_types,
-                                    candidates, actions, dellacherie_values, hold=hold)
+            yield from soft_drop_placements(base_grid, piece_type)
         else:
             num_rots = len(SHAPES[piece_type])
             for rot in range(NUM_ROTATIONS):
@@ -283,8 +261,7 @@ class AIState(GameState):
                     py = hard_drop_y(base_grid, shape, px)
                     if py < 0:
                         continue
-                    self._add_candidate(base_grid, shape, px, py, rot, upcoming_types,
-                                        candidates, actions, dellacherie_values, hold=hold)
+                    yield (shape, px, py, rot)
 
     def _get_candidate_states(self) -> tuple[np.ndarray, list[int], np.ndarray]:
         """Enumerate valid placements, simulate drop + line clear, extract features.
@@ -293,42 +270,71 @@ class AIState(GameState):
         action_id = placement index (0..N-1). Placements stored in
         self._candidate_placements as [(rot, px, py, hold), ...].
         Includes hold candidates when ``_can_hold`` is True.
+
+        Batched: collects all placements first, then runs place_and_clear_batch,
+        lookahead, extract_features_batch, and dellacherie_value_batch in two
+        vectorized passes instead of per-candidate scalar calls.
         """
         piece = self.current_piece
         base_grid = board_to_grid(self.board)
         upcoming_types = [self.next_piece.type] + [p.type for p in self.preview_pieces]
 
-        candidates = []
-        actions = []
-        dellacherie_values = []
-        self._candidate_placements = []
+        all_shapes: list[list[tuple[int, int]]] = []
+        all_pxs: list[int] = []
+        all_pys: list[int] = []
+        all_rots: list[int] = []
+        all_holds: list[bool] = []
+        all_next_piece_types: list[str] = []
 
         # Non-hold candidates: place current piece
-        self._enumerate_placements(base_grid, piece.type, upcoming_types, False,
-                                   candidates, actions, dellacherie_values)
+        for shape, px, py, rot in self._gen_placements(base_grid, piece.type):
+            all_shapes.append(shape)
+            all_pxs.append(px)
+            all_pys.append(py)
+            all_rots.append(rot)
+            all_holds.append(False)
+            all_next_piece_types.append(upcoming_types[0] if upcoming_types else "I")
 
         # Hold candidates (if can hold): place the held/next piece instead
         if self._can_hold:
             if self.hold_piece is not None:
                 # Swap: current → hold, held → current. Next unchanged.
-                self._enumerate_placements(base_grid, self.hold_piece.type,
-                                           upcoming_types, True,
-                                           candidates, actions, dellacherie_values)
+                hold_upcoming = upcoming_types
             else:
                 # No held piece: current → hold, next → current, preview shifts.
-                new_upcoming = [p.type for p in self.preview_pieces]
-                self._enumerate_placements(base_grid, self.next_piece.type,
-                                           new_upcoming, True,
-                                           candidates, actions, dellacherie_values)
+                hold_upcoming = [p.type for p in self.preview_pieces]
+            hold_piece_type = self.hold_piece.type if self.hold_piece else self.next_piece.type
+            for shape, px, py, rot in self._gen_placements(base_grid, hold_piece_type):
+                all_shapes.append(shape)
+                all_pxs.append(px)
+                all_pys.append(py)
+                all_rots.append(rot)
+                all_holds.append(True)
+                all_next_piece_types.append(hold_upcoming[0] if hold_upcoming else "I")
 
-        if not candidates:
+        if not all_shapes:
+            self._candidate_placements = []
             return np.empty((0, 17), dtype=np.float32), [], np.empty(0, dtype=np.float32)
 
-        return (
-            np.array(candidates, dtype=np.float32),
-            actions,
-            np.array(dellacherie_values, dtype=np.float32),
+        self._candidate_placements = list(zip(all_rots, all_pxs, all_pys, all_holds))
+
+        # Batch place + clear
+        sim_grids, lines_cleared = place_and_clear_batch(
+            base_grid, all_shapes, all_pxs, all_pys
         )
+
+        # Lookahead (per-candidate — each depends on its own sim_grid)
+        if self.lookahead:
+            for i in range(len(all_shapes)):
+                for pt in upcoming_types[:self.lookahead_depth]:
+                    sim_grids[i] = self._best_next_placement(sim_grids[i], pt)
+
+        # Batch feature extraction + Dellacherie
+        candidates = extract_features_batch(sim_grids, lines_cleared, all_next_piece_types)
+        dellacherie_values = dellacherie_value_batch(sim_grids)
+
+        actions = list(range(len(all_shapes)))
+        return candidates, actions, dellacherie_values
 
     # --- Macro-action execution -----------------------------------------
 

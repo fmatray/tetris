@@ -317,8 +317,7 @@ classDiagram
             +__init__(screen, font, audio, handicap, sound_volume, music_volume, music_song, piece_provider, speed, menu, epsilon_decay, epsilon_end, lr, gamma, batch_size, buffer_size, ai_mode, curriculum, curriculum_freq, curriculum_epsilon, warm_start, learn_per_action, lookahead, lookahead_depth, soft_drop, preview_count, debug) None
             - _is_valid_placement(piece, rotation: int, column: int) bool
             - _best_next_placement(grid: np.ndarray, piece_type: str) np.ndarray
-            - _add_candidate(base_grid, shape, px, py, rot, upcoming_types, candidates, actions, dellacherie_values, hold: bool) None
-            - _enumerate_placements(base_grid, piece_type, upcoming_types, hold, candidates, actions, dellacherie_values) None
+            - _gen_placements(base_grid: np.ndarray, piece_type: str) Generator
             - _get_candidate_states() tuple~np.ndarray, list~int~, np.ndarray~
             - _execute_macro_action(action: int) None
             - _lock_and_spawn(hard_drop: bool) tuple~int, list~

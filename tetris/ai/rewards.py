@@ -134,12 +134,11 @@ def count_holes(grid: np.ndarray, mask: np.ndarray | None = None,
     if first_row is None:
         first_row = np.argmax(mask, axis=0)
     # Vectorized: for each column, count empty cells below the topmost filled cell.
-    total = 0
-    for x in range(BOARD_WIDTH):
-        if not mask[:, x].any():
-            continue
-        total += int((~mask[first_row[x]:, x]).sum())
-    return total
+    any_filled = mask.any(axis=0)
+    row_idx = np.arange(BOARD_HEIGHT).reshape(-1, 1)
+    below_first = row_idx >= first_row
+    holes = below_first & ~mask & any_filled
+    return int(holes.sum())
 
 
 def aggregate_height(grid: np.ndarray, heights: np.ndarray | None = None) -> int:
@@ -187,13 +186,14 @@ def wells(grid: np.ndarray, heights: np.ndarray | None = None) -> int:
     """
     if heights is None:
         heights = column_heights(grid)
-    total = 0
-    for i in range(BOARD_WIDTH):
-        left = heights[i - 1] if i > 0 else BOARD_HEIGHT
-        right = heights[i + 1] if i < BOARD_WIDTH - 1 else BOARD_HEIGHT
-        depth = max(0, int(min(left, right) - heights[i]))
-        total += depth * (depth + 1) // 2
-    return total
+    left_h = np.empty_like(heights)
+    right_h = np.empty_like(heights)
+    left_h[0] = BOARD_HEIGHT
+    left_h[1:] = heights[:-1]
+    right_h[-1] = BOARD_HEIGHT
+    right_h[:-1] = heights[1:]
+    depth = np.maximum(0, np.minimum(left_h, right_h) - heights)
+    return int((depth * (depth + 1) // 2).sum())
 
 
 def hole_depth(grid: np.ndarray, mask: np.ndarray | None = None,
@@ -203,14 +203,11 @@ def hole_depth(grid: np.ndarray, mask: np.ndarray | None = None,
         mask = grid > 0
     if first_row is None:
         first_row = np.argmax(mask, axis=0)
-    max_depth = 0
-    for x in range(BOARD_WIDTH):
-        col_mask = mask[:, x]
-        if not col_mask.any():
-            continue
-        depth = int((~col_mask[first_row[x]:]).sum())
-        max_depth = max(max_depth, depth)
-    return max_depth
+    any_filled = mask.any(axis=0)
+    row_idx = np.arange(BOARD_HEIGHT).reshape(-1, 1)
+    below_first = row_idx >= first_row
+    holes = below_first & ~mask & any_filled
+    return int(holes.sum(axis=0).max())
 
 
 def rows_with_holes(grid: np.ndarray, mask: np.ndarray | None = None,
@@ -220,13 +217,11 @@ def rows_with_holes(grid: np.ndarray, mask: np.ndarray | None = None,
         mask = grid > 0
     if first_row is None:
         first_row = np.argmax(mask, axis=0)
-    holes_per_col = np.zeros_like(mask)
-    for x in range(BOARD_WIDTH):
-        col_mask = mask[:, x]
-        if not col_mask.any():
-            continue
-        holes_per_col[first_row[x]:, x] = ~col_mask[first_row[x]:]
-    return int(np.any(holes_per_col, axis=1).sum())
+    any_filled = mask.any(axis=0)
+    row_idx = np.arange(BOARD_HEIGHT).reshape(-1, 1)
+    below_first = row_idx >= first_row
+    holes = below_first & ~mask & any_filled
+    return int(holes.any(axis=1).sum())
 
 
 def normalize_features(features: np.ndarray) -> np.ndarray:
@@ -350,6 +345,67 @@ def dellacherie_value_batch(grids: np.ndarray) -> np.ndarray:
     )
     return vals * non_empty
 
+def extract_features_batch(
+    grids: np.ndarray,
+    lines_cleared: np.ndarray,
+    next_piece_types: list[str],
+) -> np.ndarray:
+    """Batch extract 17-dim DT-20 features for N grids (vectorized).
+
+    Same layout as :func:`extract_features`:
+    [lines_cleared, holes, aggregate_height, bumpiness, max_height,
+     row_transitions, column_transitions, wells, hole_depth,
+     rows_with_holes, *one_hot_piece(7)]
+
+    Args:
+        grids: ``(N, H, W)`` array of post-placement board states.
+        lines_cleared: ``(N,)`` int array.
+        next_piece_types: list of N piece-type strings.
+
+    Returns:
+        ``(N, 17)`` float32 array, normalized via FEATURE_MEANS/FEATURE_STDS.
+    """
+    N = grids.shape[0]
+    mask = grids > 0                                       # (N, H, W)
+    any_filled = mask.any(axis=1)                          # (N, W)
+    first_row = np.argmax(mask, axis=1)                   # (N, W)
+    heights = (BOARD_HEIGHT - first_row) * any_filled      # (N, W)
+    row_idx = np.arange(BOARD_HEIGHT).reshape(1, BOARD_HEIGHT, 1)
+    below_first = row_idx >= first_row[:, None, :]         # (N, H, W)
+    holes = below_first & ~mask & any_filled[:, None, :]
+    holes_count = holes.sum(axis=(1, 2))                  # (N,)
+    agg_height = heights.sum(axis=1)                       # (N,)
+    bumpiness = np.abs(np.diff(heights, axis=1)).sum(axis=1)  # (N,)
+    max_h = heights.max(axis=1)                            # (N,)
+    binary = mask.astype(np.int8)
+    row_trans = np.abs(binary[:, :, :-1] - binary[:, :, 1:]).sum(axis=(1, 2))
+    row_trans += np.abs(1 - binary[:, :, 0]).sum(axis=1)
+    row_trans += np.abs(binary[:, :, -1] - 1).sum(axis=1)
+    col_trans = np.abs(binary[:, :-1, :] - binary[:, 1:, :]).sum(axis=(1, 2))
+    col_trans += np.abs(binary[:, -1, :] - 1).sum(axis=1)
+    left_h = np.empty_like(heights)
+    right_h = np.empty_like(heights)
+    left_h[:, 0] = BOARD_HEIGHT
+    left_h[:, 1:] = heights[:, :-1]
+    right_h[:, -1] = BOARD_HEIGHT
+    right_h[:, :-1] = heights[:, 1:]
+    well_depth = np.maximum(0, np.minimum(left_h, right_h) - heights)
+    wells_score = (well_depth * (well_depth + 1) // 2).sum(axis=1)
+    holes_per_col = holes.sum(axis=1)                     # (N, W)
+    hole_depth_score = holes_per_col.max(axis=1)           # (N,)
+    rows_with_holes_count = holes.any(axis=2).sum(axis=1)
+    board_features = np.stack([
+        lines_cleared.astype(np.float64),
+        holes_count, agg_height, bumpiness, max_h,
+        row_trans, col_trans, wells_score,
+        hole_depth_score, rows_with_holes_count,
+    ], axis=1)                                            # (N, 10)
+    one_hot = np.zeros((N, len(PIECE_TYPES)), dtype=np.float64)
+    for i, pt in enumerate(next_piece_types):
+        one_hot[i, PIECE_TYPES.index(pt)] = 1.0
+    features = np.concatenate([board_features, one_hot], axis=1)  # (N, 17)
+    return ((features - FEATURE_MEANS) / FEATURE_STDS).astype(np.float32)
+
 
 # --- Simulation helpers (AI.md §3) -----------------------------------
 
@@ -387,8 +443,20 @@ def place_and_clear_batch(
     """
     N = len(shapes)
     batch = np.repeat(grid[np.newaxis], N, axis=0)
+    # Vectorized scatter: flatten all (candidate, cell) pairs into parallel arrays
+    all_rows = []
+    all_cols = []
+    all_batch_idx = []
     for i in range(N):
-        place_cells(batch[i], shapes[i], x_positions[i], y_positions[i], 1.0)
+        x, y = x_positions[i], y_positions[i]
+        for bx, by in shapes[i]:
+            cx, cy = x + bx, y + by
+            if 0 <= cx < BOARD_WIDTH and 0 <= cy < BOARD_HEIGHT:
+                all_rows.append(cy)
+                all_cols.append(cx)
+                all_batch_idx.append(i)
+    if all_rows:
+        batch[np.array(all_batch_idx), np.array(all_rows), np.array(all_cols)] = 1.0
     mask = batch > 0
     full = mask.all(axis=2)                                # (N, H)
     lines = full.sum(axis=1).astype(np.int32)               # (N,)

@@ -158,6 +158,44 @@ def test_place_and_clear_batch_preserves_input():
     place_and_clear_batch(grid, [shape], xs, [py])
     assert np.array_equal(grid, grid_copy)
 
+def test_place_and_clear_batch_multi_candidates_nonempty():
+    """Multiple candidates on non-empty board: scatter matches per-candidate scalar."""
+    rng = np.random.default_rng(99)
+    grid = _empty_grid()
+    # Partially fill bottom 3 rows with gaps
+    for y in range(BOARD_HEIGHT - 3, BOARD_HEIGHT):
+        for x in range(BOARD_WIDTH):
+            if rng.random() > 0.4:
+                grid[y, x] = 1.0
+    grid_copy = grid.copy()
+    # Collect multiple placements for I-piece (2 rotations) and T-piece
+    shapes = []
+    xs = []
+    pys = []
+    for pt in ("I", "T", "L"):
+        for rot in range(len(SHAPES[pt])):
+            shape = SHAPES[pt][rot]
+            min_bx = min(bx for bx, _ in shape)
+            max_bx = max(bx for bx, _ in shape)
+            for col in range(BOARD_WIDTH):
+                px = col - min_bx
+                if px < 0 or px + max_bx >= BOARD_WIDTH:
+                    continue
+                py = hard_drop_y(grid, shape, px)
+                if py < 0:
+                    continue
+                shapes.append(shape)
+                xs.append(px)
+                pys.append(py)
+    assert len(shapes) > 10  # ensure we test many candidates
+    batch_grids, batch_lines = place_and_clear_batch(grid, shapes, xs, pys)
+    for i in range(len(shapes)):
+        sg, sl = place_and_clear(grid_copy, shapes[i], xs[i], pys[i])
+        assert int(batch_lines[i]) == int(sl), f"candidate {i} lines mismatch"
+        assert np.array_equal(batch_grids[i], sg), f"candidate {i} grid mismatch"
+    # Base grid not mutated
+    assert np.array_equal(grid, grid_copy)
+
 
 # --- _best_next_placement batch equivalence -------------------------
 
