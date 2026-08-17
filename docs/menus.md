@@ -4,14 +4,8 @@
 
 ```
 Menu principal
+├── Démarrer le jeu               [ENTER]          → lance la partie (Humain ou IA selon Joueur)
 ├── Joueur                        [toggle ◄ ►]     Humain ↔ IA
-├── Son                           [toggle ◄ ►]     ON ↔ OFF
-├── Règles du jeu                 [ENTER]          → game rules submenu
-│   └── Générateur                [toggle ◄ ►]     Aléatoire ↔ 7-bag ↔ 35-bag ↔ Pondéré
-│       Prévisualisation          [toggle ◄ ►]     Désactivé ↔ 1 pièce ↔ 3 pièces
-│       Handicap                  [toggle ◄ ►]     0–5
-│       Retour                    [ENTER | ESC]
-├── Débogage                      [toggle ◄ ►]     ON ↔ OFF
 ├── Humain                        [ENTER]          (grisé si Joueur=IA)
 │   └── Mode                      [toggle ◄ ►]     Normal ↔ Replay
 │       Fantôme                   [toggle ◄ ►]     ON ↔ OFF
@@ -40,6 +34,19 @@ Menu principal
 │       Statistiques              [ENTER]          → stats + graph (une page)
 │       Réinitialiser IA          [ENTER ×2]       supprime modèle + log
 │       Retour                    [ENTER | ESC]
+├── Règles du jeu                 [ENTER]          → game rules submenu
+│   └── Générateur                [toggle ◄ ►]     Aléatoire ↔ 7-bag ↔ 35-bag ↔ Pondéré
+│       Prévisualisation          [toggle ◄ ►]     Désactivé ↔ 1 pièce ↔ 3 pièces
+│       Handicap                  [toggle ◄ ►]     0–5
+│       Retour                    [ENTER | ESC]
+├── Leaderboard                   [ENTER]          → top 10 scores
+├── Audio                         [ENTER]          → audio submenu
+│   └── Son                       [toggle ◄ ►]     Off ↔ Faible ↔ Moitié ↔ Max
+│       Musique                   [toggle ◄ ►]     Off ↔ Faible ↔ Moitié ↔ Max
+│       Morceau                   [toggle ◄ ►]     Korobeiniki ↔ Kalinka
+│       Retour                    [ENTER | ESC]
+├── Débogage                      [toggle ◄ ►]     ON ↔ OFF
+└── Quitter                       [ENTER | ESC]
 ```
 
 ## Animation de fond
