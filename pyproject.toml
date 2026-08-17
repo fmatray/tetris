@@ -38,6 +38,9 @@ dev = [
     "pytest>=7.0",
     "ruff>=0.6",
     "zuban>=0.9",
+    "line-profiler>=4.0",
+    "memory-profiler>=0.61",
+    "py-spy>=0.4",
 ]
 
 [project.scripts]
