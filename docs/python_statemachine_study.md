@@ -248,12 +248,12 @@ This is a **UI list navigation pattern**, not a state machine pattern. It handle
 
 ```python
 class AIState(GameState):
-    # Inherits: board, stats, renderer, _tick, _lock_and_spawn, _on_piece_moved
+    # Inherits: board, stats, renderer, update, _lock_and_spawn, _on_piece_moved
     # Overrides: handle_event (ESC only), update (AI decisions), draw (HUD overlay)
     # Adds: agent, training_log, _select_action, _get_candidate_states, _reset_episode
 ```
 
-python-statemachine has no inheritance mechanism for states. `human_playing` and `ai_playing` would be **sibling states** with shared callbacks, or a **compound state** with internal transitions. The shared gameplay logic (`_tick`, `_lock_and_spawn`, `_on_piece_moved`) would need to be extracted to standalone functions or mixed into the model.
+python-statemachine has no inheritance mechanism for states. `human_playing` and `ai_playing` would be **sibling states** with shared callbacks, or a **compound state** with internal transitions. The shared gameplay logic (`update`, `_lock_and_spawn`, `_on_piece_moved`) would need to be extracted to standalone functions or mixed into the model.
 
 **Impact**: The clean Open/Closed inheritance is lost. Shared logic moves from inheritance to composition or free functions.
 

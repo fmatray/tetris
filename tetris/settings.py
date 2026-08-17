@@ -20,6 +20,7 @@ GHOST_OUTLINE_WIDTH = 2  # pixel width of ghost piece outline
 BOARD_WIDTH = 10
 BOARD_HEIGHT = 22   # total rows (2 hidden buffer + 20 visible)
 VISIBLE_ROWS = 20   # rows rendered on screen (rows 0-1 are hidden)
+HIDDEN_ROWS = BOARD_HEIGHT - VISIBLE_ROWS  # 2 buffer rows above the visible field
 
 # Colors
 BLACK = (0, 0, 0)
@@ -88,7 +89,13 @@ TSPIN_POINTS = {0: 100, 1: 200, 2: 400, 3: 800, 4: 1200}
 
 # Back-to-Back: consecutive T-Spin or Tetris (4-line clear) gets ×1.5
 B2B_MULTIPLIER = 1.5
-
+# Piece generator labels (French UI)
+GENERATOR_LABELS = {
+    "random": "Aléatoire",
+    "7bag": "7-bag",
+    "35bag": "35-bag",
+    "weighted": "Pondéré",
+}
 # --- SRS wall kick data (https://tetris.wiki/Super_Rotation_System) ---------
 # Format: {(from_state, to_state): [(dx, dy), ...]}
 # dx: horizontal offset, dy: vertical offset (positive = up, screen y inverted)

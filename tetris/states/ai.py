@@ -206,6 +206,21 @@ class AIState(GameState):
         px = column - min_bx
         return rules.shape_fits(self.board.grid, shape, px, 0)
 
+    @staticmethod
+    def _iter_column_positions(piece_type: str):
+        """Yield (shape, rot, px) for every (rotation, column) that fits the board width."""
+        num_rots = len(SHAPES[piece_type])
+        for rot in range(NUM_ROTATIONS):
+            if rot >= num_rots:
+                continue
+            shape = SHAPES[piece_type][rot]
+            min_bx = min(bx for bx, _ in shape)
+            max_bx = max(bx for bx, _ in shape)
+            for col in range(BOARD_WIDTH):
+                px = col - min_bx
+                if px < 0 or px + max_bx >= BOARD_WIDTH:
+                    continue
+                yield shape, rot, px
     def _best_next_placement(self, grid: np.ndarray, piece_type: str) -> np.ndarray:
         """Simulate best placement of next piece on grid (2-piece look-ahead).
 
@@ -215,17 +230,9 @@ class AIState(GameState):
         """
         shapes: list[list[tuple[int, int]]] = []
         x_positions: list[int] = []
-        num_rots = len(SHAPES[piece_type])
-        for rot in range(num_rots):
-            shape = SHAPES[piece_type][rot]
-            min_bx = min(bx for bx, _ in shape)
-            max_bx = max(bx for bx, _ in shape)
-            for col in range(BOARD_WIDTH):
-                px = col - min_bx
-                if px < 0 or px + max_bx >= BOARD_WIDTH:
-                    continue
-                shapes.append(shape)
-                x_positions.append(px)
+        for shape, _rot, px in self._iter_column_positions(piece_type):
+            shapes.append(shape)
+            x_positions.append(px)
         if not shapes:
             return grid
         py_batch = hard_drop_y_batch(grid, shapes, x_positions)
@@ -245,23 +252,13 @@ class AIState(GameState):
         if self.soft_drop:
             yield from soft_drop_placements(base_grid, piece_type)
         else:
-            num_rots = len(SHAPES[piece_type])
-            for rot in range(NUM_ROTATIONS):
-                if rot >= num_rots:
+            for shape, rot, px in self._iter_column_positions(piece_type):
+                if not rules.shape_fits(base_grid, shape, px, 0):
                     continue
-                shape = SHAPES[piece_type][rot]
-                min_bx = min(bx for bx, _ in shape)
-                max_bx = max(bx for bx, _ in shape)
-                for col in range(BOARD_WIDTH):
-                    px = col - min_bx
-                    if px < 0 or px + max_bx >= BOARD_WIDTH:
-                        continue
-                    if not rules.shape_fits(base_grid, shape, px, 0):
-                        continue
-                    py = hard_drop_y(base_grid, shape, px)
-                    if py < 0:
-                        continue
-                    yield (shape, px, py, rot)
+                py = hard_drop_y(base_grid, shape, px)
+                if py < 0:
+                    continue
+                yield (shape, px, py, rot)
 
     def _get_candidate_states(self) -> tuple[np.ndarray, list[int], np.ndarray]:
         """Enumerate valid placements, simulate drop + line clear, extract features.

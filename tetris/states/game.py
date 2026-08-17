@@ -18,7 +18,6 @@ from tetris.game.tetromino import Tetromino
 from tetris.logger import get_logger
 from tetris.settings import (
     BLOCK_SIZE,
-    BOARD_HEIGHT,
     BOARD_OFFSET_X,
     BOARD_OFFSET_Y,
     DAS_DELAY_MS,
@@ -26,13 +25,13 @@ from tetris.settings import (
     DROP_BASE,
     DROP_MIN_INTERVAL,
     DROP_STEP,
+    HIDDEN_ROWS,
     LOCK_DELAY_MS,
     LOCK_DELAY_RESETS,
     MUSIC_BASE_SPEED,
     MUSIC_MAX_SPEED,
     MUSIC_SPEED_PER_LEVEL,
     SOFT_DROP_FACTOR,
-    VISIBLE_ROWS,
 )
 from tetris.states.base import State
 from tetris.visuals.particles import ParticleSystem
@@ -207,7 +206,7 @@ class GameState(State):
     def _lock_and_spawn(self, hard_drop: bool = False) -> tuple[int, list]:
         """Lock current piece, update stats, spawn next. Returns (cleared, rows_data)."""
         locked_blocks = self.current_piece.get_blocks()
-        hidden = BOARD_HEIGHT - VISIBLE_ROWS
+        hidden = HIDDEN_ROWS
         # Top-out: piece locked entirely above the visible field
         if all(y < hidden for _, y in locked_blocks):
             self.game_over = True
@@ -348,24 +347,8 @@ class GameState(State):
             return self._do_game_over()  # type: ignore[unreachable]
         return None
 
-    def _tick(self, particles: ParticleSystem) -> None:
-        """Legacy gravity tick — kept for AIState compatibility.
-
-        AIState calls super().update() which no longer uses _tick, but
-        _execute_macro_action calls _lock_and_spawn directly.
-        """
-        if self.board.is_valid_move(self.current_piece, dy=1):
-            self.current_piece.move(0, 1)
-            if self.down_pressed:
-                self.stats.add_soft_drop(1)
-            return
-
-        cleared, rows_data = self._lock_and_spawn()
-        if cleared > 0:
-            self._emit_line_particles(particles, rows_data)
-
     def _emit_line_particles(self, particles: ParticleSystem, rows_data) -> None:
-        hidden = BOARD_HEIGHT - VISIBLE_ROWS
+        hidden = HIDDEN_ROWS
         for r_idx, colors in rows_data:
             for c_idx, col in enumerate(colors):
                 particles.emit(

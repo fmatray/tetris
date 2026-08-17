@@ -6,7 +6,7 @@ rendered identical tables. This module centralizes that logic.
 
 import pygame
 
-from tetris.settings import BLACK, GRAY, SCREEN_WIDTH, WHITE
+from tetris.settings import BLACK, GENERATOR_LABELS, GRAY, SCREEN_WIDTH, WHITE
 from tetris.storage import load_leaderboard
 from tetris.visuals.fonts import (
     CONTENT_Y,
@@ -17,10 +17,11 @@ from tetris.visuals.fonts import (
 )
 
 
-def draw_leaderboard(screen: pygame.Surface, font: pygame.font.Font) -> None:
+def draw_leaderboard(screen: pygame.Surface, font: pygame.font.Font, scores: list[dict] | None = None) -> None:
     """Render the top-10 leaderboard table onto *screen*."""
     screen.fill(BLACK)
-    scores = load_leaderboard()
+    if scores is None:
+        scores = load_leaderboard()
     title = get_large_font().render("TOP 10 LEADERBOARD", True, WHITE)
     screen.blit(title, (SCREEN_WIDTH // 2 - title.get_width() // 2, TITLE_Y))
     # Explicit pixel columns — proportional Arial breaks f-string padding.
@@ -52,7 +53,7 @@ def draw_leaderboard(screen: pygame.Surface, font: pygame.font.Font) -> None:
     # Data rows.
     for i, entry in enumerate(scores[:10], 1):
         y = CONTENT_Y + LINE_HEIGHT_SMALL + i * LINE_HEIGHT_SMALL
-        gen = {"7bag": "7-bag", "35bag": "35-bag"}.get(entry.get("generator", ""), "Aléatoire")
+        gen = GENERATOR_LABELS.get(entry.get("generator", ""), "Aléatoire")
         mode = entry.get("mode", "-") or "-"
         values = [
             str(i),

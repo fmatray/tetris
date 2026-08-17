@@ -294,23 +294,17 @@ def dellacherie_value(
         + DELLACHERIE_WEIGHTS["rows_with_holes"] * rows_with_holes(grid, mask, first_row)
     )
 
-def dellacherie_value_batch(grids: np.ndarray) -> np.ndarray:
-    """Batch Dellacherie evaluation for N grids at once.
+def _compute_board_metrics_batch(grids: np.ndarray) -> dict:
+    """Shared vectorized board metrics for batch functions.
 
-    Vectorized version of :func:`dellacherie_value` — computes all 6
-    board heuristics in a single numpy pass over stacked grids.
+    Computes mask, heights, holes, transitions, wells, and derived metrics
+    in a single pass. Used by :func:`dellacherie_value_batch` and
+    :func:`extract_features_batch`.
 
-    Args:
-        grids: ``(N, H, W)`` array of board states.
-
-    Returns:
-        ``(N,)`` float array of Dellacherie values. Empty grids → 0.0.
+    Returns a dict of ``(N,)`` or ``(N, W)`` arrays.
     """
-    N = grids.shape[0]
     mask = grids > 0                                   # (N, H, W)
     non_empty = mask.any(axis=(1, 2))                   # (N,)
-    if not non_empty.any():
-        return np.zeros(N, dtype=np.float64)
     any_filled = mask.any(axis=1)                       # (N, W)
     first_row = np.argmax(mask, axis=1)                # (N, W)
     heights = (BOARD_HEIGHT - first_row) * any_filled    # (N, W)
@@ -318,6 +312,9 @@ def dellacherie_value_batch(grids: np.ndarray) -> np.ndarray:
     below_first = row_idx >= first_row[:, None, :]      # (N, H, W)
     holes = below_first & ~mask & any_filled[:, None, :]
     holes_count = holes.sum(axis=(1, 2))                # (N,)
+    agg_height = heights.sum(axis=1)                    # (N,)
+    bumpiness = np.abs(np.diff(heights, axis=1)).sum(axis=1)
+    max_h = heights.max(axis=1)                         # (N,)
     binary = mask.astype(np.int8)
     row_trans = np.abs(binary[:, :, :-1] - binary[:, :, 1:]).sum(axis=(1, 2))
     row_trans += np.abs(1 - binary[:, :, 0]).sum(axis=1)    # left wall
@@ -333,17 +330,43 @@ def dellacherie_value_batch(grids: np.ndarray) -> np.ndarray:
     well_depth = np.maximum(0, np.minimum(left_h, right_h) - heights)
     wells_score = (well_depth * (well_depth + 1) // 2).sum(axis=1)
     holes_per_col = holes.sum(axis=1)                   # (N, W)
-    hole_depth_score = holes_per_col.max(axis=1)         # (N,)
+    hole_depth_score = holes_per_col.max(axis=1)        # (N,)
     rows_with_holes_count = holes.any(axis=2).sum(axis=1)
+    return {
+        "mask": mask, "non_empty": non_empty,
+        "holes_count": holes_count,
+        "agg_height": agg_height, "bumpiness": bumpiness, "max_h": max_h,
+        "row_trans": row_trans, "col_trans": col_trans,
+        "wells_score": wells_score,
+        "hole_depth_score": hole_depth_score,
+        "rows_with_holes_count": rows_with_holes_count,
+    }
+
+def dellacherie_value_batch(grids: np.ndarray) -> np.ndarray:
+    """Batch Dellacherie evaluation for N grids at once.
+    Vectorized version of :func:`dellacherie_value` — computes all 6
+    board heuristics in a single numpy pass over stacked grids.
+
+    Args:
+        grids: ``(N, H, W)`` array of board states.
+
+    Returns:
+        ``(N,)`` float array of Dellacherie values. Empty grids → 0.0.
+    """
+    N = grids.shape[0]
+    m = _compute_board_metrics_batch(grids)
+    if not m["non_empty"].any():
+        return np.zeros(N, dtype=np.float64)
     vals = (
-        DELLACHERIE_WEIGHTS["row_transitions"] * row_trans
-        + DELLACHERIE_WEIGHTS["column_transitions"] * col_trans
-        + DELLACHERIE_WEIGHTS["holes"] * holes_count
-        + DELLACHERIE_WEIGHTS["wells"] * wells_score
-        + DELLACHERIE_WEIGHTS["hole_depth"] * hole_depth_score
-        + DELLACHERIE_WEIGHTS["rows_with_holes"] * rows_with_holes_count
+        DELLACHERIE_WEIGHTS["row_transitions"] * m["row_trans"]
+        + DELLACHERIE_WEIGHTS["column_transitions"] * m["col_trans"]
+        + DELLACHERIE_WEIGHTS["holes"] * m["holes_count"]
+        + DELLACHERIE_WEIGHTS["wells"] * m["wells_score"]
+        + DELLACHERIE_WEIGHTS["hole_depth"] * m["hole_depth_score"]
+        + DELLACHERIE_WEIGHTS["rows_with_holes"] * m["rows_with_holes_count"]
     )
-    return vals * non_empty
+    return vals * m["non_empty"]
+
 
 def extract_features_batch(
     grids: np.ndarray,
@@ -366,39 +389,12 @@ def extract_features_batch(
         ``(N, 17)`` float32 array, normalized via FEATURE_MEANS/FEATURE_STDS.
     """
     N = grids.shape[0]
-    mask = grids > 0                                       # (N, H, W)
-    any_filled = mask.any(axis=1)                          # (N, W)
-    first_row = np.argmax(mask, axis=1)                   # (N, W)
-    heights = (BOARD_HEIGHT - first_row) * any_filled      # (N, W)
-    row_idx = np.arange(BOARD_HEIGHT).reshape(1, BOARD_HEIGHT, 1)
-    below_first = row_idx >= first_row[:, None, :]         # (N, H, W)
-    holes = below_first & ~mask & any_filled[:, None, :]
-    holes_count = holes.sum(axis=(1, 2))                  # (N,)
-    agg_height = heights.sum(axis=1)                       # (N,)
-    bumpiness = np.abs(np.diff(heights, axis=1)).sum(axis=1)  # (N,)
-    max_h = heights.max(axis=1)                            # (N,)
-    binary = mask.astype(np.int8)
-    row_trans = np.abs(binary[:, :, :-1] - binary[:, :, 1:]).sum(axis=(1, 2))
-    row_trans += np.abs(1 - binary[:, :, 0]).sum(axis=1)
-    row_trans += np.abs(binary[:, :, -1] - 1).sum(axis=1)
-    col_trans = np.abs(binary[:, :-1, :] - binary[:, 1:, :]).sum(axis=(1, 2))
-    col_trans += np.abs(binary[:, -1, :] - 1).sum(axis=1)
-    left_h = np.empty_like(heights)
-    right_h = np.empty_like(heights)
-    left_h[:, 0] = BOARD_HEIGHT
-    left_h[:, 1:] = heights[:, :-1]
-    right_h[:, -1] = BOARD_HEIGHT
-    right_h[:, :-1] = heights[:, 1:]
-    well_depth = np.maximum(0, np.minimum(left_h, right_h) - heights)
-    wells_score = (well_depth * (well_depth + 1) // 2).sum(axis=1)
-    holes_per_col = holes.sum(axis=1)                     # (N, W)
-    hole_depth_score = holes_per_col.max(axis=1)           # (N,)
-    rows_with_holes_count = holes.any(axis=2).sum(axis=1)
+    m = _compute_board_metrics_batch(grids)
     board_features = np.stack([
         lines_cleared.astype(np.float64),
-        holes_count, agg_height, bumpiness, max_h,
-        row_trans, col_trans, wells_score,
-        hole_depth_score, rows_with_holes_count,
+        m["holes_count"], m["agg_height"], m["bumpiness"], m["max_h"],
+        m["row_trans"], m["col_trans"], m["wells_score"],
+        m["hole_depth_score"], m["rows_with_holes_count"],
     ], axis=1)                                            # (N, 10)
     one_hot = np.zeros((N, len(PIECE_TYPES)), dtype=np.float64)
     for i, pt in enumerate(next_piece_types):

@@ -125,7 +125,7 @@ Le mode débogage est activable depuis le menu principal (option Débogage ON/OF
 Chaque fonction opère à un seul niveau d'abstraction :
 
 - `TetrisApp._frame()` — niveau *dispatch FSM* (events, update, draw).
-- `GameState._tick()` — niveau *chute de pièce* (verrouillage, lignes, spawn).
+- `GameState.update()` — niveau *boucle de jeu* (gravité, DAS, lock delay, spawn).
 - `Board.clear_lines()` — niveau *ligne de grille* (détection, suppression, compactage).
 
 Aucune fonction mélange plusieurs niveaux, ce qui garde chaque méthode courte et focalisée.

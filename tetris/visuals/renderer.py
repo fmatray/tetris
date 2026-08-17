@@ -25,8 +25,10 @@ from tetris.settings import (
     BOARD_WIDTH,
     GAME_OVER_DURATION_MS,
     GAME_OVER_PARTICLE_COUNT,
+    GENERATOR_LABELS,
     GHOST_OUTLINE_WIDTH,
     GRAY,
+    HIDDEN_ROWS,
     HOLD_PANEL_X,
     HOLD_PANEL_Y,
     HUD_POSITIONS,
@@ -86,9 +88,8 @@ class Renderer:
                     self._draw_debug_bag(game)
                 case "weighted":
                     self._draw_debug_weights(game)
-        # Bottom-left: mode and generator
         mode = game.menu.mode if game.menu else "Normal"
-        gen = {"7bag": "7-bag", "35bag": "35-bag", "weighted": "Pondéré"}.get(game.pieces.generator, "Aléatoire")
+        gen = GENERATOR_LABELS.get(game.pieces.generator, "Aléatoire")
         self._draw_text(f"MODE: {mode}", HUD_POSITIONS["mode"])
         self._draw_text(f"GÉNÉRATEUR: {gen}", HUD_POSITIONS["generator"])
         if game.paused:
@@ -140,12 +141,12 @@ class Renderer:
     @staticmethod
     def _cell_rect(x: int, y: int, ox: int, oy: int) -> pygame.Rect:
         # y is a grid row; offset by hidden rows so only visible rows are drawn
-        screen_y = y - (BOARD_HEIGHT - VISIBLE_ROWS)
+        screen_y = y - HIDDEN_ROWS
         return pygame.Rect(x * BLOCK_SIZE + ox, screen_y * BLOCK_SIZE + oy, BLOCK_SIZE, BLOCK_SIZE)
 
     def draw_grid(self, board: Board) -> None:
         """Draw the visible portion of the board grid with locked blocks."""
-        hidden = BOARD_HEIGHT - VISIBLE_ROWS
+        hidden = HIDDEN_ROWS
         for y in range(hidden, BOARD_HEIGHT):
             for x in range(BOARD_WIDTH):
                 rect = self._cell_rect(x, y, BOARD_OFFSET_X, BOARD_OFFSET_Y)
@@ -156,7 +157,7 @@ class Renderer:
 
     def draw_ghost(self, tetromino: Tetromino, board: Board) -> None:
         """Draw the ghost piece at the piece's hard-drop landing position."""
-        hidden = BOARD_HEIGHT - VISIBLE_ROWS
+        hidden = HIDDEN_ROWS
         drop = 0
         while board.is_valid_move(tetromino, dy=drop + 1):
             drop += 1
@@ -170,7 +171,7 @@ class Renderer:
 
     def draw_tetromino(self, tetromino: Tetromino) -> None:
         """Draw the active piece on the board (visible rows only)."""
-        hidden = BOARD_HEIGHT - VISIBLE_ROWS
+        hidden = HIDDEN_ROWS
         for x, y in tetromino.get_blocks():
             if y >= hidden:
                 rect = self._cell_rect(x, y, BOARD_OFFSET_X, BOARD_OFFSET_Y)
@@ -216,7 +217,7 @@ class Renderer:
     # --- Game-over animation --------------------------------------------
 
     def _render_glitch_board(self, game: GameState, shake_x: int, shake_y: int, glitch: float) -> pygame.Surface:
-        hidden = BOARD_HEIGHT - VISIBLE_ROWS
+        hidden = HIDDEN_ROWS
         board_surf = pygame.Surface(
             (BOARD_WIDTH * BLOCK_SIZE, VISIBLE_ROWS * BLOCK_SIZE)
         )

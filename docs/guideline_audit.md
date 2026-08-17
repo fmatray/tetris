@@ -44,13 +44,13 @@ Date: 2026-08-14
 
 ### 4. Non-locking soft drop
 
-**Status:** ❌ Violated
+**Status:** ✅ Compliant
 
-**Current:** `game.py:228-229` — when `down_pressed`, `_tick` moves piece down 1 cell then calls `_lock_and_spawn()` immediately.
+**Current:** `game.py` — when `down_pressed`, `update()` accelerates gravity via `SOFT_DROP_FACTOR`; piece locks only via lock delay.
 
 **Guideline:** Non-locking soft drop (accelerated gravity, piece doesn't lock until it rests naturally).
 
-**Impact:** Decouple `down_pressed` from `_lock_and_spawn`.
+**Impact:** Soft drop is decoupled from `_lock_and_spawn` — pieces lock only via lock delay, not on soft-drop contact.
 
 ---
 

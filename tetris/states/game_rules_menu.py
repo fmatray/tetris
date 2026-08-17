@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
+from tetris.settings import GENERATOR_LABELS
 from tetris.states.base import State
 from tetris.states.menu_base import MenuBase
 
-_GENERATOR_LABELS = {"random": "Aléatoire", "7bag": "7-bag", "35bag": "35-bag", "weighted": "Pondéré"}
 _GENERATORS = ("random", "7bag", "35bag", "weighted")
 _PREVIEW_LABELS = ("Désactivé", "1 pièce", "3 pièces")
 _PREVIEW_VALUES = (0, 1, 3)
@@ -25,7 +25,7 @@ class GameRulesMenuState(MenuBase):
     def _value_label(self, i: int) -> str:
         match i:
             case 0:
-                return _GENERATOR_LABELS.get(self.menu.piece_generator, "Aléatoire")
+                return GENERATOR_LABELS.get(self.menu.piece_generator, "Aléatoire")
             case 1:
                 idx = _PREVIEW_VALUES.index(self.menu.preview_count)
                 return _PREVIEW_LABELS[idx]
@@ -52,7 +52,7 @@ class GameRulesMenuState(MenuBase):
         return self.menu
 
     def _on_select(self) -> State | None:
-        if self.selection == 2:  # Retour
+        if self.selection == 3:  # Retour
             return self.menu
         self._toggle(1)
         self._save()

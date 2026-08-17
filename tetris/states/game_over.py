@@ -14,7 +14,7 @@ from tetris.audio import AudioManager
 from tetris.settings import BLACK, GRAY, MAX_NAME_LENGTH, SCREEN_WIDTH, WHITE
 from tetris.states.base import State
 from tetris.states.game import GameState
-from tetris.storage import save_human_game, save_score
+from tetris.storage import load_leaderboard, save_human_game, save_score
 from tetris.visuals.fonts import (
     CONTENT_Y,
     LINE_HEIGHT_SMALL,
@@ -45,6 +45,7 @@ class GameOverState(State):
         self.menu = menu
         self.renderer = Renderer(screen, font)
         self.name = ""
+        self._scores: list[dict] = []
         self.step = "ANIMATION"
 
     def update(self, dt: float, particles) -> State | None:
@@ -83,6 +84,7 @@ class GameOverState(State):
                 self.game.stats.total_lines,
                 self.game.stats.piece_count,
             )
+            self._scores = load_leaderboard()
             self.step = "LEADERBOARD"
         elif event.key == pygame.K_BACKSPACE:
             self.name = self.name[:-1]
@@ -94,7 +96,7 @@ class GameOverState(State):
         if self.step == "NAME":
             self._draw_name_entry(screen)
         elif self.step == "LEADERBOARD":
-            draw_leaderboard(screen, self.font)
+            draw_leaderboard(screen, self.font, self._scores)
 
     def _draw_name_entry(self, screen: pygame.Surface) -> None:
         screen.fill(BLACK)

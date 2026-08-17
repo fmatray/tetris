@@ -280,7 +280,6 @@ classDiagram
             - _return_to_menu() State
             +handle_event(event: pygame.event.Event) State | None
             +update(dt: float, particles: ParticleSystem) State | None
-            - _tick(particles: ParticleSystem) None
             - _emit_line_particles(particles: ParticleSystem, rows_data) None
             +draw(screen: pygame.Surface, particles: ParticleSystem | None) None
         }
@@ -316,6 +315,7 @@ classDiagram
             - _curriculum_episode_count: int
             +__init__(screen, font, audio, handicap, sound_volume, music_volume, music_song, piece_provider, speed, menu, epsilon_decay, epsilon_end, lr, gamma, batch_size, buffer_size, ai_mode, curriculum, curriculum_freq, curriculum_epsilon, warm_start, learn_per_action, lookahead, lookahead_depth, soft_drop, preview_count, debug) None
             - _is_valid_placement(piece, rotation: int, column: int) bool
+            - _iter_column_positions(piece_type: str) Generator
             - _best_next_placement(grid: np.ndarray, piece_type: str) np.ndarray
             - _gen_placements(base_grid: np.ndarray, piece_type: str) Generator
             - _get_candidate_states() tuple~np.ndarray, list~int~, np.ndarray~
@@ -343,6 +343,7 @@ classDiagram
             +renderer: Renderer
             +name: str
             +step: str
+            - _scores: list~dict~
             +__init__(screen, font, audio, game, menu) None
             +update(dt: float, particles) State | None
             +handle_event(event: pygame.event.Event) State | None
@@ -356,7 +357,9 @@ classDiagram
             +font: pygame.font.Font
             +audio: AudioManager
             +menu: MenuState | None
+            - _scores: list~dict~
             +__init__(screen, font, audio, menu) None
+            - _load() None
             +handle_event(event: pygame.event.Event) State | None
             +draw(screen: pygame.Surface, particles: ParticleSystem | None) None
         }
@@ -574,6 +577,10 @@ classDiagram
             +last_100_avg_steps: float
             +__init__(path: str) None
             - _load() None
+            - _safe_sum(key: str) int
+            - _safe_max(key: str) int
+            - _safe_avg(key: str) float
+            - _last_n_avg(key: str, n: int) float
             +record(episode: int, score: int, lines: int, level: int, steps: int, epsilon: float, loss: float) None
             +flush() None
             - _save() None

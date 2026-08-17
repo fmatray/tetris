@@ -45,7 +45,7 @@ class HumanStatsState(State):
         self.screen, self.font, self.audio = screen, font, audio
         self.human_menu = human_menu
         self._games: list[dict] = []
-
+        self._load()
     def _load(self) -> None:
         self._games = load_human_games()
 
@@ -65,7 +65,6 @@ class HumanStatsState(State):
     # --- Rendering ------------------------------------------------------
 
     def draw(self, screen: pygame.Surface, *, particles: ParticleSystem | None = None) -> None:
-        self._load()
         screen.fill(BLACK)
 
         # --- Title ---
