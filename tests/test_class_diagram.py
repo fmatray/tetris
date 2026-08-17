@@ -88,6 +88,7 @@ def _extract_classes_from_diagram() -> dict[str, dict]:
     text = DIAGRAM_PATH.read_text()
     # Extract the mermaid block
     m = re.search(r"```mermaid\n(.*?)```", text, re.DOTALL)
+    assert m is not None
     body = m.group(1)
     # Replace {static} marker so its braces don't break block extraction
     body = body.replace("{static}", "STATIC")

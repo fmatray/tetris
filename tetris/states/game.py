@@ -103,7 +103,7 @@ class GameState(State):
         self.current_piece = Tetromino(self.pieces.next_type())
         self.next_piece = Tetromino(self.pieces.next_type())
         self.preview_pieces = [Tetromino(self.pieces.next_type()) for _ in range(max(0, preview_count - 1))]
-        self.drop_time = 0
+        self.drop_time: float = 0.0
         self.stats = GameStats()
         self.current_speed = _drop_interval(0)
         self.game_over = False
@@ -345,7 +345,7 @@ class GameState(State):
         if self._pending_level_up and self.audio.play("level_up"):
             self._pending_level_up = False
         if self.game_over:
-            return self._do_game_over()
+            return self._do_game_over()  # type: ignore[unreachable]
         return None
 
     def _tick(self, particles: ParticleSystem) -> None:

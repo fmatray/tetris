@@ -161,9 +161,11 @@ def row_transitions(grid: np.ndarray) -> int:
 
     Walls (left/right edges) treated as filled.
     """
-    binary = (grid > 0).astype(np.int8)
-    padded = np.pad(binary, ((0, 0), (1, 1)), constant_values=1)
-    return int(np.abs(np.diff(padded, axis=1)).sum())
+    b = (grid > 0).astype(np.int8)
+    transitions = np.abs(b[:, :-1] - b[:, 1:]).sum()
+    transitions += np.abs(1 - b[:, 0]).sum()   # left wall
+    transitions += np.abs(b[:, -1] - 1).sum()  # right wall
+    return int(transitions)
 
 
 def column_transitions(grid: np.ndarray) -> int:
@@ -171,9 +173,10 @@ def column_transitions(grid: np.ndarray) -> int:
 
     Floor (bottom) treated as filled.
     """
-    binary = (grid > 0).astype(np.int8)
-    padded = np.pad(binary, ((0, 1), (0, 0)), constant_values=1)
-    return int(np.abs(np.diff(padded, axis=0)).sum())
+    b = (grid > 0).astype(np.int8)
+    transitions = np.abs(b[:-1, :] - b[1:, :]).sum()
+    transitions += np.abs(b[-1, :] - 1).sum()  # floor (bottom) treated as filled
+    return int(transitions)
 
 
 def wells(grid: np.ndarray, heights: np.ndarray | None = None) -> int:
@@ -321,10 +324,11 @@ def dellacherie_value_batch(grids: np.ndarray) -> np.ndarray:
     holes = below_first & ~mask & any_filled[:, None, :]
     holes_count = holes.sum(axis=(1, 2))                # (N,)
     binary = mask.astype(np.int8)
-    padded_rt = np.pad(binary, ((0, 0), (0, 0), (1, 1)), constant_values=1)
-    row_trans = np.abs(np.diff(padded_rt, axis=2)).sum(axis=(1, 2))
-    padded_ct = np.pad(binary, ((0, 0), (0, 1), (0, 0)), constant_values=1)
-    col_trans = np.abs(np.diff(padded_ct, axis=1)).sum(axis=(1, 2))
+    row_trans = np.abs(binary[:, :, :-1] - binary[:, :, 1:]).sum(axis=(1, 2))
+    row_trans += np.abs(1 - binary[:, :, 0]).sum(axis=1)    # left wall
+    row_trans += np.abs(binary[:, :, -1] - 1).sum(axis=1)   # right wall
+    col_trans = np.abs(binary[:, :-1, :] - binary[:, 1:, :]).sum(axis=(1, 2))
+    col_trans += np.abs(binary[:, -1, :] - 1).sum(axis=1)   # floor
     left_h = np.empty_like(heights)
     right_h = np.empty_like(heights)
     left_h[:, 0] = BOARD_HEIGHT

@@ -38,6 +38,7 @@ from tetris.game import rules
 from tetris.game.board import Board
 from tetris.game.piece_provider import PieceProvider
 from tetris.game.rules import hard_drop_y, hard_drop_y_batch, soft_drop_placements
+from tetris.game.stats import GameStats
 from tetris.game.tetromino import Tetromino
 from tetris.logger import get_logger
 from tetris.settings import (
@@ -189,16 +190,15 @@ class AIState(GameState):
             self.agent.epsilon = 0.0
 
         # Curriculum learning: restrict piece pool in learning mode
-        self.curriculum = curriculum
-        self.warm_start = warm_start
-        self.curriculum_freq = curriculum_freq
-        self.curriculum_epsilon = curriculum_epsilon
+        self.curriculum: bool = curriculum
+        self.warm_start: bool = warm_start
+        self.curriculum_freq: int = curriculum_freq
+        self.curriculum_epsilon: str = curriculum_epsilon
+        self._curriculum_types: list[str] | None = None
         if curriculum and self.ai_mode == "learning":
             self._curriculum_types = ["O"]
             self._curriculum_level = 0
             self._curriculum_episode_count = 0
-        else:
-            self._curriculum_types = None
 
     # --- Candidate generation -------------------------------------------
     def _is_valid_placement(self, piece, rotation: int, column: int) -> bool:
@@ -400,6 +400,7 @@ class AIState(GameState):
         if self.ai_mode == "learning":
             # Store previous transition (delayed: prev_state + current as next_state)
             if self._prev_state is not None:
+                assert self._prev_reward is not None  # set alongside _prev_state
                 self.agent.store(
                     self._prev_state,
                     0,
@@ -517,17 +518,17 @@ class AIState(GameState):
         self.episode_steps = 0
         self.game_over = False
         self.paused = False
-        self.drop_time = 0
-        self._action_timer = 0.0
+        self.drop_time: float = 0.0
+        self._action_timer: float = 0.0
         self.down_pressed = False
-        self._lock_timer = 0.0
-        self._lock_resets = 0
-        self._grounded = False
-        self._das_held = {}
-        self._prev_state = None
-        self._prev_reward = None
-        self._prev_done = False
-        self._prev_action = None
+        self._lock_timer: float = 0.0
+        self._lock_resets: int = 0
+        self._grounded: bool = False
+        self._das_held: dict[int, float] = {}
+        self._prev_state: np.ndarray | None = None
+        self._prev_reward: float | None = None
+        self._prev_done: bool = False
+        self._prev_action: int | None = None
         self._last_level = 0
         self._pending_level_up = False
         self.audio.set_music_speed(1.0)
@@ -541,7 +542,7 @@ class AIState(GameState):
         self.preview_pieces = [Tetromino(self.pieces.next_type()) for _ in range(max(0, self.preview_count - 1))]
         self.hold_piece = None
         self._can_hold = True
-        self.stats = type(self.stats)()
+        self.stats: GameStats = GameStats()
 
     def _maybe_advance_curriculum(self) -> bool:
         """Add next piece from CURRICULUM_ORDER if enough episodes elapsed."""

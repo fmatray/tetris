@@ -14,6 +14,7 @@ from __future__ import annotations
 import json
 import random
 from pathlib import Path
+from typing import ClassVar
 
 from tetris.logger import get_logger
 from tetris.settings import FIRST_PIECE_TYPES, REPLAY_PATH, SHAPES
@@ -36,7 +37,7 @@ class PieceProvider:
         File path for the recorded/replayed piece sequence.
     """
 
-    _BAG_MULTIPLIERS: dict[str, int] = {"7bag": 1, "35bag": 5}
+    _BAG_MULTIPLIERS: ClassVar[dict[str, int]] = {"7bag": 1, "35bag": 5}
 
     def __init__(
         self,

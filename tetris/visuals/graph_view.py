@@ -65,7 +65,7 @@ def render_score_graph(episodes: list[int], scores: list[int]) -> pygame.Surface
 
     fig.canvas.draw()
     w, h = fig.canvas.get_width_height()
-    buf = fig.canvas.buffer_rgba()
+    buf = fig.canvas.buffer_rgba()  # type: ignore[attr-defined]
     plt.close(fig)
 
     surf = pygame.image.frombuffer(bytes(buf), (w, h), "RGBA")

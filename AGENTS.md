@@ -159,6 +159,63 @@ python -m tetris.verify_training
 # avg_duration > 30s, max_loss < 1000
 ```
 
+**Always run `zuban check .` and `ruff check .` before commits — fix all errors.**
+
+## Performance Analysis Tools
+
+All four profilers are installed and available:
+
+| Tool | Purpose | Usage |
+|------|---------|-------|
+| **cProfile** | Deterministic call-graph profiling | `python -m cProfile -o profile.out -s cumulative script.py` |
+| **line_profiler** | Line-level timing on hot functions | Decorate with `@profile`, run `kernprof -lv script.py` |
+| **py-spy** | Native sampling profiler (low overhead, flamegraph) | `py-spy record --duration 30 --rate 100 --output flame.svg --pid <PID>` |
+| **memory_profiler** | Memory usage tracking | `python -m memory_profiler script.py` |
+
+### Profiling the AI training loop
+
+```bash
+# cProfile — 500 training frames
+SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy python3 -c "
+import cProfile, pstats, io, pygame
+pygame.init()
+screen = pygame.Surface((800, 600))
+font = pygame.font.Font(None, 20)
+from tetris.audio import AudioManager
+from tetris.states.ai import AIState
+from tetris.game.piece_provider import PieceProvider
+from tetris.visuals.particles import ParticleSystem
+audio = AudioManager(sound_volume=0, music_volume=0)
+particles = ParticleSystem()
+state = AIState(screen=screen, font=font, audio=audio, handicap=0,
+    sound_volume=0, music_volume=0,
+    piece_provider=PieceProvider(generator='7bag'),
+    speed='fast', ai_mode='learning', lookahead=True, lookahead_depth=1,
+    soft_drop=True, preview_count=1, warm_start=True, learn_per_action=2)
+dt = 1/60
+pr = cProfile.Profile()
+pr.enable()
+for _ in range(500):
+    ns = state.update(dt, particles)
+    if ns is not None: state = ns
+pr.disable()
+pstats.Stats(pr).sort_stats('cumulative').print_stats(20)
+"
+
+# py-spy — sample a running training process for 30s
+SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy python3 -c "
+import pygame, os, subprocess
+pygame.init()
+# ... setup AIState as above ...
+pid = os.getpid()
+proc = subprocess.Popen(['py-spy', 'record', '--duration', '30', '--rate', '100',
+    '--output', '/tmp/tetris_pyspy.svg', '--pid', str(pid)])
+# ... run training loop ...
+"
+```
+
+See `docs/performance_review.md` for the full profiling report and optimization history.
+
 
 ## Workflow
 

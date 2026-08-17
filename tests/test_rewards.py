@@ -5,8 +5,12 @@ import numpy as np
 from tetris.ai.rewards import (
     aggregate_height,
     bumpiness,
+    column_transitions,
     compute_reward,
     count_holes,
+    dellacherie_value,
+    dellacherie_value_batch,
+    row_transitions,
 )
 from tetris.settings import BOARD_HEIGHT, BOARD_WIDTH
 
@@ -110,13 +114,10 @@ def test_compute_reward_no_step_survived():
 
 from tetris.ai.rewards import (
     column_heights,
-    column_transitions,
-    dellacherie_value,
     extract_features,
     hole_depth,
     max_height,
     place_and_clear,
-    row_transitions,
     rows_with_holes,
     wells,
 )
@@ -378,8 +379,6 @@ def test_srs_wall_kick():
 
 # --- dellacherie_value_batch -----------------------------------------
 
-from tetris.ai.rewards import dellacherie_value_batch
-
 
 def _diverse_grids(n=36, seed=42):
     """Generate n diverse board states for equivalence testing."""
@@ -468,3 +467,61 @@ def test_dellacherie_value_batch_preserves_input():
     dellacherie_value_batch(stacked)
     grids2 = np.stack(grids)
     assert np.array_equal(stacked, grids2)
+
+
+# --- slice-based transition equivalence -----------------------------
+
+def test_row_transitions_slice_matches_pad():
+    """Slice-based row_transitions matches known-good values."""
+    # Empty grid: each row wall(1)→0→...→0→wall(1) = 2 transitions × 22 rows
+    assert row_transitions(_empty_grid()) == 2 * BOARD_HEIGHT
+    # Full row: wall(1)→1→...→1→wall(1) = 0 transitions for that row, 2 for others
+    assert row_transitions(_grid_with_row(10)) == 2 * (BOARD_HEIGHT - 1)
+    # Single cell in middle: row has wall→0→1→0→wall = 4, other rows 2 each
+    g = _empty_grid()
+    g[10, 5] = 1
+    assert row_transitions(g) == 4 + 2 * (BOARD_HEIGHT - 1)
+    # Alternating pattern in one row
+    g = _empty_grid()
+    g[10, :] = [1, 0, 1, 0, 1, 0, 1, 0, 1, 0]
+    # row 10: wall(1)-1-0-1-0-1-0-1-0-1-0-wall(1) = 0+9+1 = 10
+    # other rows: 2 each
+    assert row_transitions(g) == 10 + 2 * (BOARD_HEIGHT - 1)
+
+
+def test_column_transitions_slice_matches_pad():
+    """Slice-based column_transitions matches known-good values."""
+    assert column_transitions(_empty_grid()) == BOARD_WIDTH
+    # Full grid: all filled, floor filled = 0 transitions
+    assert column_transitions(np.ones((BOARD_HEIGHT, BOARD_WIDTH), dtype=int)) == 0
+    # Single cell at bottom: filled-floor = 0, above: empty-filled = 1
+    g = _empty_grid()
+    g[BOARD_HEIGHT - 1, 5] = 1
+    # col 5: 20 empty→filled(1) + filled→floor(0) = 1. Other cols: empty→floor(1) = 1 each
+    assert column_transitions(g) == BOARD_WIDTH  # col 5 has 1, others have 1
+    # Cell at top
+    g = _empty_grid()
+    g[0, 5] = 1
+    # col 5: filled→empty(1) + ... + empty→floor(1) = 2. Others: 1 each
+    assert column_transitions(g) == BOARD_WIDTH + 1
+
+
+def test_row_transitions_edge_columns():
+    """Edge column transitions against walls are counted."""
+    # Left wall: row 10 = wall(1)→1→0→...→0→wall(1) = 0+1+0+1 = 2, other rows 2 each
+    g = _empty_grid()
+    g[10, 0] = 1
+    assert row_transitions(g) == 2 + 2 * (BOARD_HEIGHT - 1)
+    # Right wall edge: same pattern
+    g = _empty_grid()
+    g[10, 9] = 1
+    assert row_transitions(g) == 2 + 2 * (BOARD_HEIGHT - 1)
+
+
+def test_dellacherie_batch_transitions_match_scalar():
+    """Batch transition computation matches scalar across diverse grids."""
+    grids = _diverse_grids(36)
+    stacked = np.stack(grids)
+    batch = dellacherie_value_batch(stacked)
+    scalar = np.array([dellacherie_value(g) for g in grids])
+    assert np.allclose(batch, scalar, atol=1e-5), f"max diff={np.max(np.abs(batch - scalar))}"

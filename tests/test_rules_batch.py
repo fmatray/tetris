@@ -8,7 +8,14 @@ from tetris.ai.rewards import (
     place_and_clear,
     place_and_clear_batch,
 )
-from tetris.game.rules import hard_drop_y, hard_drop_y_batch, shape_fits
+from tetris.game.rules import (
+    find_full_rows,
+    hard_drop_y,
+    hard_drop_y_batch,
+    place_cells,
+    shape_fits,
+    soft_drop_placements,
+)
 from tetris.settings import BOARD_HEIGHT, BOARD_WIDTH, SHAPES
 
 
@@ -217,3 +224,103 @@ def test_best_next_placement_batch_matches_scalar():
             assert np.array_equal(best_grid_batch, best_grid_scalar), (
                 f"{piece_type}: batch and scalar produce different best grids"
             )
+
+
+# --- find_full_rows numpy vs list equivalence -----------------------
+
+def test_find_full_rows_numpy_matches_list():
+    """Numpy path produces same result as list path."""
+    rng = np.random.default_rng(42)
+    for _ in range(20):
+        grid_np = _random_grid(rng)
+        grid_list = grid_np.tolist()
+        np_rows = find_full_rows(grid_np)
+        list_rows = find_full_rows(grid_list)
+        assert np_rows == list_rows
+
+
+def test_find_full_rows_empty():
+    """Empty grid has no full rows."""
+    assert find_full_rows(_empty_grid()) == []
+    assert find_full_rows(_empty_grid().tolist()) == []
+
+
+def test_find_full_rows_full_bottom():
+    """Full bottom row detected."""
+    g = _empty_grid()
+    g[BOARD_HEIGHT - 1, :] = 1.0
+    assert find_full_rows(g) == [BOARD_HEIGHT - 1]
+    assert find_full_rows(g.tolist()) == [BOARD_HEIGHT - 1]
+
+
+# --- place_cells numpy vs list equivalence --------------------------
+
+def test_place_cells_numpy_matches_list():
+    """Numpy path produces same grid as list path."""
+    rng = np.random.default_rng(99)
+    for piece_type in SHAPES:
+        for shape in SHAPES[piece_type]:
+            grid_np = _random_grid(rng)
+            grid_list = [row[:] for row in grid_np.tolist()]
+            x = int(rng.integers(0, BOARD_WIDTH))
+            y = int(rng.integers(0, BOARD_HEIGHT))
+            place_cells(grid_np, shape, x, y, 1.0)
+            place_cells(grid_list, shape, x, y, 1.0)
+            assert np.array_equal(grid_np, np.array(grid_list, dtype=np.float32))
+
+
+def test_place_cells_out_of_bounds():
+    """Cells outside the board are silently skipped (numpy path)."""
+    g = _empty_grid()
+    shape = SHAPES["I"][0]  # horizontal I
+    place_cells(g, shape, -2, 0, 1.0)  # partially off-board
+    # Should not crash, cells in-bounds should be set
+    assert g.sum() >= 0  # no exception
+
+
+# --- hard_drop_y_batch vectorized equivalence -----------------------
+
+def test_hard_drop_y_batch_vectorized_matches_scalar_all_pieces():
+    """New vectorized batch matches scalar hard_drop_y for all pieces/columns."""
+    rng = np.random.default_rng(77)
+    for _ in range(10):
+        grid = _random_grid(rng)
+        for piece_type in SHAPES:
+            shapes, x_positions = _enumerate_candidates(grid, piece_type)
+            if not shapes:
+                continue
+            batch_pys = hard_drop_y_batch(grid, shapes, x_positions)
+            scalar_pys = np.array([
+                hard_drop_y(grid, shape, x)
+                for shape, x in zip(shapes, x_positions)
+            ])
+            assert np.array_equal(batch_pys, scalar_pys), (
+                f"{piece_type}: vectorized batch mismatch"
+            )
+
+
+# --- soft_drop_placements numpy vs list equivalence -----------------
+
+def test_soft_drop_placements_numpy_matches_list():
+    """soft_drop_placements with numpy grid produces same placements as list grid."""
+    rng = np.random.default_rng(123)
+    for _ in range(10):
+        grid_np = _random_grid(rng)
+        grid_list = grid_np.tolist()
+        for piece_type in SHAPES:
+            np_placements = soft_drop_placements(grid_np, piece_type)
+            list_placements = soft_drop_placements(grid_list, piece_type)
+            # Compare (px, py, rot) — shape is deterministic from piece+rot
+            np_keys = {(px, py, rot) for _, px, py, rot in np_placements}
+            list_keys = {(px, py, rot) for _, px, py, rot in list_placements}
+            assert np_keys == list_keys, f"{piece_type}: placement set mismatch"
+
+
+def test_soft_drop_placements_empty_board():
+    """Empty board produces valid placements for all piece types."""
+    grid = _empty_grid()
+    for piece_type in SHAPES:
+        placements = soft_drop_placements(grid, piece_type)
+        assert len(placements) > 0, f"{piece_type}: no placements on empty board"
+        for shape, px, py, rot in placements:
+            assert shape_fits(grid, shape, px, py)

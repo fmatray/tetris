@@ -70,22 +70,36 @@ def hard_drop_y_batch(
     ``(N,)`` int array. Matches :func:`hard_drop_y` for all valid placements.
     """
     mask = np.asarray(grid) > 0
-    # Row index of topmost filled cell per column (BOARD_HEIGHT if empty).
     col_tops = np.argmax(mask, axis=0).astype(np.int32)
     col_tops[~mask.any(axis=0)] = BOARD_HEIGHT
-    results = np.empty(len(shapes), dtype=np.int32)
-    for i, (shape, x) in enumerate(zip(shapes, x_positions)):
-        # Landing y = min over cells of (col_top[cx] - by - 1): the most
-        # constraining cell (highest top) determines the rest position.
-        min_y = BOARD_HEIGHT
+    # Flatten all (shape, cell) pairs into parallel arrays for vectorized min.
+    all_bx: list[int] = []
+    all_by: list[int] = []
+    all_shape_idx: list[int] = []
+    for i, shape in enumerate(shapes):
         for bx, by in shape:
-            cx = x + bx
-            if cx < 0 or cx >= BOARD_WIDTH:
-                min_y = -1
-                break
-            cell_y = int(col_tops[cx]) - by - 1
-            min_y = min(min_y, cell_y)
-        results[i] = max(min_y, 0)
+            all_bx.append(bx)
+            all_by.append(by)
+            all_shape_idx.append(i)
+    all_bx_arr = np.array(all_bx, dtype=np.int32)
+    all_by_arr = np.array(all_by, dtype=np.int32)
+    shape_idx_arr = np.array(all_shape_idx, dtype=np.int32)
+    all_cx = np.array(x_positions, dtype=np.int32)[shape_idx_arr] + all_bx_arr
+
+    valid = (all_cx >= 0) & (all_cx < BOARD_WIDTH)
+    cell_y = np.where(
+        valid,
+        col_tops[np.clip(all_cx, 0, BOARD_WIDTH - 1)] - all_by_arr - 1,
+        BOARD_HEIGHT,
+    )
+    cell_y[~valid] = -1
+    results = np.full(len(shapes), BOARD_HEIGHT, dtype=np.int32)
+    np.minimum.at(results, shape_idx_arr, cell_y)
+    # Shapes with any invalid cx → -1
+    invalid_shape = np.zeros(len(shapes), dtype=bool)
+    np.logical_or.at(invalid_shape, shape_idx_arr, ~valid)
+    results[invalid_shape] = -1
+    results = np.maximum(results, 0)
     return results
 
 
@@ -99,6 +113,10 @@ def soft_drop_placements(
     SRS wall kicks). This includes placements under overhangs that hard-drop
     cannot reach.
     """
+    # ponytail: numpy scalar indexing (grid[y][x]) is ~5× slower than list
+    # indexing. Convert once — amortized over ~750 shape_fits calls.
+    if isinstance(grid, np.ndarray):
+        grid = grid.tolist()
     num_rots = len(SHAPES[piece_type])
     spawn_x = BOARD_WIDTH // 2 - 2
     spawn_y = 0
@@ -151,6 +169,12 @@ def place_cells(grid, shape, x: int, y: int, value) -> None:
 
     Works for list grids (value=tuple) and numpy arrays (value=1.0).
     """
+    if isinstance(grid, np.ndarray):
+        xs = np.array([x + bx for bx, _ in shape])
+        ys = np.array([y + by for _, by in shape])
+        valid = (xs >= 0) & (xs < BOARD_WIDTH) & (ys >= 0) & (ys < BOARD_HEIGHT)
+        grid[ys[valid], xs[valid]] = value
+        return
     for bx, by in shape:
         cx, cy = x + bx, y + by
         if 0 <= cx < BOARD_WIDTH and 0 <= cy < BOARD_HEIGHT:
@@ -159,5 +183,7 @@ def place_cells(grid, shape, x: int, y: int, value) -> None:
 
 def find_full_rows(grid) -> list[int]:
     """Return row indices that are fully occupied."""
+    if isinstance(grid, np.ndarray):
+        return list(np.where((grid > 0).all(axis=1))[0])
     return [y for y in range(BOARD_HEIGHT)
             if all(bool(grid[y][x]) for x in range(BOARD_WIDTH))]

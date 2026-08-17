@@ -111,7 +111,7 @@ def _generate_midi(song_name: str, path: str) -> None:
     tempo_track.append(mido.MetaMessage("track_name", name=song_name))
     mid.tracks.append(tempo_track)
     # Music tracks
-    for notes in song["tracks"]:
+    for notes in song["tracks"]:  # type: ignore[union-attr]
         mid.tracks.append(_build_track(notes, mid.ticks_per_beat))
     mid.save(path)
 

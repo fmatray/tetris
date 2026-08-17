@@ -62,7 +62,7 @@ class _FallingPiece:
         self.color = SHAPES_COLORS[shape_key]
         # Always start at top; random horizontal position across screen.
         self.x = random.uniform(0, max(0, SCREEN_WIDTH - MENU_ANIM_BLOCK_SIZE * 4))
-        self.y = -MENU_ANIM_BLOCK_SIZE * 4  # just above visible area
+        self.y: float = -MENU_ANIM_BLOCK_SIZE * 4  # just above visible area
         self.age = 0.0
         self.explode_delay = random.uniform(*MENU_ANIM_EXPLODE_DELAY)
         self.rot_timer = random.uniform(*MENU_ANIM_ROT_INTERVAL)

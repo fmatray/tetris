@@ -50,7 +50,7 @@ class HyperparamMenuState(MenuBase):
     _toggle_indices = frozenset({0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13})
 
     # Per-param metadata: (min, max, step, explanation)
-    _PARAM_META: ClassVar[tuple[tuple[str, str, str, str, str], ...]] = (
+    _PARAM_META: ClassVar[tuple[tuple[str, str, str, str], ...]] = (
         ("0.990", "0.9999", "0.0001", "Décroissance d'epsilon. ↑ = exploration plus longue, apprentissage plus lent"),
         ("0.02", "0.10", "0.01", "Epsilon minimal. ↑ = plus d'exploration résiduelle, moins de convergence"),
         ("1e-6", "1e-2", "x10", "Taux d'apprentissage Adam. ↑ = apprentissage plus rapide mais instable"),
