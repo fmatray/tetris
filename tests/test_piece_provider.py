@@ -3,11 +3,16 @@
 import json
 
 from tetris.game.piece_provider import (
+    _WT_BOOST,
+    _WT_DECAY,
+    _WT_INIT,
+    _WT_MIN,
     BagGenerator,
     PieceProvider,
     RandomGenerator,
     ReplayGenerator,
     SevenBagGenerator,
+    WeightedGenerator,
 )
 from tetris.settings import FIRST_PIECE_TYPES, SHAPES
 
@@ -371,8 +376,116 @@ def test_replay_provider_switches_to_fallback(tmp_path):
         assert provider.next_type() in SHAPES
 
 
+
+
+# ---------------------------------------------------------------------------
+# WeightedGenerator tests
+# ---------------------------------------------------------------------------
+
+
+def test_weighted_generator_starts_uniform():
+    """After one spawn, selected piece at _WT_INIT * _WT_DECAY, others boosted."""
+    gen = WeightedGenerator()
+    pool = list(SHAPES.keys())
+    gen.next(pool, False)
+    w = gen.weights
+    assert len(w) == 7
+    selected_count = sum(1 for v in w.values() if abs(v - _WT_INIT * _WT_DECAY) < 0.01)
+    other_count = sum(1 for v in w.values() if abs(v - (_WT_INIT + _WT_BOOST)) < 0.01)
+    assert selected_count == 1
+    assert other_count == 6
+
+
+def test_weighted_generator_no_bag():
+    gen = WeightedGenerator()
+    assert gen.bag_remaining == []
+
+
+def test_weighted_generator_reset_clears_weights():
+    gen = WeightedGenerator()
+    pool = list(SHAPES.keys())
+    gen.next(pool, False)
+    assert len(gen.weights) == 7
+    gen.reset()
+    assert gen.weights == {}
+
+
+def test_weighted_generator_first_piece_safe():
+    gen = WeightedGenerator()
+    pool = list(SHAPES.keys())
+    for _ in range(50):
+        gen.reset()
+        assert gen.next(pool, True) in FIRST_PIECE_TYPES
+
+
+def test_weighted_generator_respects_curriculum():
+    gen = WeightedGenerator()
+    pool = ["O"]
+    for _ in range(20):
+        assert gen.next(pool, False) == "O"
+
+
+def test_weighted_generator_weights_never_below_min():
+    """No weight drops below _WT_MIN."""
+    gen = WeightedGenerator()
+    pool = list(SHAPES.keys())
+    for _ in range(500):
+        gen.next(pool, False)
+    assert all(w >= _WT_MIN - 0.001 for w in gen.weights.values())
+
+
+def test_weighted_generator_distributes_all_types():
+    """Over 500 spawns, all 7 types appear at least once."""
+    gen = WeightedGenerator()
+    pool = list(SHAPES.keys())
+    seen = {gen.next(pool, False) for _ in range(500)}
+    assert seen == set(SHAPES.keys())
+
+
+def test_weighted_provider_integration():
+    """PieceProvider with generator='weighted' spawns valid types."""
+    provider = PieceProvider(generator="weighted")
+    for _ in range(50):
+        assert provider.next_type() in SHAPES
+
+
+def test_weighted_provider_first_piece_safe():
+    for _ in range(50):
+        provider = PieceProvider(generator="weighted")
+        assert provider.next_type() in ("I", "J", "L", "T")
+
+
+def test_weighted_provider_weights_property():
+    """PieceProvider.weights delegates to WeightedGenerator."""
+    provider = PieceProvider(generator="weighted")
+    provider.next_type()
+    w = provider.weights
+    assert len(w) == 7
+    assert all(v > 0 for v in w.values())
+
+
+def test_weighted_provider_weights_empty_for_non_weighted():
+    """weights returns {} for non-weighted generators."""
+    provider = PieceProvider(generator="7bag")
+    assert provider.weights == {}
+
+
+def test_weighted_provider_reset_rearms_first_piece():
+    provider = PieceProvider(generator="weighted")
+    provider.next_type()
+    provider.reset()
+    assert provider.next_type() in ("I", "J", "L", "T")
+
+
+def test_weighted_provider_curriculum():
+    provider = PieceProvider(generator="weighted", allowed_types=["O"])
+    for _ in range(20):
+        assert provider.next_type() == "O"
+
+
 def test_provider_generator_property():
     """generator property returns the configured name, not the active class."""
     assert PieceProvider(generator="7bag").generator == "7bag"
     assert PieceProvider(generator="35bag").generator == "35bag"
+    assert PieceProvider(generator="weighted").generator == "weighted"
     assert PieceProvider().generator == "random"

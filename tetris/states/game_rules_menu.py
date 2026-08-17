@@ -5,8 +5,8 @@ from __future__ import annotations
 from tetris.states.base import State
 from tetris.states.menu_base import MenuBase
 
-_GENERATOR_LABELS = {"random": "Aléatoire", "7bag": "7-bag", "35bag": "35-bag"}
-_GENERATORS = ("random", "7bag", "35bag")
+_GENERATOR_LABELS = {"random": "Aléatoire", "7bag": "7-bag", "35bag": "35-bag", "weighted": "Pondéré"}
+_GENERATORS = ("random", "7bag", "35bag", "weighted")
 _PREVIEW_LABELS = ("Désactivé", "1 pièce", "3 pièces")
 _PREVIEW_VALUES = (0, 1, 3)
 

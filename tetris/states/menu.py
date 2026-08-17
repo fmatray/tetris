@@ -34,7 +34,7 @@ class MenuState(MenuBase):
         "Leaderboard",     # 7
         "Quitter",         # 8
     )
-    _GENERATOR_CYCLE: ClassVar[tuple[str, ...]] = ("random", "7bag", "35bag")
+    _GENERATOR_CYCLE: ClassVar[tuple[str, ...]] = ("random", "7bag", "35bag", "weighted")
     _toggle_indices = frozenset({0, 3})  # Joueur, Débogage
     _title = "TETRIS"
 
@@ -110,6 +110,7 @@ class MenuState(MenuBase):
         "ghost_piece": "ghost_piece",
         "preview_count": "preview_count",
         "debug": "debug",
+        "piece_generator": "piece_generator",
     }
 
     def _load_settings(self) -> None:

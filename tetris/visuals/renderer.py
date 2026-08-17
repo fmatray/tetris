@@ -33,6 +33,7 @@ from tetris.settings import (
     NEXT_PANEL_X,
     SCREEN_HEIGHT,
     SCREEN_WIDTH,
+    SHAPES,
     SHAPES_COLORS,
     VISIBLE_ROWS,
     WHITE,
@@ -80,12 +81,14 @@ class Renderer:
             next_queue = [game.next_piece] + getattr(game, "preview_pieces", [])
             self.draw_panel_pieces(next_queue, NEXT_PANEL_X, HUD_POSITIONS["next"][1] + 30)
         if game.debug:
-            self._draw_text(f"SPEED: {int(game.current_speed * 1000)}ms", HUD_POSITIONS["speed"])
-        if game.debug and game.pieces.generator in ("7bag", "35bag"):
-            self._draw_debug_bag(game)
+            match game.pieces.generator:
+                case "7bag" | "35bag":
+                    self._draw_debug_bag(game)
+                case "weighted":
+                    self._draw_debug_weights(game)
         # Bottom-left: mode and generator
         mode = game.menu.mode if game.menu else "Normal"
-        gen = {"7bag": "7-bag", "35bag": "35-bag"}.get(game.pieces.generator, "Aléatoire")
+        gen = {"7bag": "7-bag", "35bag": "35-bag", "weighted": "Pondéré"}.get(game.pieces.generator, "Aléatoire")
         self._draw_text(f"MODE: {mode}", HUD_POSITIONS["mode"])
         self._draw_text(f"GÉNÉRATEUR: {gen}", HUD_POSITIONS["generator"])
         if game.paused:
@@ -119,6 +122,21 @@ class Renderer:
             letter = self.font.render(piece_type, True, WHITE)
             self.screen.blit(letter, (x + 2, y + 2))
             x += BLOCK_SIZE + 2
+
+    def _draw_debug_weights(self, game: GameState) -> None:
+        """Draw each tetromino type and its current weight (weighted generator)."""
+        weights = game.pieces.weights
+        x = NEXT_PANEL_X + 7 * BLOCK_SIZE + 20
+        y = HUD_POSITIONS["next"][1]
+        self._draw_text("POIDS:", (x, y))
+        y += 30
+        for piece_type in SHAPES:
+            color = SHAPES_COLORS[piece_type]
+            rect = pygame.Rect(x, y, BLOCK_SIZE, BLOCK_SIZE)
+            pygame.draw.rect(self.screen, color, rect)
+            w = weights.get(piece_type, 1.0)
+            self._draw_text(f"{piece_type}: {w:.2f}", (x + BLOCK_SIZE + 6, y + 2))
+            y += BLOCK_SIZE + 2
     @staticmethod
     def _cell_rect(x: int, y: int, ox: int, oy: int) -> pygame.Rect:
         # y is a grid row; offset by hidden rows so only visible rows are drawn

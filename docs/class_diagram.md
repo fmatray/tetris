@@ -426,6 +426,16 @@ classDiagram
             +__init__() None
         }
 
+        class WeightedGenerator {
+            - _weights: dict~str, float~
+            +__init__() None
+            +next(pool: list~str~, is_first: bool) str
+            +reset() None
+            +bag_remaining: list~str~
+            +weights: dict~str, float~
+            - _rebalance(piece: str) None
+        }
+
         class ReplayGenerator {
             - _queue: list~str~
             - _idx: int
@@ -450,6 +460,7 @@ classDiagram
             - _generator: PieceGenerator
             +bag_remaining: list~str~
             +__init__(mode: str, path: str | Path, allowed_types: list~str~ | None, generator: str) None
+            +weights: dict~str, float~
             +reset() None
             +next_type() str
             +set_allowed_types(types: list~str~) None
@@ -586,6 +597,7 @@ classDiagram
             +_cell_rect(x: int, y: int, ox: int, oy: int) pygame.Rect
             %% static
             +_panel_rect(x: int, y: int, ox: int, oy: int) pygame.Rect
+            - _draw_debug_weights(game: GameState) None
             %% static
             +_normalized_blocks(tetromino: Tetromino) list~tuple~int, int~~
             +draw_grid(board: Board) None
@@ -740,6 +752,7 @@ classDiagram
     PieceGenerator <|-- RandomGenerator
     PieceGenerator <|-- BagGenerator
     PieceGenerator <|-- ReplayGenerator
+    PieceGenerator <|-- WeightedGenerator
     BagGenerator <|-- SevenBagGenerator
     BagGenerator <|-- ThirtyFiveBagGenerator
 

@@ -32,6 +32,12 @@ from tetris.settings import FIRST_PIECE_TYPES, REPLAY_PATH, SHAPES
 
 _logger = get_logger("piece_provider")
 
+# --- Weighted generator tuning ----------------------------------------------
+_WT_DECAY = 0.5   # selected piece weight *= _WT_DECAY
+_WT_BOOST = 0.1   # every other piece weight += _WT_BOOST
+_WT_MIN = 0.1     # weight floor (never zero/negative)
+_WT_INIT = 1.0    # starting weight for all pieces
+
 
 # ---------------------------------------------------------------------------
 # Generators
@@ -134,6 +140,57 @@ class ThirtyFiveBagGenerator(BagGenerator):
         super().__init__(copies=5)
 
 
+class WeightedGenerator(PieceGenerator):
+    """Weighted random spawns with anti-repeat rebalancing.
+
+    Each piece starts at weight ``_WT_INIT``. After a piece is selected,
+    its weight is halved (``_WT_DECAY``) and every other piece's weight
+    is increased by ``_WT_BOOST``. Weights never drop below ``_WT_MIN``.
+    This creates a soft anti-drought/anti-flood effect: pieces seen
+    recently become less likely, pieces absent for a while become more
+    likely.
+    """
+
+    def __init__(self) -> None:
+        self._weights: dict[str, float] = {}
+
+    def next(self, pool: list[str], is_first: bool) -> str:
+        if not self._weights:
+            self._weights = {t: _WT_INIT for t in SHAPES}
+        if is_first:
+            safe = [t for t in pool if t in FIRST_PIECE_TYPES]
+            if safe:
+                weights = [self._weights[t] for t in safe]
+                piece = random.choices(safe, weights=weights)[0]
+            else:
+                weights = [self._weights[t] for t in pool]
+                piece = random.choices(pool, weights=weights)[0]
+        else:
+            weights = [self._weights[t] for t in pool]
+            piece = random.choices(pool, weights=weights)[0]
+        self._rebalance(piece)
+        return piece
+
+    def reset(self) -> None:
+        self._weights = {}
+
+    @property
+    def bag_remaining(self) -> list[str]:
+        return []
+
+    @property
+    def weights(self) -> dict[str, float]:
+        """Current weight per tetromino type (copy for read-only access)."""
+        return dict(self._weights)
+
+    def _rebalance(self, piece: str) -> None:
+        for t in self._weights:
+            if t == piece:
+                self._weights[t] = max(self._weights[t] * _WT_DECAY, _WT_MIN)
+            else:
+                self._weights[t] += _WT_BOOST
+
+
 class ReplayGenerator(PieceGenerator):
     """Serve piece types from a saved JSON sequence.
 
@@ -178,11 +235,15 @@ class ReplayGenerator(PieceGenerator):
 
 def _make_generator(name: str) -> PieceGenerator:
     """Factory: map a settings string to a concrete generator."""
-    if name == "7bag":
-        return SevenBagGenerator()
-    if name == "35bag":
-        return ThirtyFiveBagGenerator()
-    return RandomGenerator()
+    match name:
+        case "7bag":
+            return SevenBagGenerator()
+        case "35bag":
+            return ThirtyFiveBagGenerator()
+        case "weighted":
+            return WeightedGenerator()
+        case _:
+            return RandomGenerator()
 
 
 # ---------------------------------------------------------------------------
@@ -209,7 +270,7 @@ class PieceProvider:
     allowed_types : list[str] | None
         Optional restriction on the piece pool (curriculum).
     generator : str
-        ``"random"``, ``"7bag"``, or ``"35bag"`` spawn strategy.
+        ``"random"``, ``"7bag"``, ``"35bag"``, or ``"weighted"`` spawn strategy.
     """
 
     def __init__(
@@ -275,5 +336,13 @@ class PieceProvider:
 
     @property
     def generator(self) -> str:
-        """Configured generator name (``"random"``, ``"7bag"``, ``"35bag"``)."""
+        """Configured generator name (``"random"``, ``"7bag"``, ``"35bag"``, ``"weighted"``)."""
         return self._generator_name
+
+    @property
+    def weights(self) -> dict[str, float]:
+        """Current per-type weights (weighted generator only, empty dict otherwise)."""
+        gen = self._generator
+        if isinstance(gen, WeightedGenerator):
+            return gen.weights
+        return {}
