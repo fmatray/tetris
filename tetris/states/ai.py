@@ -585,7 +585,7 @@ class AIState(GameState):
             f"Curriculum: {'ON' if self.curriculum else 'OFF'}",
             f"Pieces: {''.join(self._curriculum_types) if self._curriculum_types else 'ALL'}",
             f"Warm-start: {'ON' if self.warm_start else 'OFF'}",
-            f"Look-ahead: {'ON' if self.lookahead else 'OFF'}",
+            f"Look-ahead: {'ON' if self.lookahead else 'OFF'} (depth={self.lookahead_depth})",
             f"Soft-drop: {'ON' if self.soft_drop else 'OFF'}",
             f"Maj/pièce: {self.learn_per_action}",
         ]
