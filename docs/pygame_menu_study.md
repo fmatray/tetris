@@ -55,12 +55,10 @@ Subclasses override 7 hooks: `_value_label`, `_toggle`, `_on_select`, `_is_disab
 ```
 State
 ├── MenuBase (template)
-│   ├── MenuState          (root, 9 options, settings owner)
-│   ├── HumanMenuState     (6 options: mode, handicap, ghost, keys, stats, back)
+│   ├── HumanMenuState     (5 options: mode, ghost, keys, stats, back)
 │   ├── AIMenuState        (6 options: mode, speed, learning, stats, reset, back)
 │   ├── AudioMenuState     (4 options: sound, music, song, back)
-│   ├── GameRulesMenuState (3 options: generator, preview, back)
-│   └── HyperparamMenuState(14 options: 13 DQN params + reset, custom table draw)
+│   ├── GameRulesMenuState (4 options: generator, preview, handicap, back)
 ├── KeybindState           (interactive rebinding, not a MenuBase subclass)
 ├── StatsState             (AI stats table + matplotlib graph, any-key return)
 ├── HumanStatsState        (human stats table, any-key return)
@@ -321,8 +319,8 @@ Migrate each `MenuBase` subclass to a `pygame_menu.Menu`:
 | Submenu | Widgets needed | Complexity |
 |---------|---------------|------------|
 | AudioMenuState | 3 `Selector` + 1 `Button` (Retour) | Low |
-| GameRulesMenuState | 2 `Selector` + 1 `Button` | Low |
-| HumanMenuState | 1 `Selector` + 1 `RangeSlider` + 1 `ToggleSwitch` + 3 `Button` | Medium |
+| GameRulesMenuState | 2 `Selector` + 1 `RangeSlider` + 1 `Button` | Low |
+| HumanMenuState | 1 `Selector` + 1 `ToggleSwitch` + 3 `Button` | Medium |
 | AIMenuState | 1 `ToggleSwitch` + 1 `Selector` + 3 `Button` + confirmation | Medium |
 | HyperparamMenuState | 13 `RangeSlider`/`Selector`/`ToggleSwitch` + 1 `Button` | High |
 | MenuState | 2 `ToggleSwitch` + 6 `Button` + 1 `Selector` | Medium |

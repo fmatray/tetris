@@ -1,4 +1,4 @@
-"""Game rules sub-menu: random generator, preview count, back."""
+"""Game rules sub-menu: random generator, preview count, handicap, back."""
 
 from __future__ import annotations
 
@@ -12,10 +12,10 @@ _PREVIEW_VALUES = (0, 1, 3)
 
 
 class GameRulesMenuState(MenuBase):
-    """Game rules sub-menu: random generator, preview count, back."""
+    """Game rules sub-menu: random generator, preview count, handicap, back."""
 
-    _OPTIONS = ("Générateur", "Prévisualisation", "Retour")
-    _toggle_indices = frozenset({0, 1})
+    _OPTIONS = ("Générateur", "Prévisualisation", "Handicap", "Retour")
+    _toggle_indices = frozenset({0, 1, 2})
     _title = "Règles du jeu"
 
     def __init__(self, screen, font, audio, menu) -> None:
@@ -23,20 +23,27 @@ class GameRulesMenuState(MenuBase):
         self.menu = menu
 
     def _value_label(self, i: int) -> str:
-        if i == 0:
-            return _GENERATOR_LABELS.get(self.menu.piece_generator, "Aléatoire")
-        if i == 1:
-            idx = _PREVIEW_VALUES.index(self.menu.preview_count)
-            return _PREVIEW_LABELS[idx]
-        return ""
+        match i:
+            case 0:
+                return _GENERATOR_LABELS.get(self.menu.piece_generator, "Aléatoire")
+            case 1:
+                idx = _PREVIEW_VALUES.index(self.menu.preview_count)
+                return _PREVIEW_LABELS[idx]
+            case 2:
+                return str(self.menu.handicap)
+            case _:
+                return ""
 
     def _toggle(self, direction: int) -> None:
-        if self.selection == 0:
-            idx = _GENERATORS.index(self.menu.piece_generator)
-            self.menu.piece_generator = _GENERATORS[(idx + direction) % len(_GENERATORS)]
-        elif self.selection == 1:
-            idx = _PREVIEW_VALUES.index(self.menu.preview_count)
-            self.menu.preview_count = _PREVIEW_VALUES[(idx + direction) % len(_PREVIEW_VALUES)]
+        match self.selection:
+            case 0:
+                idx = _GENERATORS.index(self.menu.piece_generator)
+                self.menu.piece_generator = _GENERATORS[(idx + direction) % len(_GENERATORS)]
+            case 1:
+                idx = _PREVIEW_VALUES.index(self.menu.preview_count)
+                self.menu.preview_count = _PREVIEW_VALUES[(idx + direction) % len(_PREVIEW_VALUES)]
+            case 2:
+                self.menu.handicap = max(0, min(5, self.menu.handicap + direction))
 
     def _save(self) -> None:
         self.menu.save_settings()

@@ -79,9 +79,9 @@ State (base)
 | MenuState | select 6 (IA) | AIState | new instance |
 | MenuState | select 7 | LeaderboardState | new instance |
 | MenuState | select 8 / ESC | Quit | `sys.exit()` |
-| HumanMenuState | select 3 | KeybindState | new instance |
-| HumanMenuState | select 4 | HumanStatsState | new instance |
-| HumanMenuState | select 5 / back | MenuState | stored ref |
+| HumanMenuState | select 2 | KeybindState | new instance |
+| HumanMenuState | select 3 | HumanStatsState | new instance |
+| HumanMenuState | select 4 / back | MenuState | stored ref |
 | AIMenuState | select 2 | HyperparamMenuState | new instance |
 | AIMenuState | select 3 | StatsState | new instance |
 | AIMenuState | back | MenuState | stored ref |

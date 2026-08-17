@@ -6,11 +6,15 @@
 Menu principal
 ├── Joueur                        [toggle ◄ ►]     Humain ↔ IA
 ├── Son                           [toggle ◄ ►]     ON ↔ OFF
-├── Générateur                    [toggle ◄ ►]     Aléatoire ↔ 7-bag ↔ 35-bag
+├── Règles du jeu                 [ENTER]          → game rules submenu
+│   └── Générateur                [toggle ◄ ►]     Aléatoire ↔ 7-bag ↔ 35-bag ↔ Pondéré
+│       Prévisualisation          [toggle ◄ ►]     Désactivé ↔ 1 pièce ↔ 3 pièces
+│       Handicap                  [toggle ◄ ►]     0–5
+│       Retour                    [ENTER | ESC]
 ├── Débogage                      [toggle ◄ ►]     ON ↔ OFF
 ├── Humain                        [ENTER]          (grisé si Joueur=IA)
 │   └── Mode                      [toggle ◄ ►]     Normal ↔ Replay
-│       Handicap                  [toggle ◄ ►]     0–5
+│       Fantôme                   [toggle ◄ ►]     ON ↔ OFF
 │       Touches                   [ENTER]          → keybinding config
 │       Statistiques              [ENTER]          → human stats page
 │       Retour                    [ENTER | ESC]
