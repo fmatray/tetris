@@ -326,6 +326,10 @@ The **Trend** row compares the last 100 episodes' average vs the
 previous 100 episodes' average (5% threshold). Shows ↑ (improving),
 ↓ (declining), or → (stable). Requires 200+ episodes.
 
+**Last 5 moves** — displays the last 5 piece placements, each showing
+the tetromino type, rotation, column, and whether the hold was used.
+Cleared on episode reset.
+
 ### 7.4 Learning Curve Graph
 
 The AI submenu includes a **Graphique** option that opens a full-screen

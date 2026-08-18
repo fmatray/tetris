@@ -180,6 +180,8 @@ class AIState(GameState):
         self.soft_drop = soft_drop
         # Candidate placements: [(rot, px, py, hold), ...]
         self._candidate_placements: list[tuple[int, int, int, bool]] = []
+        # Last 5 moves for HUD display: [(piece, rot, col, hold), ...]
+        self._last_moves: list[tuple[str, int, int, bool]] = []
         # Per-episode tracking
         self.episode_steps = 0
         self.episode_start_grid: np.ndarray = board_to_grid(self.board)
@@ -480,6 +482,14 @@ class AIState(GameState):
                 chosen_idx = self.agent.select_action(candidates, dellvals)
                 self._prev_action = actions[chosen_idx]
                 self.episode_steps += 1
+                rot, px, _py, hold = self._candidate_placements[chosen_idx]
+                if hold:
+                    placed = self.hold_piece.type if self.hold_piece else self.next_piece.type
+                else:
+                    placed = self.current_piece.type
+                self._last_moves.append((placed, rot, px, hold))
+                if len(self._last_moves) > 5:
+                    self._last_moves.pop(0)
                 self._execute_macro_action(actions[chosen_idx])
 
         # Learning mode: fast-forward lock delay — piece is already positioned,
@@ -550,6 +560,7 @@ class AIState(GameState):
         self._prev_done: bool = False
         self._prev_action: int | None = None
         self._last_level = 0
+        self._last_moves: list[tuple[str, int, int, bool]] = []
         self._pending_level_up = False
         self.audio.set_music_speed(1.0)
 
@@ -652,6 +663,19 @@ class AIState(GameState):
             for i in range(1, 5):
                 surf = self.font.render(str(row[i]), True, RED)
                 self.screen.blit(surf, (col_x[i] - surf.get_width(), y))
+            y += lh
+
+        y += 10  # gap before moves
+
+        # --- Last 5 moves ---
+        moves_label = self.font.render("Derniers coups:", True, RED)
+        self.screen.blit(moves_label, (x0, y))
+        y += lh
+        for i, (ptype, rot, col, hold) in enumerate(self._last_moves):
+            hold_tag = " (HOLD)" if hold else ""
+            text = f"  {i + 1}. {ptype} rot={rot} col={col}{hold_tag}"
+            surf = self.font.render(text, True, RED)
+            self.screen.blit(surf, (x0, y))
             y += lh
 
     def _hud_table_rows(self) -> list[list]:

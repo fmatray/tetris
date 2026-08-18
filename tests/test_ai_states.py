@@ -45,6 +45,7 @@ def _make_ai(learning: bool = True, **kwargs: object) -> AIState:
     speed: str = str(kwargs.pop("speed", "fast"))  # type: ignore[arg-type]
     return _make_ai_full(learning=learning, speed=speed, **kwargs)
 
+
 def _make_ai_full(learning: bool = True, speed: str = "fast", **kwargs: object) -> AIState:
     soft_drop = bool(kwargs.pop("soft_drop", True))
     audio = AudioManager(sound_volume=0, music_volume=0)
@@ -124,6 +125,7 @@ class TestInit:
     def test_model_load_error_logged(self):
         """Wrong checkpoint keys → KeyError caught, AIState still created."""
         import torch
+
         torch.save({"wrong_key": 0}, MODEL_PATH)
         ai = _make_ai()
         assert ai is not None
@@ -287,9 +289,7 @@ class TestExecuteMacroAction:
     def test_hold_candidate(self):
         ai = _make_ai()
         ai._get_candidate_states()
-        hold_idx = next(
-            (i for i, p in enumerate(ai._candidate_placements) if p[3]), None
-        )
+        hold_idx = next((i for i, p in enumerate(ai._candidate_placements) if p[3]), None)
         if hold_idx is None:
             pytest.skip("No hold candidate")
         ai._execute_macro_action(hold_idx)
@@ -421,8 +421,10 @@ class TestLogAndLearn:
 
     def test_with_curriculum_advances(self):
         ai = _make_ai(
-            learning=True, curriculum=True,
-            curriculum_freq=1, curriculum_epsilon="reset",
+            learning=True,
+            curriculum=True,
+            curriculum_freq=1,
+            curriculum_epsilon="reset",
         )
         ai.episode = 1
         ai._log_and_learn()
@@ -492,6 +494,7 @@ class TestMaybeAdvanceCurriculum:
     def test_all_pieces_reached(self):
         ai = _make_ai(learning=True, curriculum=True, curriculum_freq=1)
         from tetris.settings import CURRICULUM_ORDER
+
         for _ in range(len(CURRICULUM_ORDER) - 1):
             ai._maybe_advance_curriculum()
         assert ai._curriculum_types == list(CURRICULUM_ORDER)
@@ -726,3 +729,50 @@ class TestUpdateCycle:
         assert rows[3][0] == "Average"
         assert rows[4][0] == "Last 100"
         assert rows[5][0] == "Trend"
+
+
+class TestLastMoves:
+    """Tests for the last-5-moves HUD tracking."""
+
+    def test_initially_empty(self):
+        ai = _make_ai(learning=True, speed="fast")
+        assert ai._last_moves == []
+
+    def test_records_moves_on_update(self):
+        ai = _make_ai(learning=True, speed="fast")
+        particles = ParticleSystem()
+        for _ in range(20):
+            ai.update(16, particles)
+        assert len(ai._last_moves) >= 1
+        # Each entry is (piece_type, rot, col, hold)
+        ptype, rot, col, hold = ai._last_moves[0]
+        assert ptype in "IOTSZJL"
+        assert isinstance(rot, int)
+        assert isinstance(col, int)
+        assert isinstance(hold, bool)
+
+    def test_capped_at_five(self):
+        ai = _make_ai(learning=True, speed="fast")
+        particles = ParticleSystem()
+        for _ in range(200):
+            ai.update(16, particles)
+            if len(ai._last_moves) >= 5:
+                break
+        assert len(ai._last_moves) <= 5
+
+    def test_reset_clears_moves(self):
+        ai = _make_ai(learning=True, speed="fast")
+        particles = ParticleSystem()
+        for _ in range(20):
+            ai.update(16, particles)
+        assert len(ai._last_moves) >= 1
+        ai._reset_episode()
+        assert ai._last_moves == []
+
+    def test_hud_renders_with_moves(self):
+        ai = _make_ai(learning=True, speed="fast")
+        particles = ParticleSystem()
+        for _ in range(20):
+            ai.update(16, particles)
+        assert len(ai._last_moves) >= 1
+        ai._draw_ai_hud()  # should not raise
