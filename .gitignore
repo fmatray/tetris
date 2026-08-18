@@ -52,3 +52,7 @@ Desktop.ini
 .env.*
 !.env.example
 .python-version
+
+# --- AI Skills --- 
+# .agents/
+# skills-lock.json
