@@ -18,8 +18,8 @@ GHOST_OUTLINE_WIDTH = 2  # pixel width of ghost piece outline
 
 # Game board dimensions
 BOARD_WIDTH = 10
-BOARD_HEIGHT = 22   # total rows (2 hidden buffer + 20 visible)
-VISIBLE_ROWS = 20   # rows rendered on screen (rows 0-1 are hidden)
+BOARD_HEIGHT = 22  # total rows (2 hidden buffer + 20 visible)
+VISIBLE_ROWS = 20  # rows rendered on screen (rows 0-1 are hidden)
 HIDDEN_ROWS = BOARD_HEIGHT - VISIBLE_ROWS  # 2 buffer rows above the visible field
 
 # Colors
@@ -121,18 +121,18 @@ SRS_KICKS_I: dict[tuple[int, int], list[tuple[int, int]]] = {
 }
 
 # --- Lock delay & DAS ----------------------------------------------------
-LOCK_DELAY_MS = 500        # ms before a grounded piece locks
-LOCK_DELAY_RESETS = 15    # max move/rotate resets before forced lock
-DAS_DELAY_MS = 170        # initial auto-shift delay (ms)
-DAS_REPEAT_MS = 50         # auto-shift repeat interval (ms)
+LOCK_DELAY_MS = 500  # ms before a grounded piece locks
+LOCK_DELAY_RESETS = 15  # max move/rotate resets before forced lock
+DAS_DELAY_MS = 170  # initial auto-shift delay (ms)
+DAS_REPEAT_MS = 50  # auto-shift repeat interval (ms)
 
 # Drop speed: Tetris Guideline formula (seconds per row at given level).
 # Super-exponential: (DROP_BASE - level×DROP_STEP)^level.
 # Level 0 → 1.0s, level 10 → 0.04s, level 20 → 0.001s.
-DROP_BASE = 0.8            # Tetris Guideline gravity base
-DROP_STEP = 0.007          # per-level decrement of the base
+DROP_BASE = 0.8  # Tetris Guideline gravity base
+DROP_STEP = 0.007  # per-level decrement of the base
 DROP_MIN_INTERVAL = 0.001  # minimum seconds per row (cap)
-SOFT_DROP_FACTOR = 0.1     # soft drop speed = gravity × SOFT_DROP_FACTOR
+SOFT_DROP_FACTOR = 0.1  # soft drop speed = gravity × SOFT_DROP_FACTOR
 
 # Lines required to advance one level
 LINES_PER_LEVEL = 10
@@ -162,14 +162,17 @@ HUD_POSITIONS = {
 HOLD_PANEL_X = 20
 HOLD_PANEL_Y = 250
 
+# AI HUD last-moves display position (below the board)
+AI_MOVES_POSITION = (BOARD_OFFSET_X, BOARD_OFFSET_Y + VISIBLE_ROWS * BLOCK_SIZE + 10)
+
 # Game-over animation
 GAME_OVER_DURATION_MS = 4000
 GAME_OVER_PARTICLE_COUNT = 400
 
 # AI behavior
-AI_ACTION_DELAY_MS = 80        # normal-mode reaction delay
-AI_MODEL_SAVE_INTERVAL = 50    # save model every N episodes
-LEARN_PER_ACTION = 2          # gradient updates per locked piece
+AI_ACTION_DELAY_MS = 80  # normal-mode reaction delay
+AI_MODEL_SAVE_INTERVAL = 50  # save model every N episodes
+LEARN_PER_ACTION = 2  # gradient updates per locked piece
 
 # Curriculum learning: piece introduction order (easy → hard)
 CURRICULUM_ORDER: list[str] = ["O", "I", "L", "J", "T", "S", "Z"]
@@ -188,17 +191,17 @@ LOG_PATH = os.path.join(DATA_DIR, "ai_training_log.json")
 REPLAY_PATH = os.path.join(DATA_DIR, "replay_pieces.json")
 DEBUG_LOG_PATH = os.path.join(DATA_DIR, "debug.log")
 # --- Menu background animation ------------------------------------------
-MENU_ANIM_MAX_PIECES = 35          # max simultaneously falling tetrominos
-MENU_ANIM_BLOCK_SIZE = 15         # block size for falling tetrominos (px)
-MENU_ANIM_FALL_SPEED = 45         # vertical fall speed (px/s)
+MENU_ANIM_MAX_PIECES = 35  # max simultaneously falling tetrominos
+MENU_ANIM_BLOCK_SIZE = 15  # block size for falling tetrominos (px)
+MENU_ANIM_FALL_SPEED = 45  # vertical fall speed (px/s)
 MENU_ANIM_MIN_SPAWN_INTERVAL = 0.2  # min seconds between spawns
 MENU_ANIM_MAX_SPAWN_INTERVAL = 3.0  # max seconds between spawns
 MENU_ANIM_ROT_INTERVAL = (1.5, 4.0)  # seconds between random rotations
-MENU_ANIM_ROT_CHANCE = 0.5        # probability rotation is CW vs CCW
+MENU_ANIM_ROT_CHANCE = 0.5  # probability rotation is CW vs CCW
 MENU_ANIM_EXPLODE_DELAY = (10.0, 16.0)  # seconds before explosion check
 MENU_ANIM_EXPLODE_CHANCE = 0.01  # per-frame probability after delay
 MENU_ANIM_EXPLODE_PARTICLES = 80  # particles per explosion
-MENU_ANIM_FADE_DISTANCE = 100     # px from bottom where fade-out begins
+MENU_ANIM_FADE_DISTANCE = 100  # px from bottom where fade-out begins
 
 # --- Audio --------------------------------------------------------------
 SOUND_VOLUME_LEVELS = [0.0, 0.25, 0.5, 1.0]  # Off, Low, Half, Full
@@ -214,7 +217,7 @@ MUSIC_SONG_PATHS = {
 }
 MUSIC_BASE_SPEED = 1.0
 MUSIC_SPEED_PER_LEVEL = 0.05  # +5% speed per level
-MUSIC_MAX_SPEED = 2.0          # cap at 2x
+MUSIC_MAX_SPEED = 2.0  # cap at 2x
 
 
 # --- Keybindings --------------------------------------------------------

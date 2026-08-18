@@ -42,9 +42,7 @@ from tetris.logger import get_logger
 from tetris.settings import (
     AI_ACTION_DELAY_MS,
     AI_MODEL_SAVE_INTERVAL,
-    BLOCK_SIZE,
-    BOARD_OFFSET_X,
-    BOARD_OFFSET_Y,
+    AI_MOVES_POSITION,
     BOARD_WIDTH,
     CURRICULUM_ORDER,
     HUD_POSITIONS,
@@ -55,7 +53,6 @@ from tetris.settings import (
     RED,
     SCREEN_WIDTH,
     SHAPES,
-    VISIBLE_ROWS,
 )
 from tetris.states.base import State
 from tetris.states.game import GameState
@@ -676,7 +673,7 @@ class AIState(GameState):
         ]
         moves_text = "Derniers coups: " + " | ".join(parts) if parts else "Derniers coups: —"
         surf = self.font.render(moves_text, True, RED)
-        self.screen.blit(surf, (BOARD_OFFSET_X, BOARD_OFFSET_Y + VISIBLE_ROWS * BLOCK_SIZE + 10))
+        self.screen.blit(surf, AI_MOVES_POSITION)
 
     def _hud_table_rows(self) -> list[list]:
         """Build the 6 statistics rows: Current, Total, Best, Average, Last 100, Trend."""
