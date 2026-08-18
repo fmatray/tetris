@@ -29,10 +29,7 @@ from tetris.settings import (
     GHOST_OUTLINE_WIDTH,
     GRAY,
     HIDDEN_ROWS,
-    HOLD_PANEL_X,
-    HOLD_PANEL_Y,
     HUD_POSITIONS,
-    NEXT_PANEL_X,
     SCREEN_HEIGHT,
     SCREEN_WIDTH,
     SHAPES,
@@ -45,7 +42,6 @@ from tetris.visuals.particles import Particle, ParticleSystem
 
 if TYPE_CHECKING:
     from tetris.states.game import GameState
-
 
 
 class Renderer:
@@ -77,11 +73,16 @@ class Renderer:
             self._draw_text(f"SPEED: {int(game.current_speed * 1000)}ms", HUD_POSITIONS["speed"])
         self._draw_text("HOLD:", HUD_POSITIONS["hold"])
         if game.hold_piece is not None:
-            self.draw_panel_pieces([game.hold_piece], HOLD_PANEL_X, HOLD_PANEL_Y, dim=not game._can_hold)
+            self.draw_panel_pieces(
+                [game.hold_piece],
+                HUD_POSITIONS["hold_panel"][0],
+                HUD_POSITIONS["hold_panel"][1],
+                dim=not game._can_hold,
+            )
         if getattr(game, "preview_count", 3) > 0:
             self._draw_text("NEXT:", HUD_POSITIONS["next"])
             next_queue = [game.next_piece] + getattr(game, "preview_pieces", [])
-            self.draw_panel_pieces(next_queue, NEXT_PANEL_X, HUD_POSITIONS["next"][1] + 30)
+            self.draw_panel_pieces(next_queue, HUD_POSITIONS["next"][0], HUD_POSITIONS["next"][1] + 30)
         if game.debug:
             match game.pieces.generator:
                 case "7bag" | "35bag":
@@ -107,10 +108,9 @@ class Renderer:
     def _draw_debug_bag(self, game: GameState) -> None:
         """Draw remaining bag pieces as colored blocks right of the next-piece panel."""
         bag = game.pieces.bag_remaining
-        x = NEXT_PANEL_X + 7 * BLOCK_SIZE + 20
+        x = HUD_POSITIONS["next"][0] + 7 * BLOCK_SIZE + 20
         y = HUD_POSITIONS["next"][1]
         self._draw_text(f"SAC ({len(bag)}):", (x, y))
-        y += 60
         start_x = x
         max_per_row = max(1, (SCREEN_WIDTH - x) // (BLOCK_SIZE + 2))
         for i, piece_type in enumerate(bag[::-1]):
@@ -127,10 +127,9 @@ class Renderer:
     def _draw_debug_weights(self, game: GameState) -> None:
         """Draw each tetromino type and its current weight (weighted generator)."""
         weights = game.pieces.weights
-        x = NEXT_PANEL_X + 7 * BLOCK_SIZE + 20
+        x = HUD_POSITIONS["next"][0] + 7 * BLOCK_SIZE + 20
         y = HUD_POSITIONS["next"][1]
         self._draw_text("POIDS:", (x, y))
-        y += 30
         for piece_type in SHAPES:
             color = SHAPES_COLORS[piece_type]
             rect = pygame.Rect(x, y, BLOCK_SIZE, BLOCK_SIZE)
@@ -138,6 +137,7 @@ class Renderer:
             w = weights.get(piece_type, 1.0)
             self._draw_text(f"{piece_type}: {w:.2f}", (x + BLOCK_SIZE + 6, y + 2))
             y += BLOCK_SIZE + 2
+
     @staticmethod
     def _cell_rect(x: int, y: int, ox: int, oy: int) -> pygame.Rect:
         # y is a grid row; offset by hidden rows so only visible rows are drawn
@@ -218,16 +218,12 @@ class Renderer:
 
     def _render_glitch_board(self, game: GameState, shake_x: int, shake_y: int, glitch: float) -> pygame.Surface:
         hidden = HIDDEN_ROWS
-        board_surf = pygame.Surface(
-            (BOARD_WIDTH * BLOCK_SIZE, VISIBLE_ROWS * BLOCK_SIZE)
-        )
+        board_surf = pygame.Surface((BOARD_WIDTH * BLOCK_SIZE, VISIBLE_ROWS * BLOCK_SIZE))
         board_surf.set_colorkey(BLACK)
         for y in range(hidden, BOARD_HEIGHT):
             for x in range(BOARD_WIDTH):
                 sy = y - hidden
-                rect = pygame.Rect(
-                    x * BLOCK_SIZE, sy * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE
-                )
+                rect = pygame.Rect(x * BLOCK_SIZE, sy * BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE)
                 pygame.draw.rect(board_surf, GRAY, rect, 1)
                 if game.board.grid[y][x]:
                     color = (
@@ -257,11 +253,7 @@ class Renderer:
         g = int(127 + 127 * math.sin(elapsed * 0.01 + 2 * math.pi / 3))
         b = int(127 + 127 * math.sin(elapsed * 0.01 + 4 * math.pi / 3))
         txt = get_large_font().render("!!! GAME OVER !!!", True, (r, g, b))
-        dx, dy = (
-            (random.randint(-10, 10), random.randint(-10, 10))
-            if elapsed < 2000
-            else (0, 0)
-        )
+        dx, dy = (random.randint(-10, 10), random.randint(-10, 10)) if elapsed < 2000 else (0, 0)
         self.screen.blit(
             txt,
             (
@@ -290,12 +282,8 @@ class Renderer:
                 audio.play("glitch")
             else:
                 self.screen.fill(BLACK)
-            shake_x = (
-                random.randint(-15, 15) if elapsed < 1500 else random.randint(-3, 3)
-            )
-            shake_y = (
-                random.randint(-15, 15) if elapsed < 1500 else random.randint(-3, 3)
-            )
+            shake_x = random.randint(-15, 15) if elapsed < 1500 else random.randint(-3, 3)
+            shake_y = random.randint(-15, 15) if elapsed < 1500 else random.randint(-3, 3)
             glitch = random.random()
             self._render_glitch_board(game, shake_x, shake_y, glitch)
             if random.random() < 0.3:

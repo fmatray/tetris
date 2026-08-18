@@ -5,8 +5,7 @@ from __future__ import annotations
 from tetris.settings import (
     MUSIC_SONG_LABELS,
     MUSIC_SONGS,
-    MUSIC_VOLUME_LABELS,
-    SOUND_VOLUME_LABELS,
+    VOLUME_LABELS,
 )
 from tetris.states.base import State
 from tetris.states.menu_base import MenuBase
@@ -27,9 +26,9 @@ class AudioMenuState(MenuBase):
 
     def _value_label(self, i: int) -> str:
         if i == 0:
-            return SOUND_VOLUME_LABELS[self.menu.sound_volume]
+            return VOLUME_LABELS[self.menu.sound_volume]
         if i == 1:
-            return MUSIC_VOLUME_LABELS[self.menu.music_volume]
+            return VOLUME_LABELS[self.menu.music_volume]
         if i == 2:
             return MUSIC_SONG_LABELS[self.menu.music_song]
         return ""
