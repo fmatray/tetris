@@ -102,6 +102,8 @@ class AIState(GameState):
         soft_drop: bool = True,
         preview_count: int = 3,
         debug: bool = False,
+        seed: int | None = None,
+        device: str = "auto",
     ) -> None:
         """Initialize the AI gameplay/training state.
 
@@ -137,11 +139,25 @@ class AIState(GameState):
             lookahead_depth: Number of upcoming pieces to simulate (1–3).
             soft_drop: Use soft-drop BFS for candidate generation.
             debug: Enable debug overlays.
+            seed: Random seed for reproducible training (``None`` = non-deterministic).
+            device: Torch device (``"auto"``, ``"cpu"``, or ``"cuda"``).
         """
         # Curriculum: restrict piece pool BEFORE super().__init__() spawns pieces
         if curriculum and ai_mode == "learning" and piece_provider is not None:
             piece_provider.set_allowed_types(["O"])
-        super().__init__(screen, font, audio, handicap, sound_volume, music_volume, music_song, piece_provider, menu, preview_count=preview_count, debug=debug)
+        super().__init__(
+            screen,
+            font,
+            audio,
+            handicap,
+            sound_volume,
+            music_volume,
+            music_song,
+            piece_provider,
+            menu,
+            preview_count=preview_count,
+            debug=debug,
+        )
         self._handicap = handicap
         self.ghost_piece = False  # AI never shows ghost piece
         self.agent = DQNAgent(
@@ -151,6 +167,8 @@ class AIState(GameState):
             gamma=gamma,
             batch_size=batch_size,
             buffer_size=buffer_size,
+            device=device,
+            seed=seed,
         )
         self.log = TrainingLog(LOG_PATH)
         self.episode = self.log.total_episodes
@@ -221,6 +239,7 @@ class AIState(GameState):
                 if px < 0 or px + max_bx >= BOARD_WIDTH:
                     continue
                 yield shape, rot, px
+
     def _best_next_placement(self, grid: np.ndarray, piece_type: str) -> np.ndarray:
         """Simulate best placement of next piece on grid (2-piece look-ahead).
 
@@ -316,14 +335,12 @@ class AIState(GameState):
         self._candidate_placements = list(zip(all_rots, all_pxs, all_pys, all_holds))
 
         # Batch place + clear
-        sim_grids, lines_cleared = place_and_clear_batch(
-            base_grid, all_shapes, all_pxs, all_pys
-        )
+        sim_grids, lines_cleared = place_and_clear_batch(base_grid, all_shapes, all_pxs, all_pys)
 
         # Lookahead (per-candidate — each depends on its own sim_grid)
         if self.lookahead:
             for i in range(len(all_shapes)):
-                for pt in upcoming_types[:self.lookahead_depth]:
+                for pt in upcoming_types[: self.lookahead_depth]:
                     sim_grids[i] = self._best_next_placement(sim_grids[i], pt)
 
         # Batch feature extraction + Dellacherie
@@ -613,7 +630,6 @@ class AIState(GameState):
 
         y += 10  # gap between sections
 
-
         # --- Statistics table ---
         # Columns: [Tetromino, Lines, Score, Level] — right-aligned
         # Rows: [Current, Total, Best, Average, Last 100]
@@ -654,27 +670,28 @@ class AIState(GameState):
             ["Current", cur_steps, cur_lines, cur_score, cur_level],
             ["Total", total_steps, total_lines, total_score, "—"],
             ["Best", log.best_steps, log.best_lines, log.best_score, log.best_level],
-            ["Average",
-             f"{log.avg_steps:.1f}",
-             f"{log.avg_lines:.1f}",
-             f"{log.avg_score:.1f}",
-             f"{log.avg_level:.1f}"],
-            ["Last 100",
-             f"{log.last_100_avg_steps:.1f}",
-             f"{log.last_100_avg_lines:.1f}",
-             f"{log.last_100_avg:.1f}",
-             f"{log.last_100_avg_level:.1f}"],
-            ["Trend",
-             self._trend_arrow(log._trend("steps")),
-             self._trend_arrow(log._trend("lines")),
-             self._trend_arrow(log._trend("score")),
-             self._trend_arrow(log._trend("level"))],
+            ["Average", f"{log.avg_steps:.1f}", f"{log.avg_lines:.1f}", f"{log.avg_score:.1f}", f"{log.avg_level:.1f}"],
+            [
+                "Last 100",
+                f"{log.last_100_avg_steps:.1f}",
+                f"{log.last_100_avg_lines:.1f}",
+                f"{log.last_100_avg:.1f}",
+                f"{log.last_100_avg_level:.1f}",
+            ],
+            [
+                "Trend",
+                self._trend_arrow(log._trend("steps")),
+                self._trend_arrow(log._trend("lines")),
+                self._trend_arrow(log._trend("score")),
+                self._trend_arrow(log._trend("level")),
+            ],
         ]
 
     @staticmethod
     def _trend_arrow(trend: str) -> str:
         """Convert a trend string to an arrow symbol."""
         return {"up": "↑", "down": "↓", "stable": "→"}.get(trend, "→")
+
     # --- ESC handling (return to menu) -----------------------------------
 
     def handle_event(self, event: pygame.event.Event) -> State | None:

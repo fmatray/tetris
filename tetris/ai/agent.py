@@ -51,7 +51,8 @@ class DQNAgent:
         epsilon_decay: float = 0.999,
         batch_size: int = 64,
         buffer_size: int = 50_000,
-        device: str = "cpu",
+        device: str = "auto",
+        seed: int | None = None,
     ) -> None:
         """Initialize the DQN agent: network, target network, optimizer, buffer.
 
@@ -64,7 +65,8 @@ class DQNAgent:
             epsilon_decay: Per-episode multiplicative decay.
             batch_size: Mini-batch size for learning.
             buffer_size: Replay buffer capacity.
-            device: Torch device (``"cpu"`` or ``"cuda"``).
+            device: Torch device (``"auto"``, ``"cpu"``, or ``"cuda"``).
+            seed: Random seed for reproducibility (``None`` = non-deterministic).
         """
         self.state_size = state_size
         self.gamma = gamma
@@ -73,6 +75,13 @@ class DQNAgent:
         self.epsilon_decay = epsilon_decay
         self.batch_size = batch_size
         self.tau: float = 0.005
+        self.seed = seed
+        if seed is not None:
+            torch.manual_seed(seed)
+            np.random.seed(seed)
+            random.seed(seed)
+        if device == "auto":
+            device = "cuda" if torch.cuda.is_available() else "cpu"
         self.device = torch.device(device)
 
         self.online_net = DQNetwork(state_size).to(self.device)
@@ -92,9 +101,7 @@ class DQNAgent:
 
     # --- Action selection -----------------------------------------------
 
-    def select_action(
-        self, candidate_states: np.ndarray, dellacherie_values: np.ndarray | None = None
-    ) -> int:
+    def select_action(self, candidate_states: np.ndarray, dellacherie_values: np.ndarray | None = None) -> int:
         """ε-greedy: random candidate with prob ε, greedy (max V) otherwise.
 
         During exploration, uses Dellacherie-weighted softmax (warm-start)
@@ -113,6 +120,7 @@ class DQNAgent:
                 probs = _softmax(dellacherie_values / WARM_START_TEMP)
                 return int(np.random.choice(n, p=probs))
             return random.randint(0, n - 1)
+        self.online_net.eval()
         with torch.no_grad():
             states = torch.from_numpy(candidate_states).float().to(self.device)
             values = self.online_net(states).squeeze(-1)
@@ -139,14 +147,15 @@ class DQNAgent:
     def _push_n_step(self) -> None:
         """Compute n-step return from buffer and push to PER."""
         s0, a0, _, _, _ = self._n_step_buffer[0]
+        actual_n = len(self._n_step_buffer)
         r = 0.0
         for i, (_, _, ri, _, di) in enumerate(self._n_step_buffer):
-            r += (self.gamma ** i) * ri
+            r += (self.gamma**i) * ri
             if di:
                 break
         sn = self._n_step_buffer[-1][3]
         done_n = any(t[4] for t in self._n_step_buffer)
-        self.buffer.push(s0, a0, r, sn, done_n)
+        self.buffer.push(s0, a0, r, sn, done_n, actual_n)
         # Slide window: remove oldest (keep remaining for overlap)
         self._n_step_buffer.popleft()
 
@@ -165,17 +174,20 @@ class DQNAgent:
         if len(self.buffer) < self.batch_size:
             return None
 
+        self.online_net.train()
         batch, weights, indices = self.buffer.sample(self.batch_size)
         states = np.array([t[0] for t in batch])
         rewards = np.array([t[2] for t in batch])
         next_states = np.array([t[3] for t in batch])
         dones = np.array([t[4] for t in batch])
+        n_steps = np.array([t[5] for t in batch])
 
         states_t = torch.from_numpy(states).float().to(self.device)
         rewards_t = torch.from_numpy(rewards).float().to(self.device)
         next_states_t = torch.from_numpy(next_states).float().to(self.device)
         dones_t = torch.from_numpy(dones).float().to(self.device)
         weights_t = torch.from_numpy(weights).float().to(self.device)
+        n_steps_t = torch.from_numpy(n_steps).float().to(self.device)
 
         # Current V-values
         current_v = self.online_net(states_t).squeeze(-1)
@@ -183,7 +195,7 @@ class DQNAgent:
         # Target V = r + gamma^n * V_target(s') * (1 - done)
         with torch.no_grad():
             target_v = self.target_net(next_states_t).squeeze(-1)
-            target_v = rewards_t + (self.gamma ** N_STEP) * target_v * (1 - dones_t)
+            target_v = rewards_t + (self.gamma**n_steps_t) * target_v * (1 - dones_t)
 
         td_errors = (current_v - target_v).detach()
         loss = (self.loss_fn(current_v, target_v) * weights_t).mean()
@@ -227,7 +239,7 @@ class DQNAgent:
 
     def load(self, path: str) -> None:
         """Load model weights and resume training from checkpoint."""
-        checkpoint = torch.load(path, map_location=self.device, weights_only=False)
+        checkpoint = torch.load(path, map_location=self.device, weights_only=True)
         self.online_net.load_state_dict(checkpoint["online_net"])
         self.target_net.load_state_dict(checkpoint["target_net"])
         self.optimizer.load_state_dict(checkpoint["optimizer"])

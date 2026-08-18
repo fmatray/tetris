@@ -11,9 +11,12 @@ from collections import deque
 
 import numpy as np
 
+# N-step return horizon (matches agent.N_STEP; duplicated to avoid circular import).
+N_STEP = 3
+
 
 class PrioritizedReplayBuffer:
-    """Proportional PER buffer storing (s, a, r, s', done) transitions."""
+    """Proportional PER buffer storing (s, a, r, s', done, n) transitions."""
 
     def __init__(
         self,
@@ -32,7 +35,7 @@ class PrioritizedReplayBuffer:
         """
         self.capacity = capacity
         self.alpha = alpha  # 0=uniform, 1=full priority
-        self.beta = beta    # IS correction (anneals to 1.0)
+        self.beta = beta  # IS correction (anneals to 1.0)
         self.beta_increment = beta_increment
         self.buffer: deque = deque(maxlen=capacity)
         self.priorities: deque = deque(maxlen=capacity)
@@ -44,17 +47,19 @@ class PrioritizedReplayBuffer:
         reward: float,
         next_state: np.ndarray,
         done: bool,
+        n: int = N_STEP,
     ) -> None:
         """Store a transition with max-priority (assumed high TD-error).
 
         Args:
             state: Pre-placement feature vector.
             action: Candidate index chosen.
-            reward: Reward received.
+            reward: N-step return received.
             next_state: Post-placement feature vector.
-            done: Whether the episode ended.
+            done: Whether the episode ended within the n-step window.
+            n: Actual number of steps aggregated in the return (for discount).
         """
-        self.buffer.append((state, action, reward, next_state, done))
+        self.buffer.append((state, action, reward, next_state, done, n))
         max_prio = max(self.priorities) if self.priorities else 1.0
         self.priorities.append(max_prio)
 
@@ -63,7 +68,7 @@ class PrioritizedReplayBuffer:
         if len(self.buffer) < batch_size:
             return list(self.buffer), np.ones(len(self.buffer)), np.ones(len(self.buffer), dtype=int)
         priorities = np.array(self.priorities, dtype=np.float32)
-        probs = priorities ** self.alpha
+        probs = priorities**self.alpha
         probs /= probs.sum()
         indices = np.random.choice(len(self.buffer), size=batch_size, p=probs)
         samples = [self.buffer[i] for i in indices]

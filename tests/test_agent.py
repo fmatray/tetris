@@ -52,7 +52,7 @@ class TestNStepReturns:
             agent.store(_state(i), 0, rewards[i], _state(i + 1), done=False)
         # Expected: 1.0 + 0.9*2.0 + 0.81*3.0 = 1.0 + 1.8 + 2.43 = 5.23
         transition = agent.buffer.buffer[0]
-        expected = sum(0.9 ** i * rewards[i] for i in range(N_STEP))
+        expected = sum(0.9**i * rewards[i] for i in range(N_STEP))
         assert abs(transition[2] - expected) < 0.01
 
     def test_flush_n_step(self):
@@ -194,7 +194,7 @@ def test_select_action_warm_start_proportional():
     """With dellacherie_values, exploration is softmax-weighted (not uniform)."""
     agent = DQNAgent(epsilon_start=1.0)
     states = _candidate_states(10)
- # Dellacherie values: one candidate is much better than the rest
+    # Dellacherie values: one candidate is much better than the rest
     dell = np.array([-200.0] * 9 + [-10.0], dtype=np.float32)
     counts = np.zeros(10)
     for _ in range(3000):
@@ -362,3 +362,76 @@ def test_store_done_flushes_n_step_immediately():
     assert len(agent._n_step_buffer) == 0
     # All 3 transitions flushed as n-step returns
     assert len(agent.buffer) == 3
+
+
+# ---------------------------------------------------------------------------
+# Tests for seed reproducibility
+# ---------------------------------------------------------------------------
+
+
+def test_seed_produces_identical_weights():
+    """Two agents with the same seed have identical initial weights."""
+    a1 = DQNAgent(seed=42)
+    a2 = DQNAgent(seed=42)
+    for p1, p2 in zip(a1.online_net.parameters(), a2.online_net.parameters()):
+        assert torch.allclose(p1, p2)
+
+
+def test_different_seeds_produce_different_weights():
+    """Two agents with different seeds have different initial weights."""
+    a1 = DQNAgent(seed=42)
+    a2 = DQNAgent(seed=43)
+    diffs = [not torch.allclose(p1, p2) for p1, p2 in zip(a1.online_net.parameters(), a2.online_net.parameters())]
+    assert any(diffs)
+
+
+# ---------------------------------------------------------------------------
+# Tests for eval/train mode toggles
+# ---------------------------------------------------------------------------
+
+
+def test_select_action_sets_eval_mode():
+    """select_action() sets online_net to eval mode."""
+    agent = DQNAgent(seed=42, epsilon_start=0.0)
+    states = _candidate_states(5)
+    agent.select_action(states)
+    assert agent.online_net.training is False
+
+
+def test_learn_sets_train_mode():
+    """learn() sets online_net to train mode."""
+    agent = DQNAgent(batch_size=4, seed=42)
+    for i in range(20):
+        agent.store(_state(i), 0, 1.0, _state(i + 1), done=(i == 19))
+    agent.learn()
+    assert agent.online_net.training is True
+
+
+# ---------------------------------------------------------------------------
+# Tests for n-step partial flush discount
+# ---------------------------------------------------------------------------
+
+
+def test_n_step_partial_flush_stores_actual_n():
+    """Partial flush stores the actual number of steps aggregated, not N_STEP."""
+    agent = DQNAgent()
+    # Store 2 transitions (less than N_STEP=3), then flush
+    agent.store(_state(0), 0, 1.0, _state(1), done=False)
+    agent.store(_state(1), 0, 2.0, _state(2), done=False)
+    agent.flush_n_step()
+    # First flush: 2-step return → n=2; second flush: 1-step return → n=1
+    assert agent.buffer.buffer[0][5] == 2
+    assert agent.buffer.buffer[1][5] == 1
+
+
+def test_learn_uses_per_transition_discount():
+    """learn() applies per-transition gamma^n discount without crashing."""
+    agent = DQNAgent(batch_size=4, seed=42)
+    # Fill buffer: 3 full n-step transitions + a partial flush
+    for i in range(9):
+        agent.store(_state(i), 0, 1.0, _state(i + 1), done=False)
+    agent.flush_n_step()  # Flush remaining partial n-step transitions
+    assert len(agent.buffer) >= agent.batch_size
+    result = agent.learn()
+    assert result is not None
+    assert isinstance(result, float)

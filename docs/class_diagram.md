@@ -313,7 +313,7 @@ classDiagram
             - _curriculum_types: list~str~ | None
             - _curriculum_level: int
             - _curriculum_episode_count: int
-            +__init__(screen, font, audio, handicap, sound_volume, music_volume, music_song, piece_provider, speed, menu, epsilon_decay, epsilon_end, lr, gamma, batch_size, buffer_size, ai_mode, curriculum, curriculum_freq, curriculum_epsilon, warm_start, learn_per_action, lookahead, lookahead_depth, soft_drop, preview_count, debug) None
+            +__init__(screen, font, audio, handicap, sound_volume, music_volume, music_song, piece_provider, speed, menu, epsilon_decay, epsilon_end, lr, gamma, batch_size, buffer_size, ai_mode, curriculum, curriculum_freq, curriculum_epsilon, warm_start, learn_per_action, lookahead, lookahead_depth, soft_drop, preview_count, debug, seed, device) None
             - _is_valid_placement(piece, rotation: int, column: int) bool
             - _iter_column_positions(piece_type: str) Generator
             - _best_next_placement(grid: np.ndarray, piece_type: str) np.ndarray
@@ -513,6 +513,7 @@ classDiagram
             +batch_size: int
             +tau: float
             +device: torch.device
+            +seed: int | None
             +online_net: DQNetwork
             +target_net: DQNetwork
             +optimizer: optim.Adam
@@ -521,7 +522,7 @@ classDiagram
             - _n_step_buffer: deque
             +steps: int
             +last_loss: float
-            +__init__(state_size, lr, gamma, epsilon_start, epsilon_end, epsilon_decay, batch_size, buffer_size, device) None
+            +__init__(state_size, lr, gamma, epsilon_start, epsilon_end, epsilon_decay, batch_size, buffer_size, device, seed) None
             +select_action(candidate_states: np.ndarray, dellacherie_values: np.ndarray | None) int
             +store(state: np.ndarray, action: int, reward: float, next_state: np.ndarray, done: bool) None
             - _push_n_step() None
@@ -549,7 +550,7 @@ classDiagram
             +buffer: deque
             +priorities: deque
             +__init__(capacity: int, alpha: float, beta: float, beta_increment: float) None
-            +push(state: np.ndarray, action: int, reward: float, next_state: np.ndarray, done: bool) None
+            +push(state: np.ndarray, action: int, reward: float, next_state: np.ndarray, done: bool, n: int) None
             +sample(batch_size: int) tuple~list, np.ndarray, np.ndarray~
             +update_priorities(indices: np.ndarray, td_errors: np.ndarray) None
             +__len__() int

@@ -169,6 +169,9 @@ Output (1, Linear) → V(board) = board value
 - **Batch size**: 64
 - **Discount factor (γ)**: 0.97
 - **Polyak τ**: 0.005 (soft target update every step)
+- **Device**: `auto` (CUDA if available, else CPU). No MPS — transfer overhead negates gains on this small network.
+- **Seed**: `None` by default (non-deterministic). Set `seed=N` for reproducible weight init + sampling.
+- **Mode toggling**: `online_net.eval()` during inference, `online_net.train()` during learning.
 
 The V-network evaluates board quality. Per-candidate action selection:
 evaluate V(resulting_board) for each valid placement, pick max. No
@@ -220,10 +223,14 @@ optional dependency.
 | `ai_curriculum` | OFF | ON/OFF | toggle |
 | `ai_curriculum_freq` | 50 | 10–500 | 10 |
 | `ai_curriculum_epsilon` | reset | reset/boost/decay | cycle |
-| `ai_warm_start` | ON | ON/OFF | toggle |
-| `ai_learn_per_action` | 2 | 1–8 | 1 |
-| `ai_lookahead` | ON | ON/OFF | toggle |
 | `ai_soft_drop` | ON | ON/OFF | toggle |
+
+Constructor-only parameters (not in menu, for `verify_training` / programmatic use):
+
+| Parameter | Default | Description |
+| --------- | ------- | ----------- |
+| `seed` | `None` | Random seed for reproducible training (`torch` + `numpy` + `random`) |
+| `device` | `auto` | Torch device: `auto` (CUDA if available), `cpu`, or `cuda` |
 
 
 These are configurable in the **AI submenu** and persisted to
