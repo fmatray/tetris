@@ -42,6 +42,9 @@ from tetris.logger import get_logger
 from tetris.settings import (
     AI_ACTION_DELAY_MS,
     AI_MODEL_SAVE_INTERVAL,
+    BLOCK_SIZE,
+    BOARD_OFFSET_X,
+    BOARD_OFFSET_Y,
     BOARD_WIDTH,
     CURRICULUM_ORDER,
     HUD_POSITIONS,
@@ -52,6 +55,7 @@ from tetris.settings import (
     RED,
     SCREEN_WIDTH,
     SHAPES,
+    VISIBLE_ROWS,
 )
 from tetris.states.base import State
 from tetris.states.game import GameState
@@ -665,18 +669,14 @@ class AIState(GameState):
                 self.screen.blit(surf, (col_x[i] - surf.get_width(), y))
             y += lh
 
-        y += 10  # gap before moves
-
-        # --- Last 5 moves ---
-        moves_label = self.font.render("Derniers coups:", True, RED)
-        self.screen.blit(moves_label, (x0, y))
-        y += lh
-        for i, (ptype, rot, col, hold) in enumerate(self._last_moves):
-            hold_tag = " (HOLD)" if hold else ""
-            text = f"  {i + 1}. {ptype} rot={rot} col={col}{hold_tag}"
-            surf = self.font.render(text, True, RED)
-            self.screen.blit(surf, (x0, y))
-            y += lh
+        # --- Last 5 moves (compact, below board) ---
+        parts = [
+            f"{ptype} r{rot} c{col} {'H' if hold else ' '}"
+            for _i, (ptype, rot, col, hold) in enumerate(self._last_moves)
+        ]
+        moves_text = "Derniers coups: " + " | ".join(parts) if parts else "Derniers coups: —"
+        surf = self.font.render(moves_text, True, RED)
+        self.screen.blit(surf, (BOARD_OFFSET_X, BOARD_OFFSET_Y + VISIBLE_ROWS * BLOCK_SIZE + 10))
 
     def _hud_table_rows(self) -> list[list]:
         """Build the 6 statistics rows: Current, Total, Best, Average, Last 100, Trend."""
