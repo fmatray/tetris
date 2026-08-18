@@ -136,6 +136,13 @@ python -m tetris.verify_training
 - **Headless testing** requires `SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy`
 - **Vision model unavailable for image files** — use pixel-level analysis via `screen.get_at()` instead
 
+## UI Layout Rules
+
+When rendering text, tables, or HUD overlays:
+- **No overlap**: text and tables must not overlap other text, tables, the game board, or pieces. Use explicit pixel positions from `HUD_POSITIONS` and layout constants in `settings.py`.
+- **No window overflow**: all rendered elements must stay within `SCREEN_WIDTH` × `SCREEN_HEIGHT` (1500×800). Verify text surface width + x position ≤ `SCREEN_WIDTH`, and y + surface height ≤ `SCREEN_HEIGHT`.
+- **Always leave margin**: maintain visible padding between elements and screen edges. No text flush against borders.
+
 ## Testing & QA
 
 Verification patterns:
