@@ -108,8 +108,8 @@ class Renderer:
     def _draw_debug_bag(self, game: GameState) -> None:
         """Draw remaining bag pieces as colored blocks right of the next-piece panel."""
         bag = game.pieces.bag_remaining
-        x = HUD_POSITIONS["next"][0] + 7 * BLOCK_SIZE + 20
-        y = HUD_POSITIONS["next"][1]
+        x = HUD_POSITIONS["debug_bag"][0]
+        y = HUD_POSITIONS["debug_bag"][1]
         self._draw_text(f"SAC ({len(bag)}):", (x, y))
         start_x = x
         max_per_row = max(1, (SCREEN_WIDTH - x) // (BLOCK_SIZE + 2))
@@ -127,8 +127,8 @@ class Renderer:
     def _draw_debug_weights(self, game: GameState) -> None:
         """Draw each tetromino type and its current weight (weighted generator)."""
         weights = game.pieces.weights
-        x = HUD_POSITIONS["next"][0] + 7 * BLOCK_SIZE + 20
-        y = HUD_POSITIONS["next"][1]
+        x = HUD_POSITIONS["debug_bag"][0]
+        y = HUD_POSITIONS["debug_bag"][1]
         self._draw_text("POIDS:", (x, y))
         for piece_type in SHAPES:
             color = SHAPES_COLORS[piece_type]

@@ -160,6 +160,7 @@ HUD_POSITIONS = {
     "mode": (20, 700),
     "generator": (20, 740),
     "ai_moves": (BOARD_OFFSET_X, BOARD_OFFSET_Y + VISIBLE_ROWS * BLOCK_SIZE + 10),
+    "debug_bag": (800, 50),  # bag/weights debug panel (7 blocks + 20px right of next panel)
 }
 
 # --- Game-over animation -----------------------------------------------
