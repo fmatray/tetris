@@ -155,12 +155,14 @@ HUD_POSITIONS = {
     "speed": (20, 180),
     "hold": (20, 220),  # "HOLD:" label
     "hold_panel": (20, 250),  # hold piece drawing position
-    "next": (570, 50),  # "NEXT:" label and next-panel x
+    "next": (570, 50),  # "NEXT:" label
+    "next_panel": (570, 80),  # next pieces drawing (30px below label)
     "ai_stats": (570, 350),
     "mode": (20, 700),
     "generator": (20, 740),
-    "ai_moves": (BOARD_OFFSET_X, BOARD_OFFSET_Y + VISIBLE_ROWS * BLOCK_SIZE + 10),
-    "debug_bag": (800, 50),  # bag/weights debug panel (7 blocks + 20px right of next panel)
+    "ai_moves": (800, 100),
+    "debug_bag": (800, 50),  # bag/weights debug panel
+    "pause": (750, 400),  # pause overlay center (screen center)
 }
 
 # --- Game-over animation -----------------------------------------------

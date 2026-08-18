@@ -82,7 +82,7 @@ class Renderer:
         if getattr(game, "preview_count", 3) > 0:
             self._draw_text("NEXT:", HUD_POSITIONS["next"])
             next_queue = [game.next_piece] + getattr(game, "preview_pieces", [])
-            self.draw_panel_pieces(next_queue, HUD_POSITIONS["next"][0], HUD_POSITIONS["next"][1] + 30)
+            self.draw_panel_pieces(next_queue, HUD_POSITIONS["next_panel"][0], HUD_POSITIONS["next_panel"][1])
         if game.debug:
             match game.pieces.generator:
                 case "7bag" | "35bag":
@@ -97,7 +97,7 @@ class Renderer:
             pause_text = get_large_font().render("PAUSE", True, WHITE)
             self.screen.blit(
                 pause_text,
-                (SCREEN_WIDTH // 2 - pause_text.get_width() // 2, SCREEN_HEIGHT // 2),
+                (HUD_POSITIONS["pause"][0] - pause_text.get_width() // 2, HUD_POSITIONS["pause"][1]),
             )
         particles.draw(self.screen)
 
