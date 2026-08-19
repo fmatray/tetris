@@ -19,6 +19,7 @@ def piece():
 
 # --- is_valid_move --------------------------------------------------
 
+
 def test_empty_board_valid_spawn(board, piece):
     """A new piece at spawn position is valid on an empty board."""
     assert board.is_valid_move(piece) is True
@@ -61,6 +62,7 @@ def test_is_valid_move_with_rotation(board):
 
 # --- lock_tetromino -------------------------------------------------
 
+
 def test_lock_tetromino_fills_grid(board):
     """After locking, the piece's cells are occupied in the grid."""
     o = Tetromino("O")
@@ -75,6 +77,7 @@ def test_lock_tetromino_fills_grid(board):
 
 
 # --- clear_lines ----------------------------------------------------
+
 
 def test_clear_lines_removes_full_rows(board):
     """Fill the bottom row, lock a piece, and verify the row is cleared."""
@@ -105,6 +108,7 @@ def test_clear_lines_no_full_rows(board):
 
 # --- apply_handicap -------------------------------------------------
 
+
 def test_apply_handicap_level_0(board):
     """Level 0 handicap leaves the board empty."""
     board.apply_handicap(0)
@@ -122,15 +126,13 @@ def test_apply_handicap_level_3(board):
             assert board.grid[y][x] is None
     # The bottom rows should have at least some gray cells
     gray_count = sum(
-        1
-        for y in range(BOARD_HEIGHT - 6, BOARD_HEIGHT)
-        for x in range(BOARD_WIDTH)
-        if board.grid[y][x] is not None
+        1 for y in range(BOARD_HEIGHT - 6, BOARD_HEIGHT) for x in range(BOARD_WIDTH) if board.grid[y][x] is not None
     )
     assert gray_count > 0
 
 
 # --- try_rotate -----------------------------------------------------
+
 
 def test_try_rotate_t_cw_success(board):
     """T-piece rotates CW from rotation 0 to rotation 1."""
@@ -189,6 +191,7 @@ def test_try_rotate_o_piece(board):
 
 # --- is_tspin -------------------------------------------------------
 
+
 def test_is_tspin_with_three_corners_filled(board):
     """T-piece with 3 of 4 corners filled is a T-spin."""
     t = Tetromino("T")
@@ -237,6 +240,7 @@ def test_is_tspin_wall_counts_as_filled(board):
 
 # --- hard_drop ------------------------------------------------------
 
+
 def test_hard_drop_to_bottom(board):
     """A piece hard-drops to the lowest valid row on an empty board."""
     o = Tetromino("O")
@@ -261,7 +265,23 @@ def test_hard_drop_onto_existing_blocks(board):
     assert o.y == BOARD_HEIGHT - 4
 
 
+def test_hard_drop_under_overhang(board):
+    """A piece already under an overhang drops down, not up through it."""
+    # Overhang: blocks at column 1, rows 10-11; column 0 is open below
+    board.grid[10][1] = (255, 0, 0)
+    board.grid[11][1] = (255, 0, 0)
+    # I-piece horizontal at y=15, well below the overhang
+    i = Tetromino("I")
+    i.x = 0
+    i.y = 15
+    distance = board.hard_drop(i)
+    # Piece must not move up; it should drop to the bottom
+    assert i.y >= 15
+    assert distance >= 0
+
+
 # --- lock_tetromino with line clear ---------------------------------
+
 
 def test_lock_tetromino_clears_lines(board):
     """Locking a piece that completes a row triggers a line clear."""

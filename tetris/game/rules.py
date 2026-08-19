@@ -39,8 +39,7 @@ def shape_fits(grid, shape, x: int, y: int) -> bool:
     return True
 
 
-def try_rotation(grid, piece_type: str, from_rot: int, to_rot: int,
-                 x: int, y: int) -> tuple[int, int] | None:
+def try_rotation(grid, piece_type: str, from_rot: int, to_rot: int, x: int, y: int) -> tuple[int, int] | None:
     """Try SRS wall kicks for rotation. Returns (x, y) of first valid kick, or None."""
     if piece_type == "O":
         return (x, y) if shape_fits(grid, SHAPES[piece_type][to_rot], x, y) else None
@@ -53,16 +52,23 @@ def try_rotation(grid, piece_type: str, from_rot: int, to_rot: int,
     return None
 
 
-def hard_drop_y(grid, shape, x: int) -> int:
-    """Find the lowest y where *shape* fits at column *x* on *grid*."""
-    py = 0
+def hard_drop_y(grid, shape, x: int, start_y: int = 0) -> int:
+    """Find the lowest y where *shape* fits at column *x* on *grid*.
+
+    Scans downward from *start_y* (the piece's current row). This prevents
+    a piece already under an overhang from being teleported on top of it.
+    """
+    py = start_y
     while True:
         if not shape_fits(grid, shape, x, py):
-            return py - 1 if py > 0 else 0
+            return py - 1 if py > start_y else start_y
         py += 1
 
+
 def hard_drop_y_batch(
-    grid: np.ndarray, shapes: list[list[tuple[int, int]]], x_positions: list[int],
+    grid: np.ndarray,
+    shapes: list[list[tuple[int, int]]],
+    x_positions: list[int],
 ) -> np.ndarray:
     """Batch hard-drop: landing y for N (shape, x) pairs on the same grid.
 
@@ -104,7 +110,8 @@ def hard_drop_y_batch(
 
 
 def soft_drop_placements(
-    grid, piece_type: str,
+    grid,
+    piece_type: str,
 ) -> list[tuple[list[tuple[int, int]], int, int, int]]:
     """Enumerate ALL reachable placements via BFS over (x, y, rotation).
 
@@ -185,5 +192,4 @@ def find_full_rows(grid) -> list[int]:
     """Return row indices that are fully occupied."""
     if isinstance(grid, np.ndarray):
         return list(np.where((grid > 0).all(axis=1))[0])
-    return [y for y in range(BOARD_HEIGHT)
-            if all(bool(grid[y][x]) for x in range(BOARD_WIDTH))]
+    return [y for y in range(BOARD_HEIGHT) if all(bool(grid[y][x]) for x in range(BOARD_WIDTH))]

@@ -93,7 +93,7 @@ class Board:
 
     def hard_drop(self, tetromino: Tetromino) -> int:
         """Drop *tetromino* to the lowest valid position. Returns distance fallen."""
-        py = rules.hard_drop_y(self.grid, tetromino.shape, tetromino.x)
+        py = rules.hard_drop_y(self.grid, tetromino.shape, tetromino.x, tetromino.y)
         distance = py - tetromino.y
         tetromino.y = py
         return distance
