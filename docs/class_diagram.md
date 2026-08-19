@@ -258,30 +258,40 @@ classDiagram
             - _lock_timer: float
             - _lock_resets: int
             - _grounded: bool
-            - _das_held: dict~int, float~
-            +input_map: dict~int, Callable~
             - _mute_key: int
-            - _pause_key: int
-            - _soft_drop_key: int
-            - _left_key: int
-            - _right_key: int
             +__init__(screen, font, audio, handicap, sound_volume, music_volume, music_song, piece_provider, menu, debug, ghost_piece, preview_count) None
-            - _setup_keybinds(menu) None
             - _move_left() None
             - _move_right() None
             - _rotate_cw() None
             - _rotate_ccw() None
-            - _toggle_down_true() None
+            - _soft_drop() None
             - _hard_drop() None
             - _hold() None
             - _on_piece_moved() None
             - _lock_and_spawn(hard_drop: bool) tuple~int, list~
             - _do_game_over() State
             - _return_to_menu() State
+            - _on_exit() None
             +handle_event(event: pygame.event.Event) State | None
             +update(dt: float, particles: ParticleSystem) State | None
             - _emit_line_particles(particles: ParticleSystem, rows_data) None
             +draw(screen: pygame.Surface, particles: ParticleSystem | None) None
+        }
+        %% Module-level functions: _drop_interval(level: int) -> float
+        %% Module-level functions: _music_speed_for_level(level: int) -> float
+
+        class HumanState {
+            - _das_held: dict~int, float~
+            +input_map: dict~int, Callable~
+            - _pause_key: int
+            - _soft_drop_key: int
+            - _left_key: int
+            - _right_key: int
+            - _hold_key: int
+            +__init__(screen, font, audio, handicap, sound_volume, music_volume, music_song, piece_provider, menu, debug, ghost_piece, preview_count) None
+            - _setup_keybinds(menu) None
+            +handle_event(event: pygame.event.Event) State | None
+            +update(dt: float, particles: ParticleSystem) State | None
         }
         %% Module-level functions: _drop_interval(level: int) -> float
         %% Module-level functions: _music_speed_for_level(level: int) -> float
@@ -331,7 +341,7 @@ classDiagram
             - _draw_ai_hud() None
             - _hud_table_rows() list~list~
             - _trend_arrow(trend: str) str
-            +handle_event(event: pygame.event.Event) State | None
+            - _on_exit() None
         }
 
         class GameOverState {
@@ -754,8 +764,8 @@ classDiagram
     MenuBase <|-- AudioMenuState
     MenuBase <|-- GameRulesMenuState
 
+    GameState <|-- HumanState
     GameState <|-- AIState
-
     nn_Module <|-- DQNetwork
     PieceGenerator <|-- RandomGenerator
     PieceGenerator <|-- BagGenerator
@@ -823,7 +833,7 @@ classDiagram
     MenuState "1" --> "0..1" AudioMenuState : navigates
     MenuState "1" --> "0..1" HumanMenuState : navigates
     MenuState "1" --> "0..1" AIMenuState : navigates
-    MenuState "1" --> "0..1" GameState : navigates
+    MenuState "1" --> "0..1" HumanState : navigates
     MenuState "1" --> "0..1" AIState : navigates
     MenuState "1" --> "0..1" LeaderboardState : navigates
 

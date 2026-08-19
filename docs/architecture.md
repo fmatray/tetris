@@ -4,7 +4,7 @@
 
 Le projet repose sur une architecture modulaire et extensible :
 
-- **Machine à États Finis (FSM)** : Utilisation du *State Pattern* pour gérer les transitions fluides entre `MenuState`, `HumanMenuState`, `KeybindState`, `GameState`, `AIState`, `AIMenuState`, `HyperparamMenuState`, `StatsState`, `GameOverState` et `LeaderboardState`.
+- **Machine à États Finis (FSM)** : Utilisation du *State Pattern* pour gérer les transitions fluides entre `MenuState`, `HumanMenuState`, `KeybindState`, `HumanState`, `AIState`, `AIMenuState`, `HyperparamMenuState`, `StatsState`, `GameOverState` et `LeaderboardState`.
 - **Audio Procédural** : Génération d'ondes sinusoïdales via NumPy pour créer des mélodies et effets sonores sans dépendances de fichiers externes.
 - **Système de Particules** : Moteur d'effets visuels gérant la physique (gravité, friction) et le cycle de vie des particules pour des explosions dynamiques.
 - **Rendu Isolé** : Classe `Renderer` dédiée pour séparer la logique de mise à jour du moteur graphique.
@@ -53,7 +53,8 @@ tetris/
 │   │   ├── human_menu.py        # HumanMenuState (mode, fantôme, touches, stats)
 │   │   ├── human_stats.py       # HumanStatsState (page de statistiques humaines)
 │   │   ├── keybind.py           # KeybindState (configuration des touches)
-│   │   ├── game.py              # GameState (boucle de jeu humain)
+│   │   ├── game.py              # GameState (base abstraite: board, pieces, gravité)
+│   │   ├── human.py             # HumanState (jeu humain: clavier, DAS, pause)
 │   │   ├── ai.py                # AIState (DQN agent, HUD apprentissage + stats)
 │   │   ├── ai_menu.py           # AIMenuState (mode, vitesse, apprentissage, stats, reset)
 │   │   ├── hyperparam_menu.py   # HyperparamMenuState (13 hyperparamètres DQN + reset)
@@ -123,9 +124,8 @@ Le mode débogage est activable depuis le menu principal (option Débogage ON/OF
 ### SLAP (Single Layer of Abstraction)
 
 Chaque fonction opère à un seul niveau d'abstraction :
-
 - `TetrisApp._frame()` — niveau *dispatch FSM* (events, update, draw).
-- `GameState.update()` — niveau *boucle de jeu* (gravité, DAS, lock delay, spawn).
+- `GameState.update()` — niveau *boucle de jeu* (gravité, lock delay, spawn). `HumanState.update()` ajoute le DAS.
 - `Board.clear_lines()` — niveau *ligne de grille* (détection, suppression, compactage).
 
 Aucune fonction mélange plusieurs niveaux, ce qui garde chaque méthode courte et focalisée.

@@ -11,7 +11,7 @@ pygame.init()
 pygame.mixer.init()
 
 from tetris.audio import AudioManager
-from tetris.states.game import GameState
+from tetris.states.human import HumanState
 from tetris.states.game_over import GameOverState
 from tetris.settings import MAX_NAME_LENGTH
 from tetris.visuals.particles import ParticleSystem
@@ -22,7 +22,7 @@ def _make_game_over(menu=None):
     screen = pygame.Surface((640, 480))
     font = pygame.font.Font(None, 20)
     audio = AudioManager(sound_volume=0, music_volume=0)
-    game = GameState(screen, font, audio, handicap=0, sound_volume=0, music_volume=0)
+    game = HumanState(screen, font, audio, handicap=0, sound_volume=0, music_volume=0)
     return GameOverState(screen, font, audio, game, menu=menu)
 
 

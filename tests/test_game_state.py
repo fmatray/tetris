@@ -1,4 +1,4 @@
-"""Tests for GameState game-over transitions (normal drop, soft drop, hard drop)."""
+"""Tests for HumanState game-over transitions (normal drop, soft drop, hard drop)."""
 
 import os
 
@@ -20,7 +20,7 @@ from tetris.settings import (
     DAS_REPEAT_MS,
     LOCK_DELAY_MS,
 )
-from tetris.states.game import GameState
+from tetris.states.human import HumanState
 from tetris.visuals.particles import ParticleSystem
 
 GRAY = (128, 128, 128)
@@ -30,7 +30,7 @@ def _make_game():
     screen = pygame.Surface((640, 480))
     font = pygame.font.Font(None, 24)
     audio = AudioManager(sound_volume=0, music_volume=0)
-    return GameState(screen, font, audio, handicap=0, sound_volume=0, music_volume=0)
+    return HumanState(screen, font, audio, handicap=0, sound_volume=0, music_volume=0)
 
 
 def _fill_all_but_col0(board: Board) -> None:
@@ -93,6 +93,7 @@ def test_game_over_via_normal_drop():
 
 # --- handle_event -----------------------------------------------------------
 
+
 def test_handle_event_pause_toggles():
     game = _make_game()
     assert not game.paused
@@ -121,7 +122,7 @@ def test_handle_event_esc_returns_existing_menu():
     font = pygame.font.Font(None, 24)
     audio = AudioManager(sound_volume=0, music_volume=0)
     menu = MenuState(screen, font, audio)
-    game = GameState(screen, font, audio, handicap=0, menu=menu)
+    game = HumanState(screen, font, audio, handicap=0, menu=menu)
     result = game.handle_event(_key_down(pygame.K_ESCAPE))
     assert result is menu
 
@@ -202,6 +203,7 @@ def test_handle_event_pause_blocks_movement():
 
 # --- update -----------------------------------------------------------------
 
+
 def test_update_gravity_moves_piece():
     game = _make_game()
     particles = ParticleSystem()
@@ -252,6 +254,7 @@ def test_update_paused_returns_none():
 
 # --- _move_left / _move_right ------------------------------------------------
 
+
 def test_move_left_valid():
     game = _make_game()
     start_x = game.current_piece.x
@@ -287,6 +290,7 @@ def test_move_right_blocked():
 
 # --- _rotate_cw / _rotate_ccw ------------------------------------------------
 
+
 def test_rotate_cw_success():
     game = _make_game()
     start_rot = game.current_piece.rotation
@@ -320,6 +324,7 @@ def test_rotate_ccw_blocked():
 
 # --- _hard_drop --------------------------------------------------------------
 
+
 def test_hard_drop_locks_and_spawns():
     game = _make_game()
     initial_type = game.current_piece.type
@@ -338,6 +343,7 @@ def test_hard_drop_paused_noop():
 
 
 # --- _hold -------------------------------------------------------------------
+
 
 def test_hold_first_swap():
     game = _make_game()
@@ -379,6 +385,7 @@ def test_hold_paused_noop():
 
 # --- _lock_and_spawn ---------------------------------------------------------
 
+
 def test_lock_and_spawn_valid():
     game = _make_game()
     game.board.hard_drop(game.current_piece)
@@ -402,6 +409,7 @@ def test_lock_and_spawn_top_out():
 
 # --- draw --------------------------------------------------------------------
 
+
 def test_draw_with_particles():
     game = _make_game()
     screen = pygame.Surface((640, 480))
@@ -416,6 +424,7 @@ def test_draw_without_particles():
 
 
 # --- _on_piece_moved (lock reset) ---------------------------------------------
+
 
 def test_on_piece_moved_resets_lock_when_grounded():
     game = _make_game()
@@ -446,15 +455,17 @@ def test_on_piece_moved_stops_after_max_resets():
     assert game._lock_timer == 100.0  # not reset
 
 
-# --- _toggle_down_true -------------------------------------------------------
+# --- _soft_drop ---------------------------------------------------------------
 
-def test_toggle_down_true_sets_down_pressed():
+
+def test_soft_drop_sets_down_pressed():
     game = _make_game()
-    game._toggle_down_true()
+    game._soft_drop()
     assert game.down_pressed is True
 
 
 # --- _emit_line_particles -----------------------------------------------------
+
 
 def test_emit_line_particles():
     game = _make_game()
@@ -466,6 +477,7 @@ def test_emit_line_particles():
 
 # --- _return_to_menu ---------------------------------------------------------
 
+
 def test_return_to_menu_with_existing():
     from tetris.states.menu import MenuState
 
@@ -473,7 +485,7 @@ def test_return_to_menu_with_existing():
     font = pygame.font.Font(None, 24)
     audio = AudioManager(sound_volume=0, music_volume=0)
     menu = MenuState(screen, font, audio)
-    game = GameState(screen, font, audio, handicap=0, menu=menu)
+    game = HumanState(screen, font, audio, handicap=0, menu=menu)
     assert game._return_to_menu() is menu
 
 
@@ -484,6 +496,7 @@ def test_return_to_menu_creates_new():
 
 
 # --- _do_game_over -----------------------------------------------------------
+
 
 def test_do_game_over_returns_state():
     game = _make_game()

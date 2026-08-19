@@ -48,6 +48,7 @@ def _isolate_settings():
             with open(SETTINGS_PATH, "w") as f:
                 f.write(saved)
 
+
 # ── Helpers ──────────────────────────────────────────────────────────
 
 
@@ -171,8 +172,12 @@ def test_audio_menu_handle_left_right_toggle():
 
 def test_ai_menu_options():
     assert AIMenuState._OPTIONS == (
-        "Mode", "Vitesse", "Apprentissage",
-        "Statistiques", "Réinitialiser IA", "Retour",
+        "Mode",
+        "Vitesse",
+        "Apprentissage",
+        "Statistiques",
+        "Réinitialiser IA",
+        "Retour",
     )
 
 
@@ -262,6 +267,7 @@ def test_ai_menu_select_reset_second_press_deletes():
     state._confirm_reset = True
     # Create dummy files to test deletion
     from pathlib import Path
+
     Path(MODEL_PATH).write_text("test")
     Path(LOG_PATH).write_text("test")
     state._on_select()
@@ -952,13 +958,19 @@ def test_stats_stat_values_populated_log(tmp_path):
     """Test stat values with a populated training log."""
     log_path = tmp_path / "log.json"
 
-
     episodes = []
     for i in range(5):
-        episodes.append({
-            "episode": i, "score": 100 + i * 50, "lines": i,
-            "level": i, "steps": 100, "epsilon": 0.5, "loss": 1.0,
-        })
+        episodes.append(
+            {
+                "episode": i,
+                "score": 100 + i * 50,
+                "lines": i,
+                "level": i,
+                "steps": 100,
+                "epsilon": 0.5,
+                "loss": 1.0,
+            }
+        )
     log_path.write_text(json.dumps(episodes))
 
     ai_menu = _make_ai_menu()
@@ -1062,6 +1074,7 @@ def test_menu_load_settings_invalid_json():
 def test_menu_load_settings_boolean_sound_migration():
     """Old boolean 'sound' value migrates to integer sound_volume."""
     import json
+
     with open(SETTINGS_PATH, "w") as f:
         json.dump({"sound": True, "player": "Humain"}, f)
     menu = _make_menu()
@@ -1085,6 +1098,7 @@ def test_menu_load_settings_missing_file_uses_defaults():
 def test_menu_load_settings_keybinds_merge():
     """Saved keybinds merge over defaults."""
     import json
+
     with open(SETTINGS_PATH, "w") as f:
         json.dump({"keybinds": {"move_left": pygame.K_a}}, f)
     menu = _make_menu()
@@ -1123,18 +1137,20 @@ def test_menu_toggle_player_via_event():
 
 
 def test_menu_select_start_human():
-    """Selecting 'Démarrer' with human player creates GameState."""
-    from tetris.states.game import GameState
+    """Selecting 'Démarrer' with human player creates HumanState."""
+    from tetris.states.human import HumanState
+
     menu = _make_menu()
     menu.player = "Humain"
     menu.selection = 0  # Démarrer (new idx 0)
     result = menu._on_select()
-    assert isinstance(result, GameState)
+    assert isinstance(result, HumanState)
 
 
 def test_menu_select_start_ai():
     """Selecting 'Démarrer' with AI player creates AIState."""
     from tetris.states.ai import AIState
+
     menu = _make_menu()
     menu.player = "IA"
     menu.selection = 0  # Démarrer (new idx 0)

@@ -16,7 +16,7 @@ a human pressing keys. No candidate enumeration, no DQN, no macro-actions.
 ```
 TetrisApp (main loop, 60 FPS, single thread)
   └─ FSM
-       └─ MCPState(GameState)           ← inherits GameState, NOT AIState
+       └─ MCPState(GameState)           ← inherits abstract GameState, alongside HumanState and AIState
             ├─ _action_queue: queue.Queue[str]
             ├─ update(): drain queue → execute actions on main thread
             ├─ MCP server (side thread)
@@ -43,7 +43,7 @@ No candidate generation. No DQN. No reward shaping. No feature vectors.
 | `move_right`    | `_move_right()`     | `piece.move(1, 0)` if valid                     |
 | `rotate_cw`     | `_rotate_cw()`      | SRS rotation + wall kicks via `try_rotate(+1)`  |
 | `rotate_ccw`    | `_rotate_ccw()`     | SRS rotation + wall kicks via `try_rotate(-1)`  |
-| `soft_drop`     | `_toggle_down_true()`| Sets `down_pressed = True` — gravity accelerates|
+| `soft_drop`     | `_soft_drop()`      | Sets `down_pressed = True` — gravity accelerates|
 | `hard_drop`     | `_hard_drop()`      | Instant drop + lock + spawn next piece           |
 | `hold`          | `_hold()`           | Swap current with held (once per lock)           |
 

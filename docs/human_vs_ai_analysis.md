@@ -15,10 +15,18 @@ architecture, and present an implementation plan.
 ### 1.1 Architecture Overview
 
 ```
-GameState (tetris/states/game.py)
+GameState (tetris/states/game.py) — ABSTRACT BASE
 ├── Owns: Board, PieceProvider, Tetromino, GameStats, Renderer, AudioManager
 ├── Game rules: gravity, lock delay, SRS rotation, line clear, scoring,
-│                hold, hard drop, soft drop, DAS, top-out, handicap
+│                hold, hard drop, soft drop, top-out, handicap
+├── Input handlers: _move_left, _move_right, _rotate_cw, _rotate_ccw,
+│                    _soft_drop, _hard_drop, _hold
+├── Shared handle_event: mute key + ESC (back to menu)
+└── _on_exit() hook: overridden by AIState for model save
+         │
+         ▼
+HumanState(GameState) (tetris/states/human.py)
+├── Adds: keybind setup, DAS auto-shift, pause toggle, full keyboard
 └── Input: keyboard via input_map
          │
          ▼
@@ -27,23 +35,23 @@ AIState(GameState) (tetris/states/ai.py)
 ├── Overrides:
 │   ├── update()         → AI macro-action selection + super().update()
 │   ├── _lock_and_spawn() → RL transition capture + super()._lock_and_spawn()
-│   ├── handle_event()    → ESC/mute only (no movement keys)
-│   └── draw()            → AI HUD overlay
+│   ├── _on_exit()       → save model + flush log (replaces handle_event override)
+│   └── draw()            → super().draw() + AI HUD overlay
 └── Adds: DQNAgent, TrainingLog, candidate generation, curriculum, episode loop
 ```
 
 **Verdict: The inheritance model is sound at the structural level.**
-`AIState` inherits all game rules from `GameState` and delegates to
-`super()` for gravity, lock delay, scoring, and line clears. The AI does
-not re-implement game rules in its play path — it calls the same
-`_lock_and_spawn`, `board.lock_tetromino`, `board.clear_lines`,
-`stats.on_piece_locked` as the human.
+`GameState` is now an abstract base; `HumanState` and `AIState` both inherit
+from it. `AIState` delegates to `super()` for gravity, lock delay, scoring,
+and line clears. The AI does not re-implement game rules in its play path —
+it calls the same `_lock_and_spawn`, `board.lock_tetromino`,
+`board.clear_lines`, `stats.on_piece_locked` as the human.
 
 ### 1.2 Rule-by-Rule Comparison
 
 | Game Rule | Human Path | AI Path | Identical? | Notes |
 |---|---|---|---|---|
-| **Gravity / drop speed** | `GameState.update()` → `_drop_interval(level)` | `super().update()` (same code) | ✅ Yes | AI calls `super().update()` for gravity after placing the piece |
+| **Gravity / drop speed** | `GameState.update()` → `_drop_interval(level)` (shared); DAS via `HumanState.update()` | `super().update()` (same code) | ✅ Yes | AI calls `super().update()` for gravity after placing the piece |
 | **Soft drop scoring** | `stats.add_soft_drop(1)` per gravity cell when `down_pressed` | `stats.add_soft_drop(drop_cells)` in `_execute_macro_action` | ✅ Yes | Both call `ScoreEngine.soft_drop_points(cells)` → 1 pt/cell |
 | **Hard drop** | `board.hard_drop()` + `stats.add_hard_drop(distance)` + `_lock_and_spawn(hard_drop=True)` | Same in `_execute_macro_action` when `soft_drop=False` | ✅ Yes | Identical code path |
 | **Lock delay** | `GameState.update()` → `_lock_timer += dt`, `LOCK_DELAY_MS=500`, `LOCK_DELAY_RESETS=15` | `super().update()` (same code) | ✅ Yes | AI inherits lock delay; but see §1.3 for a behavioral divergence |
@@ -552,7 +560,7 @@ declared (replay = human only, curriculum = AI only).
 | `tetris/game/stats.py` | 65 | Running stats |
 | `tetris/game/piece_provider.py` | 161 | Piece spawning (random/7-bag/replay) |
 | `tetris/ai/rewards.py` | 491 | Feature extraction + reward + **duplicated game rules** |
-| `tetris/states/menu.py` | 236 | Menu — constructs GameState/AIState with settings |
+| `tetris/states/menu.py` | 236 | Menu — constructs HumanState/AIState with settings |
 | `tetris/states/game_over.py` | 109 | Game-over flow (human only) |
 
 ## Appendix B: Duplicated Code Locations (Exact Lines)

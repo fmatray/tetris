@@ -177,7 +177,7 @@ class MenuState(MenuBase):
         match self.selection:
             case 0:  # Start
                 from tetris.game.piece_provider import PieceProvider
-                from tetris.states.game import GameState
+                from tetris.states.human import HumanState
 
                 provider = PieceProvider(
                     mode="replay" if self.mode == "Replay" else "normal",
@@ -185,7 +185,7 @@ class MenuState(MenuBase):
                 )
                 if self.player == "IA":
                     return self._build_ai_state()
-                return GameState(
+                return HumanState(
                     self.screen,
                     self.font,
                     self.audio,

@@ -554,7 +554,6 @@ class AIState(GameState):
         self._lock_timer: float = 0.0
         self._lock_resets: int = 0
         self._grounded: bool = False
-        self._das_held: dict[int, float] = {}
         self._prev_state: np.ndarray | None = None
         self._prev_reward: float | None = None
         self._prev_done: bool = False
@@ -602,8 +601,8 @@ class AIState(GameState):
 
     def draw(self, screen: pygame.Surface, *, particles: ParticleSystem | None = None) -> None:
         """Render the game frame plus the AI training HUD overlay."""
+        super().draw(screen, particles=particles)
         if particles is not None:
-            self.renderer.render_frame(self, particles)
             self._draw_ai_hud()
 
     def _draw_ai_hud(self) -> None:
@@ -715,19 +714,10 @@ class AIState(GameState):
 
     # --- ESC handling (return to menu) -----------------------------------
 
-    def handle_event(self, event: pygame.event.Event) -> State | None:
-        """Handle ESC (save + return to menu) and mute. Ignore all other keys."""
-        if event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_ESCAPE:
-                self.audio.stop_music()
-                self.pieces.save()
-                self.log.flush()
-                try:
-                    self.agent.save(MODEL_PATH)
-                except (OSError, RuntimeError) as e:
-                    logger.error("Failed to save AI model: %s", e)
-                return self._return_to_menu()
-            if event.key == self._mute_key:
-                self.audio.toggle_mute()
-        # Ignore other key input — AI controls the game
-        return None
+    def _on_exit(self) -> None:
+        """Save model and flush log before returning to menu on ESC."""
+        self.log.flush()
+        try:
+            self.agent.save(MODEL_PATH)
+        except (OSError, RuntimeError) as e:
+            logger.error("Failed to save AI model: %s", e)

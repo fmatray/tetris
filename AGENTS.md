@@ -34,8 +34,9 @@ MenuState (root, owns settings)
 ├── HumanMenuState → { KeybindState, HumanStatsState }
 ├── AIMenuState → { TrainingMenuState → { HyperparamMenuState, PlaceholderState }, StatsState }
 ├── AudioMenuState
-├── GameState   (human gameplay)
-├── AIState     (AI gameplay, inherits GameState)
+├── GameState   (abstract base: board, pieces, gravity, lock delay)
+│   ├── HumanState (human gameplay: keyboard, DAS, pause)
+│   └── AIState   (AI gameplay, inherits GameState)
 ├── LeaderboardState
 └── Quit
 ```
@@ -87,8 +88,7 @@ python -m tetris.verify_training
 ## Code Conventions & Common Patterns
 
 - **FSM states**: Subclass `State`, override `handle_event`/`update`/`draw`. Transitions return a new `State` or `None`. Import concrete states lazily inside methods (cycle avoidance).
-- **Settings flow**: `MenuState` is the single source of truth for runtime settings. Child states mutate `MenuState` attributes, then call `save_settings()`. Never read settings from disk in child states — read from the parent `MenuState` reference.
-- **Keybind flow**: `MenuState.keybinds` (dict: action→pygame keycode) → `GameState._setup_keybinds()` builds the active `input_map`. Modified by `KeybindState`.
+- **Keybind flow**: `MenuState.keybinds` (dict: action→pygame keycode) → `HumanState._setup_keybinds()` builds the active `input_map`. Modified by `KeybindState`.
 - **Path constants**: All data paths centralized in `tetris/settings.py` — never hardcode `"data/..."` in consumer modules; import from `settings`.
 - **Data directory**: `DATA_DIR = "data"`; callers create it via `os.makedirs(DATA_DIR, exist_ok=True)` (done in `TetrisApp.__init__` and `verify_training.py`).
 - **AI exclusion from human stats**: `save_human_game()` is only called in `GameOverState._handle_name_event()`. `AIState` has its own `_on_episode_end()` and never creates `GameOverState` — architectural guarantee that AI games never pollute human stats.
@@ -111,7 +111,8 @@ python -m tetris.verify_training
 | `tetris/states/menu.py` | Root menu, settings load/save, navigation hub |
 | `tetris/states/audio_menu.py` | Audio sub-menu: sound/music volume, song selection |
 | `tetris/states/game_rules_menu.py` | Game rules sub-menu: generator, preview count, handicap |
-| `tetris/states/game.py` | Human gameplay loop, `_setup_keybinds()` |
+| `tetris/states/game.py` | `GameState` abstract base: board, pieces, gravity, lock delay, movement primitives |
+| `tetris/states/human.py` | `HumanState` — human gameplay: keyboard, DAS, pause, keybind setup |
 | `tetris/states/keybind.py` | Keybinding state, `key_name()` (moved from settings.py) |
 | `tetris/states/ai.py` | AI gameplay + RL training integration |
 | `tetris/ai/agent.py` | `DQNAgent` — `select_action`, `store`, `learn`, `save`, `load` |

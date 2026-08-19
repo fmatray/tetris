@@ -1,8 +1,7 @@
-"""Game state: the active playfield, piece movement, scoring, locking."""
+"""GameState: abstract base for gameplay states (human, AI, future MCP)."""
 
 from __future__ import annotations
 
-from collections.abc import Callable
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -20,8 +19,6 @@ from tetris.settings import (
     BLOCK_SIZE,
     BOARD_OFFSET_X,
     BOARD_OFFSET_Y,
-    DAS_DELAY_MS,
-    DAS_REPEAT_MS,
     DROP_BASE,
     DROP_MIN_INTERVAL,
     DROP_STEP,
@@ -43,15 +40,24 @@ _logger = get_logger("game")
 def _drop_interval(level: int) -> float:
     """Seconds per row at the given level (Tetris Guideline gravity)."""
     base = max(DROP_MIN_INTERVAL, DROP_BASE - level * DROP_STEP)
-    return max(DROP_MIN_INTERVAL, base ** level)
+    return max(DROP_MIN_INTERVAL, base**level)
 
 
 def _music_speed_for_level(level: int) -> float:
     """Music playback speed factor for the given level."""
     return min(MUSIC_BASE_SPEED + level * MUSIC_SPEED_PER_LEVEL, MUSIC_MAX_SPEED)
 
+
 class GameState(State):
-    """Active gameplay: spawns pieces, processes input, advances the board."""
+    """Abstract base for gameplay states (human, AI, future MCP).
+
+    Provides shared game infrastructure: board, pieces, stats, movement
+    primitives, lock delay, gravity, and rendering. Subclasses override
+    ``handle_event`` and ``update`` for player-specific input. Do not
+    instantiate directly — use :class:`HumanState` or :class:`AIState`.
+    """
+
+    paused: bool
 
     def __init__(
         self,
@@ -68,10 +74,11 @@ class GameState(State):
         ghost_piece: bool = True,
         preview_count: int = 3,
     ) -> None:
-        """Initialize a human gameplay session.
+        """Initialize the shared game infrastructure.
 
-        Sets up the board (with handicap), piece provider, keybinds, lock-delay
-        state, DAS state, and the preview/hold piece queues.
+        Sets up the board (with handicap), piece provider, lock-delay
+        state, and the preview/hold piece queues. Subclasses handle
+        keybind setup and DAS state.
 
         Args:
             screen: Pygame display surface.
@@ -105,8 +112,8 @@ class GameState(State):
         self.drop_time: float = 0.0
         self.stats = GameStats()
         self.current_speed = _drop_interval(0)
-        self.game_over = False
-        self.paused = False
+        self.game_over: bool = False
+        self.paused: bool = False
         self.down_pressed = False
         # Hold piece state
         self.hold_piece: Tetromino | None = None
@@ -115,30 +122,11 @@ class GameState(State):
         self._lock_timer: float = 0.0
         self._lock_resets: int = 0
         self._grounded: bool = False
-        # DAS state: {key: held_ms}
-        self._das_held: dict[int, float] = {}
-        self._setup_keybinds(menu)
-
-    def _setup_keybinds(self, menu: MenuState | None) -> None:
-        """Build key → action map from the menu's keybindings (or defaults)."""
+        # Mute key (shared by all player types)
         from tetris.settings import DEFAULT_KEYBINDS
 
         kb = menu.keybinds if menu is not None else dict(DEFAULT_KEYBINDS)
-        self.input_map: dict[int, Callable[[], None]] = {
-            kb["move_left"]: self._move_left,
-            kb["move_right"]: self._move_right,
-            kb["rotate_cw"]: self._rotate_cw,
-            kb["rotate_ccw"]: self._rotate_ccw,
-            kb["soft_drop"]: self._toggle_down_true,
-            kb["hard_drop"]: self._hard_drop,
-            kb["hold"]: self._hold,
-        }
         self._mute_key: int = kb["mute"]
-        self._pause_key: int = kb["pause"]
-        self._soft_drop_key: int = kb["soft_drop"]
-        self._left_key: int = kb["move_left"]
-        self._right_key: int = kb["move_right"]
-        self._hold_key: int = kb["hold"]
 
     # --- Input handlers (SLAP: one operation each) ---------------------
 
@@ -168,7 +156,7 @@ class GameState(State):
             self.audio.play("rotate_ccw")
             self._on_piece_moved()
 
-    def _toggle_down_true(self) -> None:
+    def _soft_drop(self) -> None:
         self.down_pressed = True
         self.audio.play("soft_drop")
 
@@ -244,7 +232,9 @@ class GameState(State):
         self.audio.stop_music()
         _logger.debug(
             "Game over | score=%d, lines=%d, level=%d",
-            self.stats.score, self.stats.total_lines, self.stats.level,
+            self.stats.score,
+            self.stats.total_lines,
+            self.stats.level,
         )
         self.pieces.save()
         from tetris.states.game_over import GameOverState
@@ -258,36 +248,32 @@ class GameState(State):
         if self.menu is not None:
             return self.menu
         from tetris.states.menu import MenuState
+
         return MenuState(self.screen, self.font, self.audio)
 
+    def _on_exit(self) -> None:
+        """Hook called before returning to menu on ESC. Override in subclasses."""
+
     def handle_event(self, event: pygame.event.Event) -> State | None:
-        """Process keyboard input: pause, mute, ESC, movement, hold, DAS.
+        """Shared event handler: mute key + ESC (back to menu).
+
+        Subclasses override to add player-specific keys (movement, pause, etc.)
+        and call ``super().handle_event`` first.
 
         Returns a new :class:`State` on ESC (back to menu), or ``None``.
         """
         if event.type == pygame.KEYDOWN:
-            if event.key == self._pause_key:
-                self.paused = not self.paused
-            elif event.key == self._mute_key:
+            if event.key == self._mute_key:
                 self.audio.toggle_mute()
             elif event.key == pygame.K_ESCAPE:
                 self.audio.stop_music()
                 self.pieces.save()
+                self._on_exit()
                 return self._return_to_menu()
-            elif event.key in self.input_map:
-                self.input_map[event.key]()
-                # Start DAS tracking for left/right
-                if event.key in (self._left_key, self._right_key):
-                    self._das_held[event.key] = 0.0
-        elif event.type == pygame.KEYUP:
-            if event.key == self._soft_drop_key:
-                self.down_pressed = False
-            if event.key in self._das_held:
-                del self._das_held[event.key]
         return None
 
     def update(self, dt: float, particles: ParticleSystem) -> State | None:
-        """Advance gravity, DAS auto-shift, lock delay, and level-up SFX.
+        """Advance gravity, lock delay, and level-up SFX.
 
         Returns a new :class:`State` on game-over, or ``None`` to stay.
         """
@@ -295,17 +281,6 @@ class GameState(State):
             return self._do_game_over()
         if self.paused:
             return None
-
-        # --- DAS auto-shift ---
-        for key in list(self._das_held):
-            self._das_held[key] += dt
-            held = self._das_held[key]
-            if held >= DAS_DELAY_MS:
-                # In repeat phase: fire every DAS_REPEAT_MS
-                since_last = held - DAS_DELAY_MS
-                if since_last >= DAS_REPEAT_MS:
-                    self._das_held[key] = DAS_DELAY_MS
-                    self.input_map[key]()
 
         # --- Gravity / soft drop ---
         self.drop_time += dt
