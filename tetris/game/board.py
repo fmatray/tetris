@@ -1,6 +1,7 @@
 """Board grid and collision/line-clear logic."""
 
 import random
+from typing import NamedTuple
 
 from tetris.game import rules
 from tetris.game.tetromino import Tetromino
@@ -10,6 +11,20 @@ from tetris.settings import (
     GRAY,
     SHAPES,
 )
+
+
+class ClearedRow(NamedTuple):
+    """A cleared row's index and cell colors (for particle effects)."""
+
+    row_index: int
+    cell_colors: list
+
+
+class LineClearResult(NamedTuple):
+    """Result of clearing completed lines."""
+
+    lines_cleared: int
+    cleared_rows: list[ClearedRow]
 
 
 class Board:
@@ -40,8 +55,7 @@ class Board:
         shapes = SHAPES[tetromino.type]
         from_rot = tetromino.rotation % len(shapes)
         to_rot = (from_rot + direction) % len(shapes)
-        result = rules.try_rotation(self.grid, tetromino.type, from_rot, to_rot,
-                                    tetromino.x, tetromino.y)
+        result = rules.try_rotation(self.grid, tetromino.type, from_rot, to_rot, tetromino.x, tetromino.y)
         if result is not None:
             tetromino.x, tetromino.y = result
             tetromino.rotation = to_rot
@@ -68,7 +82,7 @@ class Board:
                 filled += 1
         return filled >= 3
 
-    def lock_tetromino(self, tetromino: Tetromino) -> tuple[int, list[tuple[int, list]]]:
+    def lock_tetromino(self, tetromino: Tetromino) -> LineClearResult:
         """Lock *tetromino* into the grid and clear completed lines.
 
         Returns ``(lines_cleared, cleared_rows_data)`` where each row datum
@@ -100,23 +114,19 @@ class Board:
             for x in cells:
                 self.grid[y][x] = GRAY
 
-    def clear_lines(self) -> tuple[int, list[tuple[int, list]]]:
+    def clear_lines(self) -> LineClearResult:
         """Remove completed rows and return their data.
 
         Returns ``(lines_cleared, cleared_rows_data)``.
         """
         full_rows = rules.find_full_rows(self.grid)
-        cleared_rows_data = [(y, list(self.grid[y])) for y in full_rows]
+        cleared_rows = [ClearedRow(y, list(self.grid[y])) for y in full_rows]
 
-        lines_cleared = len(cleared_rows_data)
+        lines_cleared = len(cleared_rows)
         if lines_cleared > 0:
-            new_grid = [
-                row
-                for row in self.grid
-                if not all(cell is not None for cell in row)
-            ]
+            new_grid = [row for row in self.grid if not all(cell is not None for cell in row)]
             for _ in range(lines_cleared):
                 new_grid.insert(0, [None for _ in range(BOARD_WIDTH)])
             self.grid = new_grid
 
-        return lines_cleared, cleared_rows_data
+        return LineClearResult(lines_cleared, cleared_rows)

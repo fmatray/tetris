@@ -1,20 +1,21 @@
 """Mutable running game statistics (score, lines, level, combo)."""
 
+from dataclasses import dataclass
+
 from tetris.game.scoring import ScoreEngine
 from tetris.settings import LINES_PER_LEVEL
 
 
+@dataclass
 class GameStats:
     """Tracks score, total lines, level, combo, and piece count."""
 
-    def __init__(self) -> None:
-        """Initialize all stats to zero/defaults."""
-        self.score = 0
-        self.total_lines = 0
-        self.level = 0
-        self.piece_count = 0
-        self.combo = -1
-        self.b2b = False  # True if last clear was Tetris or T-Spin
+    score: int = 0
+    total_lines: int = 0
+    level: int = 0
+    piece_count: int = 0
+    combo: int = -1
+    b2b: bool = False  # True if last clear was Tetris or T-Spin
 
     def on_piece_locked(self, lines_cleared: int, tspin: bool = False) -> None:
         """Update score, lines, level, combo, and B2B after a piece locks.

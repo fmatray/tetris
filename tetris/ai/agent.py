@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import random
 from collections import deque
+from typing import NamedTuple
 
 import numpy as np
 import torch
@@ -19,12 +20,23 @@ from tetris.ai.network import DQNetwork
 from tetris.ai.replay_buffer import PrioritizedReplayBuffer
 from tetris.ai.rewards import FEATURE_SIZE
 
+
 # Temperature for Dellacherie-weighted softmax during exploration (warm-start).
 # Calibrated to typical Dellacherie value range (-200 to -10).
 WARM_START_TEMP: float = 30.0
 
 # N-step return horizon for multi-step Bellman targets.
 N_STEP = 3
+
+
+class NStepTransition(NamedTuple):
+    """A single transition in the n-step return accumulator buffer."""
+
+    state: np.ndarray
+    action: int
+    reward: float
+    next_state: np.ndarray
+    done: bool
 
 
 def _softmax(x: np.ndarray) -> np.ndarray:
@@ -94,7 +106,7 @@ class DQNAgent:
         self.buffer = PrioritizedReplayBuffer(buffer_size)
 
         # N-step transition buffer: accumulates N transitions before pushing
-        self._n_step_buffer: deque = deque(maxlen=N_STEP)
+        self._n_step_buffer: deque[NStepTransition] = deque(maxlen=N_STEP)
 
         self.steps = 0
         self.last_loss: float = 0.0
@@ -137,7 +149,7 @@ class DQNAgent:
         done: bool,
     ) -> None:
         """Push transition to n-step buffer; flush completed n-step returns to PER."""
-        self._n_step_buffer.append((state, action, reward, next_state, done))
+        self._n_step_buffer.append(NStepTransition(state, action, reward, next_state, done))
         if done:
             # Flush all partial n-step transitions immediately
             self.flush_n_step()
@@ -146,15 +158,16 @@ class DQNAgent:
 
     def _push_n_step(self) -> None:
         """Compute n-step return from buffer and push to PER."""
-        s0, a0, _, _, _ = self._n_step_buffer[0]
+        first = self._n_step_buffer[0]
+        s0, a0 = first.state, first.action
         actual_n = len(self._n_step_buffer)
         r = 0.0
-        for i, (_, _, ri, _, di) in enumerate(self._n_step_buffer):
-            r += (self.gamma**i) * ri
-            if di:
+        for i, t in enumerate(self._n_step_buffer):
+            r += (self.gamma**i) * t.reward
+            if t.done:
                 break
-        sn = self._n_step_buffer[-1][3]
-        done_n = any(t[4] for t in self._n_step_buffer)
+        sn = self._n_step_buffer[-1].next_state
+        done_n = any(t.done for t in self._n_step_buffer)
         self.buffer.push(s0, a0, r, sn, done_n, actual_n)
         # Slide window: remove oldest (keep remaining for overlap)
         self._n_step_buffer.popleft()
@@ -176,11 +189,11 @@ class DQNAgent:
 
         self.online_net.train()
         batch, weights, indices = self.buffer.sample(self.batch_size)
-        states = np.array([t[0] for t in batch])
-        rewards = np.array([t[2] for t in batch])
-        next_states = np.array([t[3] for t in batch])
-        dones = np.array([t[4] for t in batch])
-        n_steps = np.array([t[5] for t in batch])
+        states = np.array([t.state for t in batch])
+        rewards = np.array([t.reward for t in batch])
+        next_states = np.array([t.next_state for t in batch])
+        dones = np.array([t.done for t in batch])
+        n_steps = np.array([t.n for t in batch])
 
         states_t = torch.from_numpy(states).float().to(self.device)
         rewards_t = torch.from_numpy(rewards).float().to(self.device)

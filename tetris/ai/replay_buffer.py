@@ -8,11 +8,24 @@ weights correct the induced bias.
 from __future__ import annotations
 
 from collections import deque
+from typing import NamedTuple
 
 import numpy as np
 
+
 # N-step return horizon (matches agent.N_STEP; duplicated to avoid circular import).
 N_STEP = 3
+
+
+class Transition(NamedTuple):
+    """A single PER transition with n-step return metadata."""
+
+    state: np.ndarray
+    action: int
+    reward: float
+    next_state: np.ndarray
+    done: bool
+    n: int
 
 
 class PrioritizedReplayBuffer:
@@ -59,11 +72,11 @@ class PrioritizedReplayBuffer:
             done: Whether the episode ended within the n-step window.
             n: Actual number of steps aggregated in the return (for discount).
         """
-        self.buffer.append((state, action, reward, next_state, done, n))
+        self.buffer.append(Transition(state, action, reward, next_state, done, n))
         max_prio = max(self.priorities) if self.priorities else 1.0
         self.priorities.append(max_prio)
 
-    def sample(self, batch_size: int) -> tuple[list, np.ndarray, np.ndarray]:
+    def sample(self, batch_size: int) -> tuple[list[Transition], np.ndarray, np.ndarray]:
         """Return (samples, weights, indices). Falls back to uniform if too small."""
         if len(self.buffer) < batch_size:
             return list(self.buffer), np.ones(len(self.buffer)), np.ones(len(self.buffer), dtype=int)

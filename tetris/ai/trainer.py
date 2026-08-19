@@ -10,9 +10,23 @@ from __future__ import annotations
 import json
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any, TypedDict
 
 from tetris.logger import get_logger
 from tetris.settings import LOG_PATH
+
+
+class EpisodeRecord(TypedDict):
+    """A single episode's training metrics for the log."""
+
+    episode: int
+    score: int
+    lines: int
+    level: int
+    steps: int
+    epsilon: float
+    loss: float
+    timestamp: str
 
 
 class TrainingLog:
@@ -29,7 +43,7 @@ class TrainingLog:
     def __init__(self, path: str = LOG_PATH) -> None:
         """Load the training log from disk (or start empty if missing)."""
         self.path = path
-        self.episodes: list[dict] = []
+        self.episodes: list[dict[str, Any]] = []
         self._load()
 
     def _load(self) -> None:
@@ -51,18 +65,17 @@ class TrainingLog:
         loss: float,
     ) -> None:
         """Append an episode record and persist to disk."""
-        self.episodes.append(
-            {
-                "episode": episode,
-                "score": score,
-                "lines": lines,
-                "level": level,
-                "steps": steps,
-                "epsilon": epsilon,
-                "loss": loss,
-                "timestamp": datetime.now(timezone.utc).isoformat(),
-            }
-        )
+        entry: EpisodeRecord = {
+            "episode": episode,
+            "score": score,
+            "lines": lines,
+            "level": level,
+            "steps": steps,
+            "epsilon": epsilon,
+            "loss": loss,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
+        self.episodes.append(dict(entry))
         if len(self.episodes) % self._SAVE_INTERVAL == 0:
             self._save()
 
@@ -107,12 +120,10 @@ class TrainingLog:
         """Mean score across all episodes (0 if empty)."""
         return self._safe_avg("score")
 
-
     @property
     def best_score(self) -> int:
         """Highest single-episode score (0 if empty)."""
         return self._safe_max("score")
-
 
     @property
     def total_lines(self) -> int:
@@ -158,7 +169,6 @@ class TrainingLog:
     def avg_steps(self) -> float:
         """Mean piece-placements per episode (0 if empty)."""
         return self._safe_avg("steps")
-
 
     @property
     def last_100_avg(self) -> float:

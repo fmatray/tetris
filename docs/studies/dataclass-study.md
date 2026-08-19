@@ -1,6 +1,7 @@
 # Study: Dataclass Usage to Simplify the Codebase
 
 **Date:** 2026-08-19
+**Status:** Implemented — `Transition`, `NStepTransition`, `ClearedRow`, `LineClearResult` (NamedTuple), `EpisodeRecord` (TypedDict), `GameStats` (@dataclass). See plan `dataclass-refactor-plan.md`.
 **Scope:** Evaluate where `@dataclass` (stdlib `dataclasses`) would reduce boilerplate, improve readability, and clarify intent across the tetris codebase. No implementation — analysis only.
 
 ---

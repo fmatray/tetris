@@ -10,7 +10,7 @@ if TYPE_CHECKING:
 import pygame
 
 from tetris.audio import AudioManager
-from tetris.game.board import Board
+from tetris.game.board import Board, ClearedRow, LineClearResult
 from tetris.game.piece_provider import PieceProvider
 from tetris.game.stats import GameStats
 from tetris.game.tetromino import Tetromino
@@ -191,7 +191,7 @@ class GameState(State):
         self.drop_time = 0
         self.down_pressed = False
 
-    def _lock_and_spawn(self, hard_drop: bool = False) -> tuple[int, list]:
+    def _lock_and_spawn(self, hard_drop: bool = False) -> LineClearResult:
         """Lock current piece, update stats, spawn next. Returns (cleared, rows_data)."""
         locked_blocks = self.current_piece.get_blocks()
         hidden = HIDDEN_ROWS
@@ -200,7 +200,7 @@ class GameState(State):
             self.game_over = True
             self.audio.play("hard_drop")
             _logger.debug("Top out: %s locked above visible field", self.current_piece.type)
-            return 0, []
+            return LineClearResult(0, [])
         tspin = self.board.is_tspin(self.current_piece)
         cleared, rows_data = self.board.lock_tetromino(self.current_piece)
         locked_type = self.current_piece.type
@@ -225,7 +225,7 @@ class GameState(State):
         if not self.board.is_valid_move(self.current_piece):
             self.game_over = True
         _logger.debug("Locked %s, cleared %d", locked_type, cleared)
-        return cleared, rows_data
+        return LineClearResult(cleared, rows_data)
 
     def _do_game_over(self) -> State:
         """Stop music, save, and transition to GameOverState."""
@@ -322,7 +322,7 @@ class GameState(State):
             return self._do_game_over()  # type: ignore[unreachable]
         return None
 
-    def _emit_line_particles(self, particles: ParticleSystem, rows_data) -> None:
+    def _emit_line_particles(self, particles: ParticleSystem, rows_data: list[ClearedRow]) -> None:
         hidden = HIDDEN_ROWS
         for r_idx, colors in rows_data:
             for c_idx, col in enumerate(colors):

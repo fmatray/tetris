@@ -33,7 +33,7 @@ from tetris.ai.rewards import (
 from tetris.ai.trainer import TrainingLog
 from tetris.audio import AudioManager
 from tetris.game import rules
-from tetris.game.board import Board
+from tetris.game.board import Board, LineClearResult
 from tetris.game.piece_provider import PieceProvider
 from tetris.game.rules import hard_drop_y, hard_drop_y_batch, soft_drop_placements
 from tetris.game.stats import GameStats
@@ -402,7 +402,7 @@ class AIState(GameState):
 
     # --- Override _lock_and_spawn to capture RL transitions --------------
 
-    def _lock_and_spawn(self, hard_drop: bool = False) -> tuple[int, list]:
+    def _lock_and_spawn(self, hard_drop: bool = False) -> LineClearResult:
         """Intercept piece locking to compute reward and store transition (delayed)."""
         cleared, rows_data = super()._lock_and_spawn(hard_drop=hard_drop)
 
@@ -450,7 +450,7 @@ class AIState(GameState):
         self._prev_action = None
         self.episode_start_grid = new_grid
 
-        return cleared, rows_data
+        return LineClearResult(cleared, rows_data)
 
     # --- Update: AI macro-action per piece ------------------------------
     def update(self, dt: float, particles: ParticleSystem) -> State | None:

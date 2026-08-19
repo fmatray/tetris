@@ -12,7 +12,7 @@ pygame.mixer.init()
 
 
 from tetris.audio import AudioManager
-from tetris.game.board import Board
+from tetris.game.board import Board, ClearedRow
 from tetris.settings import (
     BOARD_HEIGHT,
     BOARD_WIDTH,
@@ -470,7 +470,7 @@ def test_soft_drop_sets_down_pressed():
 def test_emit_line_particles():
     game = _make_game()
     particles = ParticleSystem()
-    rows_data = [(BOARD_HEIGHT - 1, [GRAY] * BOARD_WIDTH)]
+    rows_data = [ClearedRow(BOARD_HEIGHT - 1, [GRAY] * BOARD_WIDTH)]
     game._emit_line_particles(particles, rows_data)
     assert len(particles.particles) > 0
 
