@@ -6,7 +6,8 @@ Class hierarchy:
 - ``RandomGenerator`` — uniform random spawns.
 - ``BagGenerator`` — generic bag generator (N copies of each tetromino).
   - ``SevenBagGenerator`` — 7-bag (1 copy each).
-  - ``ThirtyFiveBagGenerator`` — 35-bag (5 copies each).
+- ``ThirtyFiveBagGenerator`` — 35-bag (5 copies each).
+- ``WeightedGenerator`` — weighted random with anti-repeat rebalancing.
 - ``ReplayGenerator`` — serve from a saved sequence, exhaustible.
 - ``PieceProvider`` — facade that owns curriculum state, first-piece
   safety, replay recording, and delegates to a generator.
@@ -33,10 +34,10 @@ from tetris.settings import FIRST_PIECE_TYPES, REPLAY_PATH, SHAPES
 _logger = get_logger("piece_provider")
 
 # --- Weighted generator tuning ----------------------------------------------
-_WT_DECAY = 0.5   # selected piece weight *= _WT_DECAY
-_WT_BOOST = 0.1   # every other piece weight += _WT_BOOST
-_WT_MIN = 0.1     # weight floor (never zero/negative)
-_WT_INIT = 1.0    # starting weight for all pieces
+_WT_DECAY = 0.5  # selected piece weight *= _WT_DECAY
+_WT_BOOST = 0.1  # every other piece weight += _WT_BOOST
+_WT_MIN = 0.1  # weight floor (never zero/negative)
+_WT_INIT = 1.0  # starting weight for all pieces
 
 
 # ---------------------------------------------------------------------------
@@ -288,9 +289,7 @@ class PieceProvider:
         self._first_piece = True
         self._all_types = list(SHAPES.keys())
         self._fallback = _make_generator(generator)
-        self._generator: PieceGenerator = (
-            ReplayGenerator(path) if mode == "replay" else self._fallback
-        )
+        self._generator: PieceGenerator = ReplayGenerator(path) if mode == "replay" else self._fallback
 
     def reset(self) -> None:
         """Re-arm the first-piece restriction and clear the active generator.
