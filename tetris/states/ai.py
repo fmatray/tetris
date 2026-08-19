@@ -591,11 +591,12 @@ class AIState(GameState):
 
     def _apply_epsilon_policy(self) -> None:
         """Adjust epsilon when new piece added, per user setting."""
-        if self.curriculum_epsilon == "reset":
-            self.agent.epsilon = 1.0
-        elif self.curriculum_epsilon == "boost":
-            self.agent.epsilon = max(self.agent.epsilon, 0.5)
-        # "decay" = do nothing, keep normal decay
+        match self.curriculum_epsilon:
+            case "reset":
+                self.agent.epsilon = 1.0
+            case "boost":
+                self.agent.epsilon = max(self.agent.epsilon, 0.5)
+            # "decay" = do nothing, keep normal decay
 
     # --- Rendering with AI HUD overlay ----------------------------------
 

@@ -25,22 +25,25 @@ class AudioMenuState(MenuBase):
     # --- Hooks ----------------------------------------------------------
 
     def _value_label(self, i: int) -> str:
-        if i == 0:
-            return VOLUME_LABELS[self.menu.sound_volume]
-        if i == 1:
-            return VOLUME_LABELS[self.menu.music_volume]
-        if i == 2:
-            return MUSIC_SONG_LABELS[self.menu.music_song]
-        return ""
+        match i:
+            case 0:
+                return VOLUME_LABELS[self.menu.sound_volume]
+            case 1:
+                return VOLUME_LABELS[self.menu.music_volume]
+            case 2:
+                return MUSIC_SONG_LABELS[self.menu.music_song]
+            case _:
+                return ""
 
     def _toggle(self, direction: int) -> None:
-        if self.selection == 0:
-            self.menu.sound_volume = (self.menu.sound_volume + direction) % 4
-        elif self.selection == 1:
-            self.menu.music_volume = (self.menu.music_volume + direction) % 4
-        elif self.selection == 2:
-            idx = MUSIC_SONGS.index(self.menu.music_song)
-            self.menu.music_song = MUSIC_SONGS[(idx + direction) % len(MUSIC_SONGS)]
+        match self.selection:
+            case 0:
+                self.menu.sound_volume = (self.menu.sound_volume + direction) % 4
+            case 1:
+                self.menu.music_volume = (self.menu.music_volume + direction) % 4
+            case 2:
+                idx = MUSIC_SONGS.index(self.menu.music_song)
+                self.menu.music_song = MUSIC_SONGS[(idx + direction) % len(MUSIC_SONGS)]
 
     def _save(self) -> None:
         self.menu.save_settings()

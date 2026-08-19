@@ -35,24 +35,23 @@ class AIMenuState(MenuBase):
     # --- Hooks ----------------------------------------------------------
 
     def _value_label(self, i: int) -> str:
-        if i == 0:  # Mode
-            return "Apprentissage" if self.menu.ai_mode == "learning" else "Jeu"
-        if i == 1:  # Vitesse
-            return "Rapide" if self.menu.ai_speed == "fast" else "Normal"
-        return ""
+        match i:
+            case 0:  # Mode
+                return "Apprentissage" if self.menu.ai_mode == "learning" else "Jeu"
+            case 1:  # Vitesse
+                return "Rapide" if self.menu.ai_speed == "fast" else "Normal"
+            case _:
+                return ""
 
     def _is_disabled(self, i: int) -> bool:
         return bool(i == 2 and self.menu.ai_mode == "playing")
 
     def _toggle(self, direction: int) -> None:
-        if self.selection == 0:  # Mode
-            self.menu.ai_mode = (
-                "playing" if self.menu.ai_mode == "learning" else "learning"
-            )
-        elif self.selection == 1:  # Vitesse
-            self.menu.ai_speed = (
-                "fast" if self.menu.ai_speed == "normal" else "normal"
-            )
+        match self.selection:
+            case 0:  # Mode
+                self.menu.ai_mode = "playing" if self.menu.ai_mode == "learning" else "learning"
+            case 1:  # Vitesse
+                self.menu.ai_speed = "fast" if self.menu.ai_speed == "normal" else "normal"
 
     def _save(self) -> None:
         self.menu.save_settings()
@@ -64,26 +63,26 @@ class AIMenuState(MenuBase):
         return self.menu
 
     def _on_select(self) -> State | None:
-        sel = self.selection
-        if sel == 0:  # Mode — toggle
-            self._toggle(-1)
-            self._save()
-        elif sel == 2:  # Apprentissage submenu
-            from tetris.states.hyperparam_menu import HyperparamMenuState
+        match self.selection:
+            case 0:  # Mode — toggle
+                self._toggle(-1)
+                self._save()
+            case 2:  # Apprentissage submenu
+                from tetris.states.hyperparam_menu import HyperparamMenuState
 
-            return HyperparamMenuState(self.screen, self.font, self.audio, self)
-        elif sel == 3:  # Statistiques
-            from tetris.states.stats import StatsState
+                return HyperparamMenuState(self.screen, self.font, self.audio, self)
+            case 3:  # Statistiques
+                from tetris.states.stats import StatsState
 
-            return StatsState(self.screen, self.font, self.audio, self)
-        elif sel == 4:  # Réinitialiser IA
-            if not self._confirm_reset:
-                self._confirm_reset = True
-            else:
-                self._reset_ai()
-                self._confirm_reset = False
-        elif sel == 5:  # Retour
-            return self.menu
+                return StatsState(self.screen, self.font, self.audio, self)
+            case 4:  # Réinitialiser IA
+                if not self._confirm_reset:
+                    self._confirm_reset = True
+                else:
+                    self._reset_ai()
+                    self._confirm_reset = False
+            case 5:  # Retour
+                return self.menu
         return None
 
     def _option_text(self, i: int, is_sel: bool) -> str:

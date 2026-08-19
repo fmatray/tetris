@@ -24,17 +24,20 @@ class HumanMenuState(MenuBase):
     # --- Hooks ----------------------------------------------------------
 
     def _value_label(self, i: int) -> str:
-        if i == 0:
-            return self.menu.mode
-        if i == 1:
-            return "ON" if self.menu.ghost_piece else "OFF"
-        return ""
+        match i:
+            case 0:
+                return self.menu.mode
+            case 1:
+                return "ON" if self.menu.ghost_piece else "OFF"
+            case _:
+                return ""
 
     def _toggle(self, direction: int) -> None:
-        if self.selection == 0:  # Mode
-            self.menu.mode = "Replay" if self.menu.mode == "Normal" else "Normal"
-        elif self.selection == 1:  # Fantôme
-            self.menu.ghost_piece = not self.menu.ghost_piece
+        match self.selection:
+            case 0:  # Mode
+                self.menu.mode = "Replay" if self.menu.mode == "Normal" else "Normal"
+            case 1:  # Fantôme
+                self.menu.ghost_piece = not self.menu.ghost_piece
 
     def _save(self) -> None:
         self.menu.save_settings()
@@ -43,15 +46,15 @@ class HumanMenuState(MenuBase):
         return self.menu
 
     def _on_select(self) -> State | None:
-        sel = self.selection
-        if sel == 2:  # Touches
-            from tetris.states.keybind import KeybindState
+        match self.selection:
+            case 2:  # Touches
+                from tetris.states.keybind import KeybindState
 
-            return KeybindState(self.screen, self.font, self.audio, self)
-        if sel == 3:  # Statistiques
-            from tetris.states.human_stats import HumanStatsState
+                return KeybindState(self.screen, self.font, self.audio, self)
+            case 3:  # Statistiques
+                from tetris.states.human_stats import HumanStatsState
 
-            return HumanStatsState(self.screen, self.font, self.audio, self)
-        if sel == 4:  # Retour
-            return self.menu
+                return HumanStatsState(self.screen, self.font, self.audio, self)
+            case 4:  # Retour
+                return self.menu
         return None

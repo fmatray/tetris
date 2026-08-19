@@ -121,45 +121,43 @@ class HyperparamMenuState(MenuBase):
 
     def _toggle(self, direction: int) -> None:
         m = self.menu
-        s = self.selection
-        if s == 0:  # Epsilon decay
-            m.ai_epsilon_decay = round(
-                max(0.990, min(0.9999, m.ai_epsilon_decay + direction * 0.0001)),
-                4,
-            )
-        elif s == 1:  # Epsilon fin
-            m.ai_epsilon_end = round(
-                max(0.02, min(0.10, m.ai_epsilon_end + direction * 0.01)),
-                2,
-            )
-        elif s == 2:  # Learning rate
-            m.ai_lr = round(max(1e-6, min(1e-2, m.ai_lr * (10 ** direction))), 6)
-        elif s == 3:  # Gamma
-            m.ai_gamma = round(max(0.80, min(0.99, m.ai_gamma + direction * 0.01)), 2)
-        elif s == 4:  # Batch size
-            m.ai_batch_size = max(8, min(256, m.ai_batch_size + direction * 8))
-        elif s == 5:  # Buffer size
-            m.ai_buffer_size = max(
-                1_000, min(200_000, m.ai_buffer_size + direction * 5_000)
-            )
-        elif s == 6:  # Curriculum
-            m.ai_curriculum = not m.ai_curriculum
-        elif s == 7:  # Curriculum frequency
-            m.ai_curriculum_freq = max(10, min(2000, m.ai_curriculum_freq + direction * 10))
-        elif s == 8:  # Curriculum epsilon policy
-            policies = ["reset", "boost", "decay"]
-            idx = policies.index(m.ai_curriculum_epsilon)
-            m.ai_curriculum_epsilon = policies[(idx + direction) % len(policies)]
-        elif s == 9:  # Warm-start
-            m.ai_warm_start = not m.ai_warm_start
-        elif s == 10:  # Maj. par pièce
-            m.ai_learn_per_action = max(1, min(8, m.ai_learn_per_action + direction))
-        elif s == 11:  # Look-ahead
-            m.ai_lookahead = not m.ai_lookahead
-        elif s == 12:  # Prof. lookahead
-            m.ai_lookahead_depth = max(1, min(3, m.ai_lookahead_depth + direction))
-        elif s == 13:  # Soft-drop
-            m.ai_soft_drop = not m.ai_soft_drop
+        match self.selection:
+            case 0:  # Epsilon decay
+                m.ai_epsilon_decay = round(
+                    max(0.990, min(0.9999, m.ai_epsilon_decay + direction * 0.0001)),
+                    4,
+                )
+            case 1:  # Epsilon fin
+                m.ai_epsilon_end = round(
+                    max(0.02, min(0.10, m.ai_epsilon_end + direction * 0.01)),
+                    2,
+                )
+            case 2:  # Learning rate
+                m.ai_lr = round(max(1e-6, min(1e-2, m.ai_lr * (10**direction))), 6)
+            case 3:  # Gamma
+                m.ai_gamma = round(max(0.80, min(0.99, m.ai_gamma + direction * 0.01)), 2)
+            case 4:  # Batch size
+                m.ai_batch_size = max(8, min(256, m.ai_batch_size + direction * 8))
+            case 5:  # Buffer size
+                m.ai_buffer_size = max(1_000, min(200_000, m.ai_buffer_size + direction * 5_000))
+            case 6:  # Curriculum
+                m.ai_curriculum = not m.ai_curriculum
+            case 7:  # Curriculum frequency
+                m.ai_curriculum_freq = max(10, min(2000, m.ai_curriculum_freq + direction * 10))
+            case 8:  # Curriculum epsilon policy
+                policies = ["reset", "boost", "decay"]
+                idx = policies.index(m.ai_curriculum_epsilon)
+                m.ai_curriculum_epsilon = policies[(idx + direction) % len(policies)]
+            case 9:  # Warm-start
+                m.ai_warm_start = not m.ai_warm_start
+            case 10:  # Maj. par pièce
+                m.ai_learn_per_action = max(1, min(8, m.ai_learn_per_action + direction))
+            case 11:  # Look-ahead
+                m.ai_lookahead = not m.ai_lookahead
+            case 12:  # Prof. lookahead
+                m.ai_lookahead_depth = max(1, min(3, m.ai_lookahead_depth + direction))
+            case 13:  # Soft-drop
+                m.ai_soft_drop = not m.ai_soft_drop
 
     def _save(self) -> None:
         self.menu.save_settings()
@@ -176,6 +174,7 @@ class HyperparamMenuState(MenuBase):
         if self.selection == 15:  # Retour
             return self.ai_menu
         return None
+
     # --- Custom table draw ------------------------------------------------
 
     def draw(self, screen: pygame.Surface, *, particles=None) -> None:
@@ -199,8 +198,8 @@ class HyperparamMenuState(MenuBase):
         # Left-aligned: Param, Explanation. Right-aligned: Current, Min, Max, Step.
         headers = ("Paramètre", "Current", "Min", "Max", "Step", "Explication")
         margin = 40
-        left_w = 180     # Param
-        num_w = 100        # Current, Min, Max, Step (right-aligned)
+        left_w = 180  # Param
+        num_w = 100  # Current, Min, Max, Step (right-aligned)
         gap = 15
         expl_w = SCREEN_WIDTH - margin * 2 - left_w - num_w * 4 - gap
 

@@ -49,22 +49,24 @@ class GameOverState(State):
         self.step = "ANIMATION"
 
     def update(self, dt: float, particles) -> State | None:
-        if self.step == "ANIMATION":
-            self.renderer.play_game_over_animation(self.game, self.audio)
-            self.step = "NAME"
+        match self.step:
+            case "ANIMATION":
+                self.renderer.play_game_over_animation(self.game, self.audio)
+                self.step = "NAME"
         return None
 
     def handle_event(self, event: pygame.event.Event) -> State | None:
         if event.type != pygame.KEYDOWN:
             return None
-        if self.step == "NAME":
-            return self._handle_name_event(event)
-        elif self.step == "LEADERBOARD":
-            if self.menu is not None:
-                return self.menu
-            from tetris.states.menu import MenuState
+        match self.step:
+            case "NAME":
+                return self._handle_name_event(event)
+            case "LEADERBOARD":
+                if self.menu is not None:
+                    return self.menu
+                from tetris.states.menu import MenuState
 
-            return MenuState(self.screen, self.font, self.audio)
+                return MenuState(self.screen, self.font, self.audio)
         return None
 
     def _handle_name_event(self, event: pygame.event.Event) -> State | None:
@@ -93,18 +95,18 @@ class GameOverState(State):
         return None
 
     def draw(self, screen: pygame.Surface, *, particles: ParticleSystem | None = None) -> None:
-        if self.step == "NAME":
-            self._draw_name_entry(screen)
-        elif self.step == "LEADERBOARD":
-            draw_leaderboard(screen, self.font, self._scores)
+        match self.step:
+            case "NAME":
+                self._draw_name_entry(screen)
+            case "LEADERBOARD":
+                draw_leaderboard(screen, self.font, self._scores)
 
     def _draw_name_entry(self, screen: pygame.Surface) -> None:
         screen.fill(BLACK)
         prompt = get_large_font().render("GAME OVER!", True, WHITE)
         screen.blit(prompt, (SCREEN_WIDTH // 2 - prompt.get_width() // 2, TITLE_Y))
         instr = self.font.render("Enter your name and press ENTER:", True, GRAY)
-        screen.blit(instr, (SCREEN_WIDTH // 2 - instr.get_width() // 2,
-                            TITLE_Y + LINE_HEIGHT_SMALL + 10))
+        screen.blit(instr, (SCREEN_WIDTH // 2 - instr.get_width() // 2, TITLE_Y + LINE_HEIGHT_SMALL + 10))
         rect = pygame.Rect(SCREEN_WIDTH // 2 - 150, CONTENT_Y + LINE_HEIGHT_SMALL * 2 + 10, 300, 50)
         pygame.draw.rect(screen, GRAY, rect, 2)
         txt = self.font.render(self.name, True, WHITE)
