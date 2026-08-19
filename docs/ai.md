@@ -268,6 +268,8 @@ tetris/
 │   ├── network.py        # DQNetwork (17→128→64→1 V-network)
 │   ├── replay_buffer.py  # Experience replay buffer (50,000)
 │   ├── rewards.py        # DT-20 features, Dellacherie value, PBRS reward, simulation helpers
+│   ├── candidates.py     # Candidate placement generation (pure functions)
+│   ├── hud.py            # AI training HUD rendering (pure presentation)
 │   └── trainer.py        # TrainingLog (per-episode JSON persistence)
 ├── states/
 │   ├── ai.py             # AIState (subclass of GameState)
@@ -292,11 +294,13 @@ AIState (subclass of GameState)
 ```
 
 `AIState` inherits all board, piece, stats, and rendering logic from
-`GameState`. It overrides:
+`GameState`. Candidate generation and HUD rendering are extracted to
+`tetris/ai/candidates.py` and `tetris/ai/hud.py` as pure functions.
+It overrides:
 
 - `update()` — AI macro-action selection and execution
 - `_lock_and_spawn()` — intercepts piece locking for reward + transition
-- `render()` — draws AI HUD overlay (training + statistics table)
+- `draw()` — delegates AI HUD overlay to `tetris.ai.hud.draw_ai_hud`
 - `_on_episode_end()` — logs episode, saves model, auto-restarts
 
 ### 7.3 AI HUD

@@ -25,6 +25,8 @@ from tetris.settings import (
     MODEL_PATH,
     SHAPES,
 )
+from tetris.ai.candidates import iter_column_positions, best_next_placement, gen_placements
+from tetris.ai.hud import _hud_table_rows, _trend_arrow, draw_ai_hud
 from tetris.states.ai import AIState, NUM_ROTATIONS
 from tetris.visuals.particles import ParticleSystem
 
@@ -139,7 +141,7 @@ class TestInit:
 class TestIterColumnPositions:
     def test_all_piece_types_yield_positions(self):
         for piece_type in SHAPES:
-            positions = list(AIState._iter_column_positions(piece_type))
+            positions = list(iter_column_positions(piece_type))
             assert len(positions) > 0
             for shape, rot, px in positions:
                 assert isinstance(shape, list)
@@ -147,53 +149,35 @@ class TestIterColumnPositions:
                 assert 0 <= px < BOARD_WIDTH
 
     def test_o_piece_one_rotation(self):
-        positions = list(AIState._iter_column_positions("O"))
+        positions = list(iter_column_positions("O"))
         rots = {rot for _, rot, _ in positions}
         assert rots == {0}
 
     def test_i_piece_all_rotations(self):
-        positions = list(AIState._iter_column_positions("I"))
+        positions = list(iter_column_positions("I"))
         rots = {rot for _, rot, _ in positions}
         assert rots == {0, 1, 2, 3}
 
 
-class TestIsValidPlacement:
-    def test_valid_on_empty_board(self):
-        ai = _make_ai()
-        piece = ai.current_piece
-        assert ai._is_valid_placement(piece, 0, 3) is True
-
-    def test_invalid_on_full_board(self):
-        ai = _make_ai()
-        for y in range(BOARD_HEIGHT):
-            for x in range(BOARD_WIDTH):
-                ai.board.grid[y][x] = GRAY
-        piece = ai.current_piece
-        assert ai._is_valid_placement(piece, 0, 3) is False
-
-
 class TestBestNextPlacement:
     def test_empty_grid_returns_grid(self):
-        ai = _make_ai()
         grid = np.zeros((BOARD_HEIGHT, BOARD_WIDTH), dtype=np.float32)
-        result = ai._best_next_placement(grid, "I")
+        result = best_next_placement(grid, "I")
         assert result.shape == grid.shape
         assert not np.array_equal(result, grid)  # piece placed
 
     def test_full_grid_clears_lines(self):
         """Full grid: placement triggers line clears → result differs."""
-        ai = _make_ai()
         grid = np.ones((BOARD_HEIGHT, BOARD_WIDTH), dtype=np.float32)
-        result = ai._best_next_placement(grid, "O")
+        result = best_next_placement(grid, "O")
         # After clearing, the grid is not all ones
         assert not np.array_equal(result, grid)
 
 
 class TestGenPlacements:
     def test_soft_drop_yields_placements(self):
-        ai = _make_ai(soft_drop=True)
         grid = np.zeros((BOARD_HEIGHT, BOARD_WIDTH), dtype=np.float32)
-        placements = list(ai._gen_placements(grid, "I"))
+        placements = list(gen_placements(grid, "I", soft_drop=True))
         assert len(placements) > 0
         for shape, px, py, rot in placements:
             assert len(shape) == 4
@@ -201,9 +185,8 @@ class TestGenPlacements:
             assert 0 <= rot < NUM_ROTATIONS
 
     def test_hard_drop_yields_placements(self):
-        ai = _make_ai(soft_drop=False)
         grid = np.zeros((BOARD_HEIGHT, BOARD_WIDTH), dtype=np.float32)
-        placements = list(ai._gen_placements(grid, "I"))
+        placements = list(gen_placements(grid, "I", soft_drop=False))
         assert len(placements) > 0
         for shape, px, py, rot in placements:
             assert len(shape) == 4
@@ -212,16 +195,14 @@ class TestGenPlacements:
 
     def test_full_grid_soft_drop_yields_spawn(self):
         """Full grid: soft_drop BFS finds spawn position (py=0)."""
-        ai = _make_ai(soft_drop=True)
         grid = np.ones((BOARD_HEIGHT, BOARD_WIDTH), dtype=np.float32)
-        placements = list(ai._gen_placements(grid, "O"))
+        placements = list(gen_placements(grid, "O", soft_drop=True))
         assert len(placements) >= 1
 
     def test_full_grid_hard_drop_yields_nothing(self):
         """Full grid: shape_fits at y=0 fails → no hard-drop placements."""
-        ai = _make_ai(soft_drop=False)
         grid = np.ones((BOARD_HEIGHT, BOARD_WIDTH), dtype=np.float32)
-        placements = list(ai._gen_placements(grid, "O"))
+        placements = list(gen_placements(grid, "O", soft_drop=False))
         assert len(placements) == 0
 
 
@@ -547,26 +528,26 @@ class TestDraw:
 class TestDrawAiHud:
     def test_smoke_learning_mode(self):
         ai = _make_ai(learning=True)
-        ai._draw_ai_hud()
+        draw_ai_hud(ai)
 
     def test_smoke_playing_mode(self):
         ai = _make_ai(learning=False)
-        ai._draw_ai_hud()
+        draw_ai_hud(ai)
 
     def test_smoke_with_curriculum(self):
         ai = _make_ai(learning=True, curriculum=True)
-        ai._draw_ai_hud()
+        draw_ai_hud(ai)
 
 
 class TestHudTableRows:
     def test_returns_six_rows(self):
         ai = _make_ai(learning=True)
-        rows = ai._hud_table_rows()
+        rows = _hud_table_rows(ai.log, ai.stats, ai.episode_steps)
         assert len(rows) == 6
 
     def test_row_structure(self):
         ai = _make_ai(learning=True)
-        rows = ai._hud_table_rows()
+        rows = _hud_table_rows(ai.log, ai.stats, ai.episode_steps)
         for row in rows:
             assert len(row) == 5
         assert rows[0][0] == "Current"
@@ -579,22 +560,22 @@ class TestHudTableRows:
     def test_current_row_values(self):
         ai = _make_ai(learning=True)
         ai.episode_steps = 5
-        rows = ai._hud_table_rows()
+        rows = _hud_table_rows(ai.log, ai.stats, ai.episode_steps)
         assert rows[0] == ["Current", 5, 0, 0, 0]
 
 
 class TestTrendArrow:
     def test_up(self):
-        assert AIState._trend_arrow("up") == "\u2191"
+        assert _trend_arrow("up") == "\u2191"
 
     def test_down(self):
-        assert AIState._trend_arrow("down") == "\u2193"
+        assert _trend_arrow("down") == "\u2193"
 
     def test_stable(self):
-        assert AIState._trend_arrow("stable") == "\u2192"
+        assert _trend_arrow("stable") == "\u2192"
 
     def test_unknown(self):
-        assert AIState._trend_arrow("unknown") == "\u2192"
+        assert _trend_arrow("unknown") == "\u2192"
 
 
 # ---------------------------------------------------------------------------
@@ -712,14 +693,14 @@ class TestUpdateCycle:
         ai.draw(_screen, particles=None)
 
     def test_draw_ai_hud_smoke(self):
-        """_draw_ai_hud should render without error."""
+        """draw_ai_hud should render without error."""
         ai = _make_ai(learning=True, speed="fast")
-        ai._draw_ai_hud()
+        draw_ai_hud(ai)
 
     def test_hud_table_rows_structure(self):
         """_hud_table_rows should return 6 rows with 5 columns each."""
         ai = _make_ai(learning=True, speed="fast")
-        rows = ai._hud_table_rows()
+        rows = _hud_table_rows(ai.log, ai.stats, ai.episode_steps)
         assert len(rows) == 6
         for row in rows:
             assert len(row) == 5
@@ -775,4 +756,4 @@ class TestLastMoves:
         for _ in range(20):
             ai.update(16, particles)
         assert len(ai._last_moves) >= 1
-        ai._draw_ai_hud()  # should not raise
+        draw_ai_hud(ai)  # should not raise

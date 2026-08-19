@@ -56,6 +56,7 @@ def _enumerate_candidates(grid, piece_type):
 
 # --- hard_drop_y_batch ----------------------------------------------
 
+
 def test_hard_drop_y_batch_empty():
     """All pieces on empty board land at correct rows."""
     grid = _empty_grid()
@@ -68,7 +69,7 @@ def test_hard_drop_y_batch_empty():
 def test_hard_drop_y_batch_with_blocks():
     """Pieces land on top of existing blocks."""
     grid = _empty_grid()
-    grid[BOARD_HEIGHT - 3:, :5] = 1.0
+    grid[BOARD_HEIGHT - 3 :, :5] = 1.0
     shapes, xs = _enumerate_candidates(grid, "T")
     batch_pys = hard_drop_y_batch(grid, shapes, xs)
     scalar_pys = np.array([hard_drop_y(grid, s, x) for s, x in zip(shapes, xs)])
@@ -86,9 +87,7 @@ def test_hard_drop_y_batch_matches_scalar():
                 continue
             batch_pys = hard_drop_y_batch(grid, shapes, xs)
             scalar_pys = np.array([hard_drop_y(grid, s, x) for s, x in zip(shapes, xs)])
-            assert np.array_equal(batch_pys, scalar_pys), (
-                f"{piece_type}: {batch_pys} vs {scalar_pys}"
-            )
+            assert np.array_equal(batch_pys, scalar_pys), f"{piece_type}: {batch_pys} vs {scalar_pys}"
 
 
 def test_hard_drop_y_batch_empty_board_all_pieces():
@@ -102,6 +101,7 @@ def test_hard_drop_y_batch_empty_board_all_pieces():
 
 
 # --- place_and_clear_batch ------------------------------------------
+
 
 def test_place_and_clear_batch_no_lines():
     """Place O-piece on empty board, no lines cleared."""
@@ -158,6 +158,7 @@ def test_place_and_clear_batch_preserves_input():
     place_and_clear_batch(grid, [shape], xs, [py])
     assert np.array_equal(grid, grid_copy)
 
+
 def test_place_and_clear_batch_multi_candidates_nonempty():
     """Multiple candidates on non-empty board: scatter matches per-candidate scalar."""
     rng = np.random.default_rng(99)
@@ -197,13 +198,14 @@ def test_place_and_clear_batch_multi_candidates_nonempty():
     assert np.array_equal(grid, grid_copy)
 
 
-# --- _best_next_placement batch equivalence -------------------------
+# --- best_next_placement batch equivalence ---------------------------
+
 
 def test_best_next_placement_batch_matches_scalar():
-    """Batched _best_next_placement produces same result as scalar loop.
+    """Batched best_next_placement produces same result as scalar loop.
 
     Recreates the scalar logic and compares against the batch version
-    used in AIState._best_next_placement for diverse board states.
+    used in tetris.ai.candidates.best_next_placement for diverse board states.
     """
     rng = np.random.default_rng(123)
     for piece_type in SHAPES:
@@ -266,6 +268,7 @@ def test_best_next_placement_batch_matches_scalar():
 
 # --- find_full_rows numpy vs list equivalence -----------------------
 
+
 def test_find_full_rows_numpy_matches_list():
     """Numpy path produces same result as list path."""
     rng = np.random.default_rng(42)
@@ -293,6 +296,7 @@ def test_find_full_rows_full_bottom():
 
 # --- place_cells numpy vs list equivalence --------------------------
 
+
 def test_place_cells_numpy_matches_list():
     """Numpy path produces same grid as list path."""
     rng = np.random.default_rng(99)
@@ -318,6 +322,7 @@ def test_place_cells_out_of_bounds():
 
 # --- hard_drop_y_batch vectorized equivalence -----------------------
 
+
 def test_hard_drop_y_batch_vectorized_matches_scalar_all_pieces():
     """New vectorized batch matches scalar hard_drop_y for all pieces/columns."""
     rng = np.random.default_rng(77)
@@ -328,16 +333,12 @@ def test_hard_drop_y_batch_vectorized_matches_scalar_all_pieces():
             if not shapes:
                 continue
             batch_pys = hard_drop_y_batch(grid, shapes, x_positions)
-            scalar_pys = np.array([
-                hard_drop_y(grid, shape, x)
-                for shape, x in zip(shapes, x_positions)
-            ])
-            assert np.array_equal(batch_pys, scalar_pys), (
-                f"{piece_type}: vectorized batch mismatch"
-            )
+            scalar_pys = np.array([hard_drop_y(grid, shape, x) for shape, x in zip(shapes, x_positions)])
+            assert np.array_equal(batch_pys, scalar_pys), f"{piece_type}: vectorized batch mismatch"
 
 
 # --- soft_drop_placements numpy vs list equivalence -----------------
+
 
 def test_soft_drop_placements_numpy_matches_list():
     """soft_drop_placements with numpy grid produces same placements as list grid."""

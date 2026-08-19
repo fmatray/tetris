@@ -55,7 +55,7 @@ tetris/
 │   │   ├── keybind.py           # KeybindState (configuration des touches)
 │   │   ├── game.py              # GameState (base abstraite: board, pieces, gravité)
 │   │   ├── human.py             # HumanState (jeu humain: clavier, DAS, pause)
-│   │   ├── ai.py                # AIState (DQN agent, HUD apprentissage + stats)
+│   │   ├── ai.py                # AIState (DQN agent, HUD apprentissage + stats; candidates/HUD extraits vers tetris/ai/)
 │   │   ├── ai_menu.py           # AIMenuState (mode, vitesse, apprentissage, stats, reset)
 │   │   ├── hyperparam_menu.py   # HyperparamMenuState (13 hyperparamètres DQN + reset)
 │   │   ├── stats.py             # StatsState (tableau stats + graphique)

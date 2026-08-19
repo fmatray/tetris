@@ -50,7 +50,7 @@ MenuState (root, owns settings)
 |---|---|
 | `tetris/game/` | Pure domain: `Board`, `Tetromino`, `PieceProvider` facade + `PieceGenerator` hierarchy (`RandomGenerator`, `BagGenerator`→`SevenBagGenerator`/`ThirtyFiveBagGenerator`, `WeightedGenerator`, `ReplayGenerator`), `ScoreEngine`, `GameStats`, `rules` (grid-agnostic game-rule functions) |
 | `tetris/states/` | FSM states (`State` base + 15 concrete states) |
-| `tetris/ai/` | V-network DQN: `DQNetwork` (V-function), `DQNAgent` (per-candidate eval), `PrioritizedReplayBuffer`, DT-20 features + PBRS reward, `TrainingLog`. Game-rule functions (SRS kicks, soft-drop BFS) extracted to `tetris/game/rules.py` |
+| `tetris/ai/` | V-network DQN: `DQNetwork` (V-function), `DQNAgent` (per-candidate eval), `PrioritizedReplayBuffer`, DT-20 features + PBRS reward, `TrainingLog`, `candidates.py` (placement generation), `hud.py` (AI HUD rendering). Game-rule functions (SRS kicks, soft-drop BFS) extracted to `tetris/game/rules.py` |
 | `tetris/visuals/` | `Renderer`, `ParticleSystem`, leaderboard/graph views |
 | `tetris/audio/` | `AudioManager` — NumPy SFX synthesis + MIDI parsing for polyphonic music; `midi_gen` generates `.mid` files |
 | `tetris/storage/` | JSON load/save for leaderboard and human game history |
@@ -114,9 +114,10 @@ python -m tetris.verify_training
 | `tetris/states/game.py` | `GameState` abstract base: board, pieces, gravity, lock delay, movement primitives |
 | `tetris/states/human.py` | `HumanState` — human gameplay: keyboard, DAS, pause, keybind setup |
 | `tetris/states/keybind.py` | Keybinding state, `key_name()` (moved from settings.py) |
-| `tetris/states/ai.py` | AI gameplay + RL training integration |
+| `tetris/states/ai.py` | AI gameplay state + RL training integration (candidate generation and HUD rendering extracted to `tetris/ai/candidates.py` and `tetris/ai/hud.py`) |
 | `tetris/ai/agent.py` | `DQNAgent` — `select_action`, `store`, `learn`, `save`, `load` |
-| `tetris/ai/rewards.py` | `extract_features` (17-dim DT-20, normalized) + `compute_reward` (PBRS scale 0.1) + `dellacherie_value`. Batch functions (`dellacherie_value_batch`, `extract_features_batch`) share `_compute_board_metrics_batch`. Game-rule functions (SRS kicks, soft-drop BFS, `hard_drop_y`, `shape_fits`) extracted to `tetris/game/rules.py` |
+| `tetris/ai/candidates.py` | Candidate placement generation — `iter_column_positions`, `best_next_placement`, `gen_placements`, `get_candidate_states`. Pure functions, no instance state |
+| `tetris/ai/hud.py` | AI training HUD rendering — training params table, stats table, last-5-moves. Pure presentation |
 | `tetris/game/rules.py` | Grid-agnostic pure game-rule functions (`shape_fits`, `try_rotation`, `hard_drop_y`, `soft_drop_placements`, `place_cells`, `find_full_rows`) — shared by `Board` (list grid) and AI simulation (numpy grid) |
 | `tetris/game/piece_provider.py` | `PieceProvider` facade + `PieceGenerator` hierarchy (`RandomGenerator`, `BagGenerator`→`SevenBagGenerator`/`ThirtyFiveBagGenerator`, `WeightedGenerator`, `ReplayGenerator`) — tetromino spawning with record/replay, curriculum, first-piece safety |
 | `tetris/ai/network.py` | `DQNetwork` — 17→128→64→1 V-network MLP |

@@ -22,43 +22,34 @@ import numpy as np
 import pygame
 
 from tetris.ai.agent import DQNAgent
+from tetris.ai.candidates import NUM_ROTATIONS, get_candidate_states  # noqa: F401
+from tetris.ai.hud import draw_ai_hud
 from tetris.ai.rewards import (
     board_to_grid,
     compute_reward,
-    dellacherie_value_batch,
     extract_features,
-    extract_features_batch,
-    place_and_clear_batch,
 )
 from tetris.ai.trainer import TrainingLog
 from tetris.audio import AudioManager
-from tetris.game import rules
 from tetris.game.board import Board, LineClearResult
 from tetris.game.piece_provider import PieceProvider
-from tetris.game.rules import hard_drop_y, hard_drop_y_batch, soft_drop_placements
 from tetris.game.stats import GameStats
 from tetris.game.tetromino import Tetromino
 from tetris.logger import get_logger
 from tetris.settings import (
     AI_ACTION_DELAY_MS,
     AI_MODEL_SAVE_INTERVAL,
-    BOARD_WIDTH,
     CURRICULUM_ORDER,
-    HUD_POSITIONS,
     LEARN_PER_ACTION,
     LOCK_DELAY_MS,
     LOG_PATH,
     MODEL_PATH,
-    RED,
-    SCREEN_WIDTH,
     SHAPES,
 )
 from tetris.states.base import State
 from tetris.states.game import GameState
-from tetris.visuals.fonts import LINE_HEIGHT_SMALL
 from tetris.visuals.particles import ParticleSystem
 
-NUM_ROTATIONS = 4
 
 logger = get_logger("ai")
 
@@ -219,138 +210,27 @@ class AIState(GameState):
             self._curriculum_episode_count = 0
 
     # --- Candidate generation -------------------------------------------
-    def _is_valid_placement(self, piece, rotation: int, column: int) -> bool:
-        """Check if piece can be placed at (column, rotation) at spawn height."""
-        shape = SHAPES[piece.type][rotation % len(SHAPES[piece.type])]
-        min_bx = min(bx for bx, _ in shape)
-        px = column - min_bx
-        return rules.shape_fits(self.board.grid, shape, px, 0)
-
-    @staticmethod
-    def _iter_column_positions(piece_type: str):
-        """Yield (shape, rot, px) for every (rotation, column) that fits the board width."""
-        num_rots = len(SHAPES[piece_type])
-        for rot in range(NUM_ROTATIONS):
-            if rot >= num_rots:
-                continue
-            shape = SHAPES[piece_type][rot]
-            min_bx = min(bx for bx, _ in shape)
-            max_bx = max(bx for bx, _ in shape)
-            for col in range(BOARD_WIDTH):
-                px = col - min_bx
-                if px < 0 or px + max_bx >= BOARD_WIDTH:
-                    continue
-                yield shape, rot, px
-
-    def _best_next_placement(self, grid: np.ndarray, piece_type: str) -> np.ndarray:
-        """Simulate best placement of next piece on grid (2-piece look-ahead).
-
-        Uses hard-drop for speed — look-ahead only needs approximate board quality.
-        Batches all (rotation, column) candidates and evaluates Dellacherie
-        in one vectorized pass.
-        """
-        shapes: list[list[tuple[int, int]]] = []
-        x_positions: list[int] = []
-        for shape, _rot, px in self._iter_column_positions(piece_type):
-            shapes.append(shape)
-            x_positions.append(px)
-        if not shapes:
-            return grid
-        py_batch = hard_drop_y_batch(grid, shapes, x_positions)
-        valid = py_batch >= 0
-        if not valid.any():
-            return grid
-        v_shapes = [s for s, v in zip(shapes, valid) if v]
-        v_xs = [x for x, v in zip(x_positions, valid) if v]
-        v_pys = [int(y) for y, v in zip(py_batch, valid) if v]
-        sim_grids, _ = place_and_clear_batch(grid, v_shapes, v_xs, v_pys)
-        vals = dellacherie_value_batch(sim_grids)
-        best_idx = int(np.argmin(vals))
-        return sim_grids[best_idx]
-
-    def _gen_placements(self, base_grid: np.ndarray, piece_type: str):
-        """Yield (shape, px, py, rot) for all valid placements of a piece type."""
-        if self.soft_drop:
-            yield from soft_drop_placements(base_grid, piece_type)
-        else:
-            for shape, rot, px in self._iter_column_positions(piece_type):
-                if not rules.shape_fits(base_grid, shape, px, 0):
-                    continue
-                py = hard_drop_y(base_grid, shape, px)
-                if py < 0:
-                    continue
-                yield (shape, px, py, rot)
-
     def _get_candidate_states(self) -> tuple[np.ndarray, list[int], np.ndarray]:
-        """Enumerate valid placements, simulate drop + line clear, extract features.
+        """Enumerate valid placements, simulate, extract features.
 
-        Returns (candidate_states[N,17], action_ids[N], dellacherie_values[N]).
-        action_id = placement index (0..N-1). Placements stored in
-        self._candidate_placements as [(rot, px, py, hold), ...].
-        Includes hold candidates when ``_can_hold`` is True.
-
-        Batched: collects all placements first, then runs place_and_clear_batch,
-        lookahead, extract_features_batch, and dellacherie_value_batch in two
-        vectorized passes instead of per-candidate scalar calls.
+        Delegates to :func:`tetris.ai.candidates.get_candidate_states`.
+        Stores placements in ``self._candidate_placements``.
         """
-        piece = self.current_piece
-        base_grid = board_to_grid(self.board)
-        upcoming_types = [self.next_piece.type] + [p.type for p in self.preview_pieces]
-
-        all_shapes: list[list[tuple[int, int]]] = []
-        all_pxs: list[int] = []
-        all_pys: list[int] = []
-        all_rots: list[int] = []
-        all_holds: list[bool] = []
-        all_next_piece_types: list[str] = []
-
-        # Non-hold candidates: place current piece
-        for shape, px, py, rot in self._gen_placements(base_grid, piece.type):
-            all_shapes.append(shape)
-            all_pxs.append(px)
-            all_pys.append(py)
-            all_rots.append(rot)
-            all_holds.append(False)
-            all_next_piece_types.append(upcoming_types[0] if upcoming_types else "I")
-
-        # Hold candidates (if can hold): place the held/next piece instead
-        if self._can_hold:
-            if self.hold_piece is not None:
-                # Swap: current → hold, held → current. Next unchanged.
-                hold_upcoming = upcoming_types
-            else:
-                # No held piece: current → hold, next → current, preview shifts.
-                hold_upcoming = [p.type for p in self.preview_pieces]
-            hold_piece_type = self.hold_piece.type if self.hold_piece else self.next_piece.type
-            for shape, px, py, rot in self._gen_placements(base_grid, hold_piece_type):
-                all_shapes.append(shape)
-                all_pxs.append(px)
-                all_pys.append(py)
-                all_rots.append(rot)
-                all_holds.append(True)
-                all_next_piece_types.append(hold_upcoming[0] if hold_upcoming else "I")
-
-        if not all_shapes:
-            self._candidate_placements = []
-            return np.empty((0, 17), dtype=np.float32), [], np.empty(0, dtype=np.float32)
-
-        self._candidate_placements = list(zip(all_rots, all_pxs, all_pys, all_holds))
-
-        # Batch place + clear
-        sim_grids, lines_cleared = place_and_clear_batch(base_grid, all_shapes, all_pxs, all_pys)
-
-        # Lookahead (per-candidate — each depends on its own sim_grid)
-        if self.lookahead:
-            for i in range(len(all_shapes)):
-                for pt in upcoming_types[: self.lookahead_depth]:
-                    sim_grids[i] = self._best_next_placement(sim_grids[i], pt)
-
-        # Batch feature extraction + Dellacherie
-        candidates = extract_features_batch(sim_grids, lines_cleared, all_next_piece_types)
-        dellacherie_values = dellacherie_value_batch(sim_grids)
-
-        actions = list(range(len(all_shapes)))
-        return candidates, actions, dellacherie_values
+        hold_type = self.hold_piece.type if self.hold_piece is not None else None
+        preview_types = [p.type for p in self.preview_pieces]
+        candidates, actions, dellvals, placements = get_candidate_states(
+            base_grid=board_to_grid(self.board),
+            current_piece_type=self.current_piece.type,
+            hold_piece_type=hold_type,
+            next_piece_type=self.next_piece.type,
+            preview_piece_types=preview_types,
+            can_hold=self._can_hold,
+            soft_drop=self.soft_drop,
+            lookahead=self.lookahead,
+            lookahead_depth=self.lookahead_depth,
+        )
+        self._candidate_placements = placements
+        return candidates, actions, dellvals
 
     # --- Macro-action execution -----------------------------------------
 
@@ -603,114 +483,7 @@ class AIState(GameState):
         """Render the game frame plus the AI training HUD overlay."""
         super().draw(screen, particles=particles)
         if particles is not None:
-            self._draw_ai_hud()
-
-    def _draw_ai_hud(self) -> None:
-        """Overlay training parameters and a statistics table on the game screen."""
-        x0 = HUD_POSITIONS["ai_stats"][0]
-        y = HUD_POSITIONS["ai_stats"][1]
-        lh = LINE_HEIGHT_SMALL  # line height
-
-        # --- Training section (3 columns) ---
-        mode_label = "Apprentissage" if self.ai_mode == "learning" else "Jeu"
-        training_items = [
-            f"Mode: {mode_label}",
-            f"Vitesse: {'Rapide' if self.speed == 'fast' else 'Normal'}",
-            f"Episode: {self.episode}",
-            f"Epsilon: {self.agent.epsilon:.5f}",
-            f"Epsilon decay: {self.agent.epsilon_decay:.4f}",
-            f"Epsilon end: {self.agent.epsilon_end:.2f}",
-            f"LR: {self.agent.optimizer.param_groups[0]['lr']:.1e}",
-            f"Gamma: {self.agent.gamma:.3f}",
-            f"Batch: {self.agent.batch_size}",
-            f"Loss: {self.agent.last_loss:.4f}",
-            f"Curriculum: {'ON' if self.curriculum else 'OFF'}",
-            f"Pieces: {''.join(self._curriculum_types) if self._curriculum_types else 'ALL'}",
-            f"Warm-start: {'ON' if self.warm_start else 'OFF'}",
-            f"Look-ahead: {'ON' if self.lookahead else 'OFF'} (depth={self.lookahead_depth})",
-            f"Soft-drop: {'ON' if self.soft_drop else 'OFF'}",
-            f"Maj/pièce: {self.learn_per_action}",
-        ]
-        col_w = (SCREEN_WIDTH - x0) // 3
-        for i, item in enumerate(training_items):
-            col = i % 3
-            row = i // 3
-            surf = self.font.render(item, True, RED)
-            self.screen.blit(surf, (x0 + col * col_w, y + row * lh))
-        y += (len(training_items) // 3 + (1 if len(training_items) % 3 else 0)) * lh
-
-        y += 10  # gap between sections
-
-        # --- Statistics table ---
-        # Columns: [Tetromino, Lines, Score, Level] — right-aligned
-        # Rows: [Current, Total, Best, Average, Last 100]
-        label_w = 130
-        margin = 20
-        col_w = (SCREEN_WIDTH - x0 - label_w - margin) // 4
-        col_x = [x0 + label_w + i * col_w for i in range(5)]
-
-        headers = ["", "Tetromino", "Lines", "Score", "Level"]
-        for i in range(1, 5):
-            surf = self.font.render(headers[i], True, RED)
-            self.screen.blit(surf, (col_x[i] - surf.get_width(), y))
-        y += lh
-
-        rows = self._hud_table_rows()
-        for row in rows:
-            label = row[0]
-            surf = self.font.render(label, True, RED)
-            self.screen.blit(surf, (x0, y))
-            for i in range(1, 5):
-                surf = self.font.render(str(row[i]), True, RED)
-                self.screen.blit(surf, (col_x[i] - surf.get_width(), y))
-            y += lh
-
-        # --- Last 5 moves (compact, below board) ---
-        parts = [
-            f"{ptype} r{rot} c{col} {'H' if hold else ' '}"
-            for _i, (ptype, rot, col, hold) in enumerate(self._last_moves)
-        ]
-        moves_text = "Derniers coups: " + " | ".join(parts) if parts else "Derniers coups: —"
-        surf = self.font.render(moves_text, True, RED)
-        self.screen.blit(surf, HUD_POSITIONS["ai_moves"])
-
-    def _hud_table_rows(self) -> list[list]:
-        """Build the 6 statistics rows: Current, Total, Best, Average, Last 100, Trend."""
-        log = self.log
-        cur_steps = self.episode_steps
-        cur_lines = self.stats.total_lines
-        cur_score = self.stats.score
-        cur_level = self.stats.level
-
-        total_steps = log.total_steps + cur_steps
-        total_lines = log.total_lines + cur_lines
-        total_score = log.total_score + cur_score
-
-        return [
-            ["Current", cur_steps, cur_lines, cur_score, cur_level],
-            ["Total", total_steps, total_lines, total_score, "—"],
-            ["Best", log.best_steps, log.best_lines, log.best_score, log.best_level],
-            ["Average", f"{log.avg_steps:.1f}", f"{log.avg_lines:.1f}", f"{log.avg_score:.1f}", f"{log.avg_level:.1f}"],
-            [
-                "Last 100",
-                f"{log.last_100_avg_steps:.1f}",
-                f"{log.last_100_avg_lines:.1f}",
-                f"{log.last_100_avg:.1f}",
-                f"{log.last_100_avg_level:.1f}",
-            ],
-            [
-                "Trend",
-                self._trend_arrow(log._trend("steps")),
-                self._trend_arrow(log._trend("lines")),
-                self._trend_arrow(log._trend("score")),
-                self._trend_arrow(log._trend("level")),
-            ],
-        ]
-
-    @staticmethod
-    def _trend_arrow(trend: str) -> str:
-        """Convert a trend string to an arrow symbol."""
-        return {"up": "↑", "down": "↓", "stable": "→"}.get(trend, "→")
+            draw_ai_hud(self)
 
     # --- ESC handling (return to menu) -----------------------------------
 

@@ -324,10 +324,6 @@ classDiagram
             - _curriculum_level: int
             - _curriculum_episode_count: int
             +__init__(screen, font, audio, handicap, sound_volume, music_volume, music_song, piece_provider, speed, menu, epsilon_decay, epsilon_end, lr, gamma, batch_size, buffer_size, ai_mode, curriculum, curriculum_freq, curriculum_epsilon, warm_start, learn_per_action, lookahead, lookahead_depth, soft_drop, preview_count, debug, seed, device) None
-            - _is_valid_placement(piece, rotation: int, column: int) bool
-            - _iter_column_positions(piece_type: str) Generator
-            - _best_next_placement(grid: np.ndarray, piece_type: str) np.ndarray
-            - _gen_placements(base_grid: np.ndarray, piece_type: str) Generator
             - _get_candidate_states() tuple~np.ndarray, list~int~, np.ndarray~
             - _execute_macro_action(action: int) None
             - _lock_and_spawn(hard_drop: bool) tuple~int, list~
@@ -338,9 +334,15 @@ classDiagram
             - _maybe_advance_curriculum() bool
             - _apply_epsilon_policy() None
             +draw(screen: pygame.Surface, particles: ParticleSystem | None) None
-            - _draw_ai_hud() None
-            - _hud_table_rows() list~list~
-            - _trend_arrow(trend: str) str
+            - _on_exit() None
+        }
+        %% Module-level function: iter_column_positions(piece_type: str) -> Iterator
+        %% Module-level function: best_next_placement(grid: np.ndarray, piece_type: str) -> np.ndarray
+        %% Module-level function: gen_placements(base_grid: np.ndarray, piece_type: str, soft_drop: bool) -> Iterator
+        %% Module-level function: get_candidate_states(...) -> tuple
+        %% Module-level function: draw_ai_hud(ai_state) -> None
+        %% Module-level function: _hud_table_rows(log, stats, episode_steps: int) -> list
+        %% Module-level function: _trend_arrow(trend: str) -> str
             - _on_exit() None
         }
 
@@ -379,6 +381,16 @@ classDiagram
     %%  Game
     %% ====================================================================
     namespace Game {
+        class ClearedRow {
+            +row_index: int
+            +cell_colors: list
+        }
+
+        class LineClearResult {
+            +lines_cleared: int
+            +cleared_rows: list~ClearedRow~
+        }
+
         class Board {
             +grid: list~list~tuple~int, int, int~ | None~~
             +__init__() None
@@ -514,6 +526,14 @@ classDiagram
     %%  AI
     %% ====================================================================
     namespace AI {
+        class NStepTransition {
+            +state: np.ndarray
+            +action: int
+            +reward: float
+            +next_state: np.ndarray
+            +done: bool
+        }
+
         class DQNAgent {
             +state_size: int
             +gamma: float
@@ -552,6 +572,15 @@ classDiagram
             +forward(x: torch.Tensor) torch.Tensor
         }
 
+        class Transition {
+            +state: np.ndarray
+            +action: int
+            +reward: float
+            +next_state: np.ndarray
+            +done: bool
+            +n: int
+        }
+
         class PrioritizedReplayBuffer {
             +capacity: int
             +alpha: float
@@ -564,6 +593,17 @@ classDiagram
             +sample(batch_size: int) tuple~list, np.ndarray, np.ndarray~
             +update_priorities(indices: np.ndarray, td_errors: np.ndarray) None
             +__len__() int
+        }
+
+        class EpisodeRecord {
+            +episode: int
+            +score: int
+            +lines: int
+            +level: int
+            +steps: int
+            +epsilon: float
+            +loss: float
+            +timestamp: str
         }
 
         class TrainingLog {
