@@ -11,11 +11,10 @@ from tetris.ai.rewards import (
 from tetris.game.rules import (
     find_full_rows,
     hard_drop_y,
-    hard_drop_y_batch,
     place_cells,
     shape_fits,
 )
-from tetris.ai.candidates import soft_drop_placements
+from tetris.ai.candidates import hard_drop_y_batch, soft_drop_placements
 from tetris.settings import BOARD_HEIGHT, BOARD_WIDTH, SHAPES
 
 

@@ -351,6 +351,7 @@ classDiagram
         %% Module-level function: iter_column_positions(piece_type: str) -> Iterator
         %% Module-level function: best_next_placement(grid: np.ndarray, piece_type: str) -> np.ndarray
         %% Module-level function: gen_placements(base_grid: np.ndarray, piece_type: str, soft_drop: bool) -> Iterator
+        %% Module-level function: hard_drop_y_batch(grid: np.ndarray, shapes: list, x_positions: list) -> np.ndarray
         %% Module-level function: soft_drop_placements(grid, piece_type: str) -> list[Placement]
         %% Module-level function: get_candidate_states(...) -> tuple
         %% Module-level function: draw_ai_hud(ai_state) -> None

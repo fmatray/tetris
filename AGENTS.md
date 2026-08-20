@@ -116,7 +116,7 @@ python -m tetris.verify_training
 | `tetris/states/keybind.py` | Keybinding state, `key_name()` (moved from settings.py) |
 | `tetris/states/ai.py` | AI gameplay state + RL training integration (candidate generation and HUD rendering extracted to `tetris/ai/candidates.py` and `tetris/ai/hud.py`) |
 | `tetris/ai/agent.py` | `DQNAgent` — `select_action`, `store`, `learn`, `save`, `load` |
-| `tetris/ai/candidates.py` | Candidate placement generation — `iter_column_positions`, `best_next_placement`, `gen_placements`, `get_candidate_states`, `soft_drop_placements` (moved from `tetris/game/rules.py`). `Placement` NamedTuple. Pure functions, no instance state |
+| `tetris/ai/candidates.py` | Candidate placement generation — `iter_column_positions`, `best_next_placement`, `gen_placements`, `get_candidate_states`, `soft_drop_placements`, `hard_drop_y_batch` (moved from `tetris/game/rules.py`). `Placement` NamedTuple. Pure functions, no instance state |
 | `tetris/ai/hud.py` | AI training HUD rendering — training params table, stats table, last-5-moves. Pure presentation |
 | `tetris/game/rules.py` | Grid-agnostic pure game-rule functions (`shape_fits`, `try_rotation`, `hard_drop_y`, `place_cells`, `find_full_rows`) — shared by `Board` (list grid) and AI simulation (numpy grid) |
 | `tetris/game/piece_provider.py` | `PieceProvider` facade + `PieceGenerator` hierarchy (`RandomGenerator`, `BagGenerator`→`SevenBagGenerator`/`ThirtyFiveBagGenerator`, `WeightedGenerator`, `ReplayGenerator`) — tetromino spawning with record/replay, curriculum, first-piece safety |

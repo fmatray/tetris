@@ -16,8 +16,8 @@ from tetris.ai.rewards import (
     place_and_clear_batch,
 )
 from tetris.game import rules
-from tetris.game.rules import hard_drop_y, hard_drop_y_batch, try_rotation
-from tetris.settings import BOARD_WIDTH, SHAPES
+from tetris.game.rules import hard_drop_y, try_rotation
+from tetris.settings import BOARD_HEIGHT, BOARD_WIDTH, SHAPES
 
 from typing import NamedTuple
 
@@ -54,6 +54,50 @@ def iter_column_positions(
             if px < 0 or px + max_bx >= BOARD_WIDTH:
                 continue
             yield shape, rot, px
+
+
+def hard_drop_y_batch(
+    grid: np.ndarray,
+    shapes: list[list[tuple[int, int]]],
+    x_positions: list[int],
+) -> np.ndarray:
+    """Batch hard-drop: landing y for N (shape, x) pairs on the same grid.
+
+    Replaces the per-piece while-loop with a column-height lookup. Returns
+    ``(N,)`` int array. Matches :func:`hard_drop_y` for all valid placements.
+    """
+    mask = np.asarray(grid) > 0
+    col_tops = np.argmax(mask, axis=0).astype(np.int32)
+    col_tops[~mask.any(axis=0)] = BOARD_HEIGHT
+    # Flatten all (shape, cell) pairs into parallel arrays for vectorized min.
+    all_bx: list[int] = []
+    all_by: list[int] = []
+    all_shape_idx: list[int] = []
+    for i, shape in enumerate(shapes):
+        for bx, by in shape:
+            all_bx.append(bx)
+            all_by.append(by)
+            all_shape_idx.append(i)
+    all_bx_arr = np.array(all_bx, dtype=np.int32)
+    all_by_arr = np.array(all_by, dtype=np.int32)
+    shape_idx_arr = np.array(all_shape_idx, dtype=np.int32)
+    all_cx = np.array(x_positions, dtype=np.int32)[shape_idx_arr] + all_bx_arr
+
+    valid = (all_cx >= 0) & (all_cx < BOARD_WIDTH)
+    cell_y = np.where(
+        valid,
+        col_tops[np.clip(all_cx, 0, BOARD_WIDTH - 1)] - all_by_arr - 1,
+        BOARD_HEIGHT,
+    )
+    cell_y[~valid] = -1
+    results = np.full(len(shapes), BOARD_HEIGHT, dtype=np.int32)
+    np.minimum.at(results, shape_idx_arr, cell_y)
+    # Shapes with any invalid cx → -1
+    invalid_shape = np.zeros(len(shapes), dtype=bool)
+    np.logical_or.at(invalid_shape, shape_idx_arr, ~valid)
+    results[invalid_shape] = -1
+    results = np.maximum(results, 0)
+    return results
 
 
 def best_next_placement(grid: np.ndarray, piece_type: str) -> np.ndarray:
