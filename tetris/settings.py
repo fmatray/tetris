@@ -115,9 +115,9 @@ HUD_POSITIONS = {
     "next": (570, 50),  # "NEXT:" label
     "next_panel": (570, 80),  # next pieces drawing (30px below label)
     "ai_stats": (570, 350),
-    "mode": (20, 700),
-    "generator": (20, 740),
-    "speed_mode": (20, 770),
+    "mode": (20, 680),
+    "generator": (20, 720),
+    "speed_mode": (20, 760),
     "ai_moves": (800, 100),
     "debug_bag": (800, 50),  # bag/weights debug panel
     "pause": (750, 400),  # pause overlay center (screen center)

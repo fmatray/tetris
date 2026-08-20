@@ -114,6 +114,7 @@ class Renderer:
         x = HUD_POSITIONS["debug_bag"][0]
         y = HUD_POSITIONS["debug_bag"][1]
         self._draw_text(f"SAC ({len(bag)}):", (x, y))
+        y += self.font.get_height() + 4
         start_x = x
         max_per_row = max(1, (SCREEN_WIDTH - x) // (BLOCK_SIZE + 2))
         for i, piece_type in enumerate(bag[::-1]):
@@ -124,7 +125,9 @@ class Renderer:
             rect = pygame.Rect(x, y, BLOCK_SIZE, BLOCK_SIZE)
             pygame.draw.rect(self.screen, color, rect)
             letter = self.font.render(piece_type, True, WHITE)
-            self.screen.blit(letter, (x + 2, y + 2))
+            lx = x + (BLOCK_SIZE - letter.get_width()) // 2
+            ly = y + (BLOCK_SIZE - letter.get_height()) // 2
+            self.screen.blit(letter, (lx, ly))
             x += BLOCK_SIZE + 2
 
     def _draw_debug_weights(self, game: GameState) -> None:
@@ -133,12 +136,17 @@ class Renderer:
         x = HUD_POSITIONS["debug_bag"][0]
         y = HUD_POSITIONS["debug_bag"][1]
         self._draw_text("POIDS:", (x, y))
+        y += self.font.get_height() + 4
         for piece_type in SHAPES_TYPES:
             color = SHAPES_COLORS[piece_type]
             rect = pygame.Rect(x, y, BLOCK_SIZE, BLOCK_SIZE)
             pygame.draw.rect(self.screen, color, rect)
+            letter = self.font.render(piece_type, True, WHITE)
+            lx = x + (BLOCK_SIZE - letter.get_width()) // 2
+            ly = y + (BLOCK_SIZE - letter.get_height()) // 2
+            self.screen.blit(letter, (lx, ly))
             w = weights.get(piece_type, 1.0)
-            self._draw_text(f"{piece_type}: {w:.2f}", (x + BLOCK_SIZE + 6, y + 2))
+            self._draw_text(f"{w:.2f}", (x + BLOCK_SIZE + 6, y + (BLOCK_SIZE - self.font.get_height()) // 2))
             y += BLOCK_SIZE + 2
 
     @staticmethod
