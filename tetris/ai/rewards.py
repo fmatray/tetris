@@ -10,7 +10,7 @@ from __future__ import annotations
 import numpy as np
 
 from tetris.game.rules import find_full_rows, place_cells
-from tetris.game.shapes import SHAPES_TYPES
+from tetris.game.shapes import NB_SHAPES_TYPES, SHAPES_TYPES
 from tetris.settings import BOARD_HEIGHT, BOARD_WIDTH
 
 
@@ -87,7 +87,7 @@ def board_to_grid(board) -> np.ndarray:
 
 def one_hot_piece(piece_type: str) -> np.ndarray:
     """7-element one-hot encoding of a piece type."""
-    vec = np.zeros(len(SHAPES_TYPES), dtype=np.float32)
+    vec = np.zeros(NB_SHAPES_TYPES, dtype=np.float32)
     vec[SHAPES_TYPES.index(piece_type)] = 1.0
     return vec
 
@@ -396,7 +396,7 @@ def extract_features_batch(
         m["row_trans"], m["col_trans"], m["wells_score"],
         m["hole_depth_score"], m["rows_with_holes_count"],
     ], axis=1)                                            # (N, 10)
-    one_hot = np.zeros((N, len(SHAPES_TYPES)), dtype=np.float64)
+    one_hot = np.zeros((N, NB_SHAPES_TYPES), dtype=np.float64)
     for i, pt in enumerate(next_piece_types):
         one_hot[i, SHAPES_TYPES.index(pt)] = 1.0
     features = np.concatenate([board_features, one_hot], axis=1)  # (N, 17)

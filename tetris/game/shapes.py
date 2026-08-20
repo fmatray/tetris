@@ -43,6 +43,7 @@ SHAPES: dict[str, list[list[tuple[int, int]]]] = {
 }
 
 SHAPES_TYPES = list(SHAPES.keys())  # ["I", "O", "T", "S", "Z", "J", "L"]
+NB_SHAPES_TYPES = len(SHAPES_TYPES)  # 7
 
 
 def num_shape_rot(piece_type: str) -> int:
