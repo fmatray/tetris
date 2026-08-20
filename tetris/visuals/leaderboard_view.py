@@ -6,7 +6,7 @@ rendered identical tables. This module centralizes that logic.
 
 import pygame
 from typing import NamedTuple
-from tetris.settings import BLACK, GENERATOR_LABELS, GRAY, SCREEN_WIDTH, WHITE
+from tetris.settings import BLACK, GENERATOR_LABELS, GRAY, SCREEN_WIDTH, SPEED_MODE_LABELS, WHITE
 from tetris.storage import load_leaderboard
 from tetris.visuals.fonts import (
     CONTENT_Y,
@@ -44,7 +44,8 @@ def draw_leaderboard(screen: pygame.Surface, font: pygame.font.Font, scores: lis
         ColumnDef("Lines", 80, "right"),
         ColumnDef("Générateur", 170, "left"),
         ColumnDef("Mode", 130, "left"),
-        ColumnDef("Date", 330, "left"),
+        ColumnDef("Vitesse", 130, "left"),
+        ColumnDef("Date", 200, "left"),
     ]
     x0 = margin
     # Compute absolute x for each column (start of cell).
@@ -71,6 +72,7 @@ def draw_leaderboard(screen: pygame.Surface, font: pygame.font.Font, scores: lis
             str(entry["lines"]),
             gen,
             mode,
+            SPEED_MODE_LABELS.get(entry.get("speed_mode", ""), "-"),
             entry.get("date", "Unknown"),
         ]
         for val, (label, w, align), cx in zip(values, columns, xs):

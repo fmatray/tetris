@@ -34,6 +34,7 @@ from tetris.settings import (
     SCREEN_HEIGHT,
     SCREEN_WIDTH,
     SHAPES_COLORS,
+    SPEED_MODE_LABELS,
     VISIBLE_ROWS,
     WHITE,
 )
@@ -93,6 +94,8 @@ class Renderer:
         gen = GENERATOR_LABELS.get(game.pieces.generator, "Aléatoire")
         self._draw_text(f"MODE: {mode}", HUD_POSITIONS["mode"])
         self._draw_text(f"GÉNÉRATEUR: {gen}", HUD_POSITIONS["generator"])
+        speed_label = SPEED_MODE_LABELS.get(game.speed_mode, "Normal")
+        self._draw_text(f"VITESSE: {speed_label}", HUD_POSITIONS["speed_mode"])
         if game.paused:
             pause_text = get_large_font().render("PAUSE", True, WHITE)
             self.screen.blit(

@@ -10,6 +10,7 @@ import pygame
 
 from tetris.logger import configure_logging, get_logger
 from tetris.settings import (
+    DEFAULT_SPEED_MODE,
     SETTINGS_PATH,
 )
 from tetris.states.base import State
@@ -59,6 +60,7 @@ class MenuState(MenuBase):
         self.ghost_piece = True
         self.preview_count = 3
         self.debug = False
+        self.speed_mode = DEFAULT_SPEED_MODE
         self.ai_epsilon_decay = 0.999
         self.ai_epsilon_end = 0.1
         self.ai_lr = 1e-4
@@ -110,7 +112,7 @@ class MenuState(MenuBase):
         "ghost_piece": "ghost_piece",
         "preview_count": "preview_count",
         "debug": "debug",
-        "piece_generator": "piece_generator",
+        "speed_mode": "speed_mode",
     }
 
     def _load_settings(self) -> None:
@@ -197,7 +199,7 @@ class MenuState(MenuBase):
                     self,
                     ghost_piece=self.ghost_piece,
                     preview_count=self.preview_count,
-                    debug=self.debug,
+                    speed_mode=self.speed_mode,
                 )
             case 2:  # Humain sub-menu
                 from tetris.states.human_menu import HumanMenuState
@@ -255,5 +257,5 @@ class MenuState(MenuBase):
             lookahead_depth=self.ai_lookahead_depth,
             soft_drop=self.ai_soft_drop,
             preview_count=self.preview_count,
-            debug=self.debug,
+            speed_mode=self.speed_mode,
         )

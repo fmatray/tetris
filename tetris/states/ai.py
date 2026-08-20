@@ -42,6 +42,7 @@ from tetris.settings import (
     AI_ACTION_DELAY_MS,
     AI_MODEL_SAVE_INTERVAL,
     CURRICULUM_ORDER,
+    DEFAULT_SPEED_MODE,
     LEARN_PER_ACTION,
     LOCK_DELAY_MS,
     LOG_PATH,
@@ -113,6 +114,7 @@ class AIState(GameState):
         soft_drop: bool = True,
         preview_count: int = 3,
         debug: bool = False,
+        speed_mode: str = DEFAULT_SPEED_MODE,
         seed: int | None = None,
         device: str = "auto",
     ) -> None:
@@ -168,6 +170,7 @@ class AIState(GameState):
             menu,
             preview_count=preview_count,
             debug=debug,
+            speed_mode=speed_mode,
         )
         self._handicap = handicap
         self.ghost_piece = False  # AI never shows ghost piece

@@ -375,10 +375,16 @@ def test_game_rules_value_label_handicap():
     assert state._value_label(2) == "4"
 
 
+def test_game_rules_value_label_speed():
+    menu = _make_menu()
+    state = _make_state(GameRulesMenuState, menu)
+    assert state._value_label(3) == "Normal"
+
+
 def test_game_rules_value_label_retour():
     menu = _make_menu()
     state = _make_state(GameRulesMenuState, menu)
-    assert state._value_label(3) == ""
+    assert state._value_label(4) == ""
 
 
 # ── HyperparamMenuState ───────────────────────────────────────────────

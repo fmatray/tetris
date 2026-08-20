@@ -19,9 +19,9 @@ from tetris.settings import (
     BLOCK_SIZE,
     BOARD_OFFSET_X,
     BOARD_OFFSET_Y,
+    DEFAULT_SPEED_MODE,
     DROP_BASE,
     DROP_MIN_INTERVAL,
-    DROP_STEP,
     HIDDEN_ROWS,
     LOCK_DELAY_MS,
     LOCK_DELAY_RESETS,
@@ -29,6 +29,7 @@ from tetris.settings import (
     MUSIC_MAX_SPEED,
     MUSIC_SPEED_PER_LEVEL,
     SOFT_DROP_FACTOR,
+    SPEED_MODES,
 )
 from tetris.states.base import State
 from tetris.visuals.particles import ParticleSystem
@@ -37,9 +38,9 @@ from tetris.visuals.renderer import Renderer
 _logger = get_logger("game")
 
 
-def _drop_interval(level: int) -> float:
+def _drop_interval(level: int, drop_step: float) -> float:
     """Seconds per row at the given level (Tetris Guideline gravity)."""
-    base = max(DROP_MIN_INTERVAL, DROP_BASE - level * DROP_STEP)
+    base = max(DROP_MIN_INTERVAL, DROP_BASE - level * drop_step)
     return max(DROP_MIN_INTERVAL, base**level)
 
 
@@ -73,6 +74,7 @@ class GameState(State):
         debug: bool = False,
         ghost_piece: bool = True,
         preview_count: int = 3,
+        speed_mode: str = DEFAULT_SPEED_MODE,
     ) -> None:
         """Initialize the shared game infrastructure.
 
@@ -103,6 +105,7 @@ class GameState(State):
         self.ghost_piece = ghost_piece
         self.preview_count = preview_count
         self.renderer = Renderer(screen, font)
+        self.speed_mode = speed_mode
         self.board = Board()
         self.board.apply_handicap(handicap)
         self.pieces = piece_provider or PieceProvider()
@@ -111,7 +114,7 @@ class GameState(State):
         self.preview_pieces = [Tetromino(self.pieces.next_type()) for _ in range(max(0, preview_count - 1))]
         self.drop_time: float = 0.0
         self.stats = GameStats()
-        self.current_speed = _drop_interval(0)
+        self.current_speed = _drop_interval(0, SPEED_MODES[self.speed_mode])
         self.game_over: bool = False
         self.paused: bool = False
         self.down_pressed = False
@@ -284,10 +287,11 @@ class GameState(State):
 
         # --- Gravity / soft drop ---
         self.drop_time += dt
+        step = SPEED_MODES[self.speed_mode]
         speed = (
-            _drop_interval(self.stats.level) * SOFT_DROP_FACTOR
+            _drop_interval(self.stats.level, step) * SOFT_DROP_FACTOR
             if self.down_pressed
-            else _drop_interval(self.stats.level)
+            else _drop_interval(self.stats.level, step)
         )
         self.current_speed = speed
 

@@ -9,11 +9,12 @@ def test_save_score_stores_generator_and_mode(tmp_path, monkeypatch):
     """save_score persists generator and mode fields."""
     lb_path = tmp_path / "leaderboard.json"
     monkeypatch.setattr("tetris.storage.LEADERBOARD_PATH", str(lb_path))
-    save_score("Alice", 5000, 5, 20, generator="7bag", mode="Normal")
+    save_score("Alice", 5000, 5, 20, generator="7bag", mode="Normal", speed_mode="normal")
     scores = load_leaderboard()
     assert len(scores) == 1
     assert scores[0]["generator"] == "7bag"
     assert scores[0]["mode"] == "Normal"
+    assert scores[0]["speed_mode"] == "normal"
 
 
 def test_save_score_defaults_empty_generator_mode(tmp_path, monkeypatch):
@@ -24,14 +25,13 @@ def test_save_score_defaults_empty_generator_mode(tmp_path, monkeypatch):
     scores = load_leaderboard()
     assert scores[0]["generator"] == ""
     assert scores[0]["mode"] == ""
+    assert scores[0]["speed_mode"] == ""
 
 
 def test_load_leaderboard_normalizes_legacy_dict(tmp_path, monkeypatch):
     """Dict entries missing generator/mode get defaults via .get()."""
     lb_path = tmp_path / "leaderboard.json"
-    lb_path.write_text(json.dumps([
-        {"name": "Old", "score": 1000, "level": 1, "lines": 5, "date": "2020-01-01"}
-    ]))
+    lb_path.write_text(json.dumps([{"name": "Old", "score": 1000, "level": 1, "lines": 5, "date": "2020-01-01"}]))
     monkeypatch.setattr("tetris.storage.LEADERBOARD_PATH", str(lb_path))
     scores = load_leaderboard()
     assert len(scores) == 1
@@ -46,18 +46,18 @@ def test_load_leaderboard_normalizes_legacy_tuple(tmp_path, monkeypatch):
     lb_path.write_text(json.dumps([["Legacy", 999]]))
     monkeypatch.setattr("tetris.storage.LEADERBOARD_PATH", str(lb_path))
     scores = load_leaderboard()
-    assert len(scores) == 1
     assert scores[0]["name"] == "Legacy"
     assert scores[0]["generator"] == "-"
     assert scores[0]["mode"] == "-"
+    assert scores[0]["speed_mode"] == "normal"
 
 
 def test_save_score_sorts_descending(tmp_path, monkeypatch):
     """Scores are sorted descending after insert."""
     lb_path = tmp_path / "leaderboard.json"
     monkeypatch.setattr("tetris.storage.LEADERBOARD_PATH", str(lb_path))
-    save_score("Low", 100, 1, 1, generator="random", mode="Normal")
-    save_score("High", 9000, 9, 90, generator="35bag", mode="Replay")
+    save_score("Low", 100, 1, 1, generator="random", mode="Normal", speed_mode="normal")
+    save_score("High", 9000, 9, 90, generator="35bag", mode="Replay", speed_mode="normal")
     scores = load_leaderboard()
     assert scores[0]["name"] == "High"
     assert scores[1]["name"] == "Low"

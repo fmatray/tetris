@@ -96,6 +96,7 @@ classDiagram
             +ai_lookahead: bool
             +ai_lookahead_depth: int
             +ai_soft_drop: bool
+            +speed_mode: str
             +__init__(screen, font, audio) None
             - _load_settings() None
             +save_settings() None
@@ -241,6 +242,7 @@ classDiagram
             +debug: bool
             +ghost_piece: bool
             +preview_count: int
+            +speed_mode: str
             +renderer: Renderer
             +board: Board
             +pieces: PieceProvider
@@ -259,7 +261,7 @@ classDiagram
             - _lock_resets: int
             - _grounded: bool
             - _mute_key: int
-            +__init__(screen, font, audio, handicap, sound_volume, music_volume, music_song, piece_provider, menu, debug, ghost_piece, preview_count) None
+            +__init__(screen, font, audio, handicap, sound_volume, music_volume, music_song, piece_provider, menu, debug, ghost_piece, preview_count, speed_mode) None
             - _move_left() None
             - _move_right() None
             - _rotate_cw() None
@@ -277,7 +279,7 @@ classDiagram
             - _emit_line_particles(particles: ParticleSystem, rows_data) None
             +draw(screen: pygame.Surface, particles: ParticleSystem | None) None
         }
-        %% Module-level functions: _drop_interval(level: int) -> float
+        %% Module-level functions: _drop_interval(level: int, drop_step: float) -> float
         %% Module-level functions: _music_speed_for_level(level: int) -> float
 
         class HumanState {
@@ -288,12 +290,12 @@ classDiagram
             - _left_key: int
             - _right_key: int
             - _hold_key: int
-            +__init__(screen, font, audio, handicap, sound_volume, music_volume, music_song, piece_provider, menu, debug, ghost_piece, preview_count) None
+            +__init__(screen, font, audio, handicap, sound_volume, music_volume, music_song, piece_provider, menu, debug, ghost_piece, preview_count, speed_mode) None
             - _setup_keybinds(menu) None
             +handle_event(event: pygame.event.Event) State | None
             +update(dt: float, particles: ParticleSystem) State | None
         }
-        %% Module-level functions: _drop_interval(level: int) -> float
+        %% Module-level functions: _drop_interval(level: int, drop_step: float) -> float
         %% Module-level functions: _music_speed_for_level(level: int) -> float
 
         class PendingTransition {
@@ -335,7 +337,7 @@ classDiagram
             - _curriculum_types: list~str~ | None
             - _curriculum_level: int
             - _curriculum_episode_count: int
-            +__init__(screen, font, audio, handicap, sound_volume, music_volume, music_song, piece_provider, speed, menu, epsilon_decay, epsilon_end, lr, gamma, batch_size, buffer_size, ai_mode, curriculum, curriculum_freq, curriculum_epsilon, warm_start, learn_per_action, lookahead, lookahead_depth, soft_drop, preview_count, debug, seed, device) None
+            +__init__(screen, font, audio, handicap, sound_volume, music_volume, music_song, piece_provider, speed, menu, epsilon_decay, epsilon_end, lr, gamma, batch_size, buffer_size, ai_mode, curriculum, curriculum_freq, curriculum_epsilon, warm_start, learn_per_action, lookahead, lookahead_depth, soft_drop, preview_count, speed_mode, debug, seed, device) None
             - _get_candidate_states() tuple~np.ndarray, list~int~, np.ndarray~
             - _execute_macro_action(action: int) None
             - _lock_and_spawn(hard_drop: bool) tuple~int, list~

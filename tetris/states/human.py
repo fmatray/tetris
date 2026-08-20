@@ -16,7 +16,7 @@ import pygame
 
 from tetris.audio import AudioManager
 from tetris.game.piece_provider import PieceProvider
-from tetris.settings import DAS_DELAY_MS, DAS_REPEAT_MS
+from tetris.settings import DEFAULT_SPEED_MODE, DAS_DELAY_MS, DAS_REPEAT_MS
 from tetris.states.base import State
 from tetris.states.game import GameState
 from tetris.visuals.particles import ParticleSystem
@@ -45,6 +45,7 @@ class HumanState(GameState):
         debug: bool = False,
         ghost_piece: bool = True,
         preview_count: int = 3,
+        speed_mode: str = DEFAULT_SPEED_MODE,
     ) -> None:
         """Initialize a human gameplay session.
 
@@ -78,6 +79,7 @@ class HumanState(GameState):
             debug=debug,
             ghost_piece=ghost_piece,
             preview_count=preview_count,
+            speed_mode=speed_mode,
         )
         self._setup_keybinds(menu)
         self._das_held: dict[int, float] = {}

@@ -78,6 +78,7 @@ class GameOverState(State):
                 self.game.stats.total_lines,
                 self.game.pieces.generator,
                 self.game.menu.mode if self.game.menu else "Normal",
+                speed_mode=self.game.speed_mode,
             )
             save_human_game(
                 self.name,

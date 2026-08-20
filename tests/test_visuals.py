@@ -322,6 +322,7 @@ class TestDrawLeaderboard:
                 "lines": 100,
                 "generator": "7bag",
                 "mode": "Normal",
+                "speed_mode": "normal",
                 "date": "2025-01-01",
             },
             {
@@ -331,6 +332,7 @@ class TestDrawLeaderboard:
                 "lines": 50,
                 "generator": "random",
                 "mode": "Sprint",
+                "speed_mode": "crazy",
                 "date": "2025-01-02",
             },
             {
@@ -340,6 +342,7 @@ class TestDrawLeaderboard:
                 "lines": 10,
                 "generator": "35bag",
                 "mode": None,
+                "speed_mode": None,
                 "date": "2025-01-03",
             },
         ]
@@ -356,6 +359,7 @@ class TestDrawLeaderboard:
                 "lines": i * 10,
                 "generator": "7bag",
                 "mode": "Normal",
+                "speed_mode": "normal",
                 "date": "2025-01-01",
             }
             for i in range(20)
@@ -387,6 +391,7 @@ class TestDrawLeaderboard:
                 "lines": 5,
                 "generator": "unknown_gen",
                 "mode": "Normal",
+                "speed_mode": "normal",
                 "date": "2025-01-01",
             }
         ]

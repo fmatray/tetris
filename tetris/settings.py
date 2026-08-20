@@ -76,9 +76,31 @@ DAS_REPEAT_MS = 50  # auto-shift repeat interval (ms)
 # Super-exponential: (DROP_BASE - level×DROP_STEP)^level.
 # Level 0 → 1.0s, level 10 → 0.04s, level 20 → 0.001s.
 DROP_BASE = 0.8  # Tetris Guideline gravity base
-DROP_STEP = 0.007  # per-level decrement of the base
 DROP_MIN_INTERVAL = 0.001  # minimum seconds per row (cap)
 SOFT_DROP_FACTOR = 0.1  # soft drop speed = gravity × SOFT_DROP_FACTOR
+
+# Speed modes: maps mode key → DROP_STEP value (per-level gravity decrement).
+# "normal" matches the original DROP_STEP (0.007). Higher = faster acceleration.
+SPEED_MODES: dict[str, float] = {
+    "none": 0.0,  # no speedup — constant 0.8s/row
+    "easy": 0.003,
+    "normal": 0.007,  # default, original value
+    "medium": 0.012,
+    "hard": 0.020,
+    "crazy": 0.035,
+    "insane": 0.060,
+}
+SPEED_MODE_LABELS: dict[str, str] = {
+    "none": "Aucune",
+    "easy": "Facile",
+    "normal": "Normal",
+    "medium": "Moyen",
+    "hard": "Difficile",
+    "crazy": "Fou",
+    "insane": "Infernal",
+}
+SPEED_MODE_ORDER: list[str] = list(SPEED_MODES.keys())  # ["none", "easy", ...]
+DEFAULT_SPEED_MODE = "normal"
 
 # --- Layout / HUD positions --------------------------------------------
 # All in-game text and panel positions as (x, y) pixel coordinates.
@@ -95,6 +117,7 @@ HUD_POSITIONS = {
     "ai_stats": (570, 350),
     "mode": (20, 700),
     "generator": (20, 740),
+    "speed_mode": (20, 770),
     "ai_moves": (800, 100),
     "debug_bag": (800, 50),  # bag/weights debug panel
     "pause": (750, 400),  # pause overlay center (screen center)

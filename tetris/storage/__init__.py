@@ -30,6 +30,7 @@ def load_leaderboard() -> list[dict[str, Any]]:
                 "lines": 0,
                 "generator": "-",
                 "mode": "-",
+                "speed_mode": "normal",
                 "date": "Unknown",
             }
             for d in data
@@ -39,7 +40,7 @@ def load_leaderboard() -> list[dict[str, Any]]:
 
 
 def save_score(
-    name: str, score: int, level: int, lines: int, generator: str = "", mode: str = ""
+    name: str, score: int, level: int, lines: int, generator: str = "", mode: str = "", speed_mode: str = ""
 ) -> None:
     """Append a score, sort descending, and persist the top entries."""
     scores = load_leaderboard()
@@ -51,6 +52,7 @@ def save_score(
             "lines": lines,
             "generator": generator,
             "mode": mode,
+            "speed_mode": speed_mode,
             "date": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M"),
         }
     )
@@ -73,9 +75,7 @@ def load_human_games() -> list[dict[str, Any]]:
         return []
 
 
-def save_human_game(
-    name: str, score: int, level: int, lines: int, tetrominos: int
-) -> None:
+def save_human_game(name: str, score: int, level: int, lines: int, tetrominos: int) -> None:
     """Append a human game record to the stats log (unbounded)."""
     games = load_human_games()
     games.append(

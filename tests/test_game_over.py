@@ -108,6 +108,7 @@ def test_handle_event_name_return_saves_and_transitions(tmp_path, monkeypatch):
     assert state.step == "LEADERBOARD"
     assert len(state._scores) == 1
     assert state._scores[0]["name"] == "Alice"
+    assert state._scores[0]["speed_mode"] == "normal"
 
 
 def test_handle_event_leaderboard_returns_menu(tmp_path, monkeypatch):

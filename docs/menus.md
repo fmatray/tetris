@@ -38,6 +38,7 @@ Menu principal
 │   └── Générateur                [toggle ◄ ►]     Aléatoire ↔ 7-bag ↔ 35-bag ↔ Pondéré
 │       Prévisualisation          [toggle ◄ ►]     Désactivé ↔ 1 pièce ↔ 3 pièces
 │       Handicap                  [toggle ◄ ►]     0–5
+│       Vitesse                   [toggle ◄ ►]     Aucune ↔ Facile ↔ Normal ↔ Moyen ↔ Difficile ↔ Fou ↔ Infernal
 │       Retour                    [ENTER | ESC]
 ├── Leaderboard                   [ENTER]          → top 10 scores
 ├── Audio                         [ENTER]          → audio submenu
