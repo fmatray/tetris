@@ -554,6 +554,7 @@ classDiagram
             +px: int
             +py: int
             +hold: bool
+            +shape: list~tuple~ [property]
         }
 
         class DQNAgent {

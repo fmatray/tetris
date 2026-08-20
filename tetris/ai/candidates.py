@@ -34,6 +34,11 @@ class Placement(NamedTuple):
     py: int
     hold: bool
 
+    @property
+    def shape(self) -> list[tuple[int, int]]:
+        """Cell offsets for this placement's piece type and rotation."""
+        return SHAPES[self.piece_type][self.rot]
+
 
 NUM_ROTATIONS = 4
 
@@ -232,13 +237,12 @@ def get_candidate_states(
     # Non-hold candidates: place current piece
     for p in gen_placements(base_grid, current_piece_type, soft_drop):
         all_placements.append(p)
-        all_shapes.append(SHAPES[p.piece_type][p.rot])
+        all_shapes.append(p.shape)
         all_next_piece_types.append(upcoming_types[0] if upcoming_types else "I")
 
     # Hold candidates (if can hold): place the held/next piece instead
     if can_hold:
         if hold_piece_type is not None:
-            # Swap: current → hold, held → current. Next unchanged.
             hold_upcoming = upcoming_types
         else:
             # No held piece: current → hold, next → current, preview shifts.
@@ -246,7 +250,7 @@ def get_candidate_states(
             hold_piece_type = next_piece_type
         for p in gen_placements(base_grid, hold_piece_type, soft_drop):
             all_placements.append(Placement(p.piece_type, p.rot, p.px, p.py, True))
-            all_shapes.append(SHAPES[p.piece_type][p.rot])
+            all_shapes.append(p.shape)
             all_next_piece_types.append(hold_upcoming[0] if hold_upcoming else "I")
 
     if not all_placements:

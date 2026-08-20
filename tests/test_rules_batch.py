@@ -361,4 +361,4 @@ def test_soft_drop_placements_empty_board():
         placements = soft_drop_placements(grid, piece_type)
         assert len(placements) > 0, f"{piece_type}: no placements on empty board"
         for p in placements:
-            assert shape_fits(grid, SHAPES[p.piece_type][p.rot], p.px, p.py)
+            assert shape_fits(grid, p.shape, p.px, p.py)

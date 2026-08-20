@@ -178,7 +178,7 @@ class TestGenPlacements:
         placements = list(gen_placements(grid, "I", soft_drop=True))
         assert len(placements) > 0
         for p in placements:
-            assert len(SHAPES[p.piece_type][p.rot]) == 4
+            assert len(p.shape) == 4
             assert p.py >= 0
             assert 0 <= p.rot < NUM_ROTATIONS
 
@@ -187,7 +187,7 @@ class TestGenPlacements:
         placements = list(gen_placements(grid, "I", soft_drop=False))
         assert len(placements) > 0
         for p in placements:
-            assert len(SHAPES[p.piece_type][p.rot]) == 4
+            assert len(p.shape) == 4
             assert 0 <= p.px < BOARD_WIDTH
             assert p.py >= 0
 
