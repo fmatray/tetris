@@ -1,6 +1,7 @@
 """Tests for Tetromino: type, shape, rotation, movement."""
 
-from tetris.game.tetromino import SHAPES, Tetromino
+from tetris.game.shapes import SHAPES, num_shape_rot
+from tetris.game.tetromino import Tetromino
 
 
 def test_default_type_is_valid():
@@ -28,7 +29,7 @@ def test_rotate_changes_shape():
     t = Tetromino("T")
     initial_shape = t.shape
     t.rotate(1)
-    assert t.shape != initial_shape or len(SHAPES["T"]) == 1
+    assert t.shape != initial_shape or num_shape_rot("T") == 1
 
 
 def test_rotate_wraps_around():

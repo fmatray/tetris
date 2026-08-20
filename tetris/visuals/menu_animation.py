@@ -12,7 +12,7 @@ import random
 
 import pygame
 
-from tetris.game.tetromino import SHAPES
+from tetris.game.shapes import SHAPES, SHAPES_TYPES
 from tetris.settings import (
     MENU_ANIM_BLOCK_SIZE,
     MENU_ANIM_EXPLODE_CHANCE,
@@ -183,7 +183,7 @@ class MenuBackgroundAnimation:
         # Spawn new pieces up to the cap.
         self._spawn_timer -= dt
         if self._spawn_timer <= 0 and len(self._pieces) < MENU_ANIM_MAX_PIECES:
-            self._pieces.append(_FallingPiece(random.choice(list(SHAPES))))
+            self._pieces.append(_FallingPiece(random.choice(SHAPES_TYPES)))
             self._spawn_timer = random.uniform(
                 MENU_ANIM_MIN_SPAWN_INTERVAL, MENU_ANIM_MAX_SPAWN_INTERVAL,
             )

@@ -35,7 +35,8 @@ from tetris.audio import AudioManager
 from tetris.game.board import Board, LineClearResult
 from tetris.game.piece_provider import PieceProvider
 from tetris.game.stats import GameStats
-from tetris.game.tetromino import SHAPES, Tetromino
+from tetris.game.shapes import num_shape_rot
+from tetris.game.tetromino import Tetromino
 from tetris.logger import get_logger
 from tetris.settings import (
     AI_ACTION_DELAY_MS,
@@ -261,7 +262,7 @@ class AIState(GameState):
         piece = self.current_piece  # piece after hold (if any)
 
         # Rotate to target rotation with SRS wall kicks
-        num_rots = len(SHAPES[piece.type])
+        num_rots = num_shape_rot(piece.type)
         target_rot = rot % num_rots
         while piece.rotation != target_rot:
             if not self.board.try_rotate(piece, 1):

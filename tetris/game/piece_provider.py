@@ -29,7 +29,7 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 
 from tetris.logger import get_logger
-from tetris.game.tetromino import SHAPES
+from tetris.game.shapes import SHAPES_TYPES
 from tetris.settings import FIRST_PIECE_TYPES, REPLAY_PATH
 
 _logger = get_logger("piece_provider")
@@ -158,7 +158,7 @@ class WeightedGenerator(PieceGenerator):
 
     def next(self, pool: list[str], is_first: bool) -> str:
         if not self._weights:
-            self._weights = {t: _WT_INIT for t in SHAPES}
+            self._weights = {t: _WT_INIT for t in SHAPES_TYPES}
         if is_first:
             safe = [t for t in pool if t in FIRST_PIECE_TYPES]
             if safe:
@@ -288,7 +288,6 @@ class PieceProvider:
         self._generator_name = generator
         self._recorded: list[str] = []
         self._first_piece = True
-        self._all_types = list(SHAPES.keys())
         self._fallback = _make_generator(generator)
         self._generator: PieceGenerator = ReplayGenerator(path) if mode == "replay" else self._fallback
 
@@ -303,7 +302,7 @@ class PieceProvider:
 
     def next_type(self) -> str:
         """Return the next piece type, applying generator and first-piece rules."""
-        pool = self.allowed_types if self.allowed_types is not None else self._all_types
+        pool = self.allowed_types if self.allowed_types is not None else SHAPES_TYPES
         piece = self._generator.next(pool, self._first_piece)
         if piece is None:  # replay exhausted → switch to fallback
             self._generator = self._fallback

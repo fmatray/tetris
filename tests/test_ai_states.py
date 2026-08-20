@@ -16,7 +16,8 @@ from tetris.ai.agent import DQNAgent
 from tetris.ai.trainer import TrainingLog
 from tetris.audio import AudioManager
 from tetris.game.piece_provider import PieceProvider
-from tetris.game.tetromino import SHAPES, Tetromino
+from tetris.game.shapes import SHAPES
+from tetris.game.tetromino import Tetromino
 from tetris.settings import (
     BOARD_HEIGHT,
     BOARD_WIDTH,

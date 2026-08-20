@@ -15,7 +15,8 @@ from typing import TYPE_CHECKING
 import pygame
 
 from tetris.game.board import Board
-from tetris.game.tetromino import SHAPES, Tetromino
+from tetris.game.shapes import SHAPES_TYPES
+from tetris.game.tetromino import Tetromino
 from tetris.settings import (
     BLACK,
     BLOCK_SIZE,
@@ -129,7 +130,7 @@ class Renderer:
         x = HUD_POSITIONS["debug_bag"][0]
         y = HUD_POSITIONS["debug_bag"][1]
         self._draw_text("POIDS:", (x, y))
-        for piece_type in SHAPES:
+        for piece_type in SHAPES_TYPES:
             color = SHAPES_COLORS[piece_type]
             rect = pygame.Rect(x, y, BLOCK_SIZE, BLOCK_SIZE)
             pygame.draw.rect(self.screen, color, rect)

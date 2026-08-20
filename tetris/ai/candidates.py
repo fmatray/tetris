@@ -17,7 +17,7 @@ from tetris.ai.rewards import (
 )
 from tetris.game import rules
 from tetris.game.rules import hard_drop_y, try_rotation
-from tetris.game.tetromino import SHAPES
+from tetris.game.shapes import get_shape_rot, num_shape_rot
 from tetris.settings import BOARD_HEIGHT, BOARD_WIDTH
 
 from typing import NamedTuple
@@ -26,7 +26,7 @@ from typing import NamedTuple
 class Placement(NamedTuple):
     """A piece placement: piece type, rotation, column, row, hold flag.
 
-    shape is derivable: SHAPES[piece_type][rot].
+    shape is derivable: get_shape_rot(piece_type, rot).
     """
 
     piece_type: str
@@ -38,7 +38,7 @@ class Placement(NamedTuple):
     @property
     def shape(self) -> list[tuple[int, int]]:
         """Cell offsets for this placement's piece type and rotation."""
-        return SHAPES[self.piece_type][self.rot]
+        return get_shape_rot(self.piece_type, self.rot)
 
 
 NUM_ROTATIONS = 4
@@ -48,11 +48,11 @@ def iter_column_positions(
     piece_type: str,
 ) -> Iterator[tuple[list[tuple[int, int]], int, int]]:
     """Yield (shape, rot, px) for every (rotation, column) that fits the board width."""
-    num_rots = len(SHAPES[piece_type])
+    num_rots = num_shape_rot(piece_type)
     for rot in range(NUM_ROTATIONS):
         if rot >= num_rots:
             continue
-        shape = SHAPES[piece_type][rot]
+        shape = get_shape_rot(piece_type, rot)
         min_bx = min(bx for bx, _ in shape)
         max_bx = max(bx for bx, _ in shape)
         for col in range(BOARD_WIDTH):
@@ -147,7 +147,7 @@ def soft_drop_placements(
     # indexing. Convert once — amortized over ~750 shape_fits calls.
     if isinstance(grid, np.ndarray):
         grid = grid.tolist()
-    num_rots = len(SHAPES[piece_type])
+    num_rots = num_shape_rot(piece_type)
     spawn_x = BOARD_WIDTH // 2 - 2
     spawn_y = 0
     # ponytail: BFS frontier — state = (x, y, rot). O(W*H*4) states.
@@ -159,7 +159,7 @@ def soft_drop_placements(
 
     while frontier:
         x, y, rot = frontier.pop()
-        shape = SHAPES[piece_type][rot]
+        shape = get_shape_rot(piece_type, rot)
 
         # Try left
         if rules.shape_fits(grid, shape, x - 1, y) and (x - 1, y, rot) not in visited:

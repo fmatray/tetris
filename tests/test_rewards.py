@@ -26,7 +26,7 @@ from tetris.game.rules import (
     try_rotation,
 )
 from tetris.ai.candidates import soft_drop_placements
-from tetris.game.tetromino import SHAPES
+from tetris.game.shapes import SHAPES_TYPES, get_shape_rot
 from tetris.settings import BOARD_HEIGHT, BOARD_WIDTH
 
 
@@ -273,7 +273,7 @@ def test_dellacherie_value_bad_board():
 
 def test_hard_drop_y_empty():
     """O-piece dropped on empty board lands at the bottom row."""
-    shape = SHAPES["O"][0]
+    shape = get_shape_rot("O", 0)
     py = hard_drop_y(_empty_grid(), shape, 0)
     # O occupies rows py and py+1; bottom row is BOARD_HEIGHT-1
     assert py == BOARD_HEIGHT - 2
@@ -285,7 +285,7 @@ def test_hard_drop_y_with_blocks():
     block_row = BOARD_HEIGHT - 4
     grid[block_row, 0] = 1
     grid[block_row, 1] = 1
-    shape = SHAPES["O"][0]  # occupies (0,0),(1,0),(0,1),(1,1)
+    shape = get_shape_rot("O", 0)  # occupies (0,0),(1,0),(0,1),(1,1)
     py = hard_drop_y(grid, shape, 0)
     assert py == block_row - 2
 
@@ -295,7 +295,7 @@ def test_hard_drop_y_with_blocks():
 
 def test_place_and_clear_no_lines():
     """Place O-piece on empty board, no lines cleared."""
-    shape = SHAPES["O"][0]
+    shape = get_shape_rot("O", 0)
     new_grid, cleared = place_and_clear(_empty_grid(), shape, 0, 18)
     assert cleared == 0
     assert new_grid[18, 0] == 1.0
@@ -308,7 +308,7 @@ def test_place_and_clear_full_line():
     # Fill row 19 except columns 0-1
     for x in range(2, BOARD_WIDTH):
         grid[19, x] = 1.0
-    shape = SHAPES["O"][0]  # occupies (0,0),(1,0),(0,1),(1,1)
+    shape = get_shape_rot("O", 0)  # occupies (0,0),(1,0),(0,1),(1,1)
     new_grid, cleared = place_and_clear(grid, shape, 0, 18)
     assert cleared == 1
     # After line clear, row 19 has O-piece top shifted down (columns 0-1)
@@ -393,7 +393,7 @@ def test_srs_wall_kick():
     result = try_rotation(grid, "J", 0, 1, 3, 0)
     assert result is not None
     nx, ny = result
-    assert shape_fits(grid, SHAPES["J"][1], nx, ny)
+    assert shape_fits(grid, get_shape_rot("J", 1), nx, ny)
 
 
 # --- dellacherie_value_batch -----------------------------------------
@@ -549,7 +549,7 @@ def test_dellacherie_batch_transitions_match_scalar():
 
 # --- vectorized scalar heuristic equivalence ------------------------
 
-_PIECE_TYPES = list(SHAPES.keys())
+_SHAPES_TYPES = SHAPES_TYPES
 
 
 def test_wells_vectorized_matches_expected():
@@ -645,9 +645,9 @@ def test_extract_features_batch_single():
     g[BOARD_HEIGHT // 2 :, :] = 1.0
     stacked = g[np.newaxis]
     lines = np.array([2], dtype=np.int32)
-    piece_types = [_PIECE_TYPES[0]]
+    piece_types = [_SHAPES_TYPES[0]]
     batch = extract_features_batch(stacked, lines, piece_types)
-    scalar = extract_features(g, 2, _PIECE_TYPES[0])
+    scalar = extract_features(g, 2, _SHAPES_TYPES[0])
     assert batch.shape == (1, 17)
     assert np.allclose(batch, scalar, atol=1e-5)
 
@@ -658,7 +658,7 @@ def test_extract_features_batch_matches_scalar():
     grids = _diverse_grids(36)
     stacked = np.stack(grids).astype(np.float32)
     lines = rng.integers(0, 5, size=36).astype(np.int32)
-    piece_types = [_PIECE_TYPES[i % len(_PIECE_TYPES)] for i in range(36)]
+    piece_types = [_SHAPES_TYPES[i % len(_SHAPES_TYPES)] for i in range(36)]
     batch = extract_features_batch(stacked, lines, piece_types)
     scalar = np.array([extract_features(g, int(l), pt) for g, l, pt in zip(grids, lines, piece_types)])
     assert batch.shape == (36, 17)
@@ -670,7 +670,7 @@ def test_extract_features_batch_preserves_input():
     grids = _diverse_grids(5)
     stacked = np.stack(grids).astype(np.float32).copy()
     lines = np.array([0, 1, 2, 3, 4], dtype=np.int32)
-    piece_types = _PIECE_TYPES[:5]
+    piece_types = _SHAPES_TYPES[:5]
     extract_features_batch(stacked, lines, piece_types)
     original = np.stack(grids).astype(np.float32)
     assert np.array_equal(stacked, original)

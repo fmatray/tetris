@@ -3,7 +3,8 @@
 import pytest
 
 from tetris.game.board import Board
-from tetris.game.tetromino import SHAPES, Tetromino
+from tetris.game.shapes import get_shape_rot, num_shape_rot
+from tetris.game.tetromino import Tetromino
 from tetris.settings import BOARD_HEIGHT, BOARD_WIDTH
 
 
@@ -142,7 +143,7 @@ def test_try_rotate_t_cw_success(board):
     assert board.try_rotate(t, 1) is True
     assert t.rotation == 1
     # shape should match rotation 1
-    assert t.shape == SHAPES["T"][1]
+    assert t.shape == get_shape_rot("T", 1)
 
 
 def test_try_rotate_blocked_returns_false(board):
@@ -155,7 +156,7 @@ def test_try_rotate_blocked_returns_false(board):
     # Block every cell each kick position would occupy so none fits.
     kicks = [(0, 0), (-1, 0), (-1, 1), (0, -2), (-1, -2)]
     for dx, dy in kicks:
-        for bx, by in SHAPES["T"][1]:
+        for bx, by in get_shape_rot("T", 1):
             cx, cy = t.x + dx + bx, t.y - dy + by
             if 0 <= cx < BOARD_WIDTH and 0 <= cy < BOARD_HEIGHT:
                 board.grid[cy][cx] = (255, 0, 0)
@@ -186,7 +187,7 @@ def test_try_rotate_o_piece(board):
     o.x = 4
     o.y = 5
     assert board.try_rotate(o, 1) is True
-    assert o.rotation == 1 % len(SHAPES["O"])
+    assert o.rotation == 1 % num_shape_rot("O")
 
 
 # --- is_tspin -------------------------------------------------------

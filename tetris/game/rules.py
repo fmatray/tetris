@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from tetris.game.tetromino import SHAPES
+from tetris.game.shapes import get_shape_rot, num_shape_rot
 from tetris.settings import (
     BOARD_HEIGHT,
     BOARD_WIDTH,
@@ -64,12 +64,12 @@ def shape_fits(grid, shape, x: int, y: int) -> bool:
 def try_rotation(grid, piece_type: str, from_rot: int, to_rot: int, x: int, y: int) -> tuple[int, int] | None:
     """Try SRS wall kicks for rotation. Returns (x, y) of first valid kick, or None."""
     if piece_type == "O":
-        return (x, y) if shape_fits(grid, SHAPES[piece_type][to_rot], x, y) else None
+        return (x, y) if shape_fits(grid, get_shape_rot(piece_type, to_rot), x, y) else None
     kicks = SRS_KICKS_I if piece_type == "I" else SRS_KICKS_JLSTZ
-    key = (from_rot % len(SHAPES[piece_type]), to_rot % len(SHAPES[piece_type]))
+    key = (from_rot % num_shape_rot(piece_type), to_rot % num_shape_rot(piece_type))
     for dx, dy in kicks.get(key, [(0, 0)]):
         nx, ny = x + dx, y - dy  # screen y inverted: positive kick_dy = up
-        if shape_fits(grid, SHAPES[piece_type][to_rot], nx, ny):
+        if shape_fits(grid, get_shape_rot(piece_type, to_rot), nx, ny):
             return (nx, ny)
     return None
 

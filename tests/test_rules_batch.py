@@ -15,7 +15,7 @@ from tetris.game.rules import (
     shape_fits,
 )
 from tetris.ai.candidates import hard_drop_y_batch, soft_drop_placements
-from tetris.game.tetromino import SHAPES
+from tetris.game.shapes import SHAPES, SHAPES_TYPES, get_shape_rot, num_shape_rot
 from tetris.settings import BOARD_HEIGHT, BOARD_WIDTH
 
 
@@ -38,9 +38,9 @@ def _enumerate_candidates(grid, piece_type):
     """Enumerate valid (shape, px) pairs for a piece type on a grid."""
     shapes = []
     x_positions = []
-    num_rots = len(SHAPES[piece_type])
+    num_rots = num_shape_rot(piece_type)
     for rot in range(num_rots):
-        shape = SHAPES[piece_type][rot]
+        shape = get_shape_rot(piece_type, rot)
         min_bx = min(bx for bx, _ in shape)
         max_bx = max(bx for bx, _ in shape)
         for col in range(BOARD_WIDTH):
@@ -79,7 +79,7 @@ def test_hard_drop_y_batch_with_blocks():
 def test_hard_drop_y_batch_matches_scalar():
     """For all 7 piece types, all rotations, all columns: batch matches scalar."""
     rng = np.random.default_rng(42)
-    for piece_type in SHAPES:
+    for piece_type in SHAPES_TYPES:
         for _ in range(20):
             grid = _random_grid(rng)
             shapes, xs = _enumerate_candidates(grid, piece_type)
@@ -93,7 +93,7 @@ def test_hard_drop_y_batch_matches_scalar():
 def test_hard_drop_y_batch_empty_board_all_pieces():
     """Empty board: every piece type, every rotation, every column."""
     grid = _empty_grid()
-    for piece_type in SHAPES:
+    for piece_type in SHAPES_TYPES:
         shapes, xs = _enumerate_candidates(grid, piece_type)
         batch_pys = hard_drop_y_batch(grid, shapes, xs)
         scalar_pys = np.array([hard_drop_y(grid, s, x) for s, x in zip(shapes, xs)])
@@ -106,7 +106,7 @@ def test_hard_drop_y_batch_empty_board_all_pieces():
 def test_place_and_clear_batch_no_lines():
     """Place O-piece on empty board, no lines cleared."""
     grid = _empty_grid()
-    shape = SHAPES["O"][0]
+    shape = get_shape_rot("O", 0)
     shapes = [shape]
     xs = [0]
     pys = [hard_drop_y(grid, shape, 0)]
@@ -121,7 +121,7 @@ def test_place_and_clear_batch_with_lines():
     grid = _empty_grid()
     grid[BOARD_HEIGHT - 1, :8] = 1.0
     # O-piece fills columns 8-9, completing the bottom row
-    shape = SHAPES["O"][0]
+    shape = get_shape_rot("O", 0)
     xs = [8]
     py = hard_drop_y(grid, shape, 8)
     batch_grids, batch_lines = place_and_clear_batch(grid, [shape], xs, [py])
@@ -133,7 +133,7 @@ def test_place_and_clear_batch_with_lines():
 def test_place_and_clear_batch_matches_scalar():
     """For all 7 piece types, batch matches scalar (grid + lines_cleared)."""
     rng = np.random.default_rng(42)
-    for piece_type in SHAPES:
+    for piece_type in SHAPES_TYPES:
         for _ in range(20):
             grid = _random_grid(rng)
             shapes, xs = _enumerate_candidates(grid, piece_type)
@@ -152,7 +152,7 @@ def test_place_and_clear_batch_preserves_input():
     grid = _empty_grid()
     grid[BOARD_HEIGHT - 1, :5] = 1.0
     grid_copy = grid.copy()
-    shape = SHAPES["I"][0]
+    shape = get_shape_rot("I", 0)
     xs = [5]
     py = hard_drop_y(grid, shape, 5)
     place_and_clear_batch(grid, [shape], xs, [py])
@@ -174,8 +174,8 @@ def test_place_and_clear_batch_multi_candidates_nonempty():
     xs = []
     pys = []
     for pt in ("I", "T", "L"):
-        for rot in range(len(SHAPES[pt])):
-            shape = SHAPES[pt][rot]
+        for rot in range(num_shape_rot(pt)):
+            shape = get_shape_rot(pt, rot)
             min_bx = min(bx for bx, _ in shape)
             max_bx = max(bx for bx, _ in shape)
             for col in range(BOARD_WIDTH):
@@ -208,15 +208,15 @@ def test_best_next_placement_batch_matches_scalar():
     used in tetris.ai.candidates.best_next_placement for diverse board states.
     """
     rng = np.random.default_rng(123)
-    for piece_type in SHAPES:
+    for piece_type in SHAPES_TYPES:
         for _ in range(10):
             grid = _random_grid(rng)
             # Scalar version
             best_grid_scalar = grid
             best_val = float("inf")
-            num_rots = len(SHAPES[piece_type])
+            num_rots = num_shape_rot(piece_type)
             for rot in range(num_rots):
-                shape = SHAPES[piece_type][rot]
+                shape = get_shape_rot(piece_type, rot)
                 min_bx = min(bx for bx, _ in shape)
                 max_bx = max(bx for bx, _ in shape)
                 for col in range(BOARD_WIDTH):
@@ -236,7 +236,7 @@ def test_best_next_placement_batch_matches_scalar():
             shapes = []
             x_positions = []
             for rot in range(num_rots):
-                shape = SHAPES[piece_type][rot]
+                shape = get_shape_rot(piece_type, rot)
                 min_bx = min(bx for bx, _ in shape)
                 max_bx = max(bx for bx, _ in shape)
                 for col in range(BOARD_WIDTH):
@@ -300,7 +300,7 @@ def test_find_full_rows_full_bottom():
 def test_place_cells_numpy_matches_list():
     """Numpy path produces same grid as list path."""
     rng = np.random.default_rng(99)
-    for piece_type in SHAPES:
+    for piece_type in SHAPES_TYPES:
         for shape in SHAPES[piece_type]:
             grid_np = _random_grid(rng)
             grid_list = [row[:] for row in grid_np.tolist()]
@@ -314,7 +314,7 @@ def test_place_cells_numpy_matches_list():
 def test_place_cells_out_of_bounds():
     """Cells outside the board are silently skipped (numpy path)."""
     g = _empty_grid()
-    shape = SHAPES["I"][0]  # horizontal I
+    shape = get_shape_rot("I", 0)  # horizontal I
     place_cells(g, shape, -2, 0, 1.0)  # partially off-board
     # Should not crash, cells in-bounds should be set
     assert g.sum() >= 0  # no exception
@@ -328,7 +328,7 @@ def test_hard_drop_y_batch_vectorized_matches_scalar_all_pieces():
     rng = np.random.default_rng(77)
     for _ in range(10):
         grid = _random_grid(rng)
-        for piece_type in SHAPES:
+        for piece_type in SHAPES_TYPES:
             shapes, x_positions = _enumerate_candidates(grid, piece_type)
             if not shapes:
                 continue
@@ -346,7 +346,7 @@ def test_soft_drop_placements_numpy_matches_list():
     for _ in range(10):
         grid_np = _random_grid(rng)
         grid_list = grid_np.tolist()
-        for piece_type in SHAPES:
+        for piece_type in SHAPES_TYPES:
             np_placements = soft_drop_placements(grid_np, piece_type)
             list_placements = soft_drop_placements(grid_list, piece_type)
             # Compare (px, py, rot) — shape is deterministic from piece+rot
@@ -358,7 +358,7 @@ def test_soft_drop_placements_numpy_matches_list():
 def test_soft_drop_placements_empty_board():
     """Empty board produces valid placements for all piece types."""
     grid = _empty_grid()
-    for piece_type in SHAPES:
+    for piece_type in SHAPES_TYPES:
         placements = soft_drop_placements(grid, piece_type)
         assert len(placements) > 0, f"{piece_type}: no placements on empty board"
         for p in placements:

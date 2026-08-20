@@ -25,6 +25,8 @@ tetris/
 │   ├── game/                    # Logique métier (sans pygame)
 │   │   ├── __init__.py
 │   │   ├── tetromino.py         # Modèle de pièce
+│   │   ├── shapes.py            # Données de formes (SHAPES, SHAPES_TYPES, helpers rotation)
+│   │   ├── rules.py             # Fonctions de jeu grid-agnostic (SRS kicks, shape_fits, hard_drop_y)
 │   │   ├── board.py             # Grille, collisions, lignes, handicap, hard drop
 │   │   ├── piece_provider.py    # Fournisseur de pièces (Aléatoire / 7-Bag / Replay, 1ère pièce sûre I/J/L/T)
 │   │   ├── scoring.py           # Règles de score (Guideline : lignes × niveau, combos, drop)

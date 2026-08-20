@@ -14,7 +14,7 @@ from tetris.game.piece_provider import (
     SevenBagGenerator,
     WeightedGenerator,
 )
-from tetris.game.tetromino import SHAPES
+from tetris.game.shapes import SHAPES, SHAPES_TYPES
 from tetris.settings import FIRST_PIECE_TYPES
 
 
@@ -277,28 +277,28 @@ def test_random_generator_no_bag():
 
 def test_random_generator_first_piece_safe():
     gen = RandomGenerator()
-    pool = list(SHAPES.keys())
+    pool = SHAPES_TYPES
     for _ in range(50):
         assert gen.next(pool, True) in FIRST_PIECE_TYPES
 
 
 def test_random_generator_subsequent_unrestricted():
     gen = RandomGenerator()
-    pool = list(SHAPES.keys())
+    pool = SHAPES_TYPES
     gen.next(pool, True)
     assert gen.next(pool, False) in SHAPES
 
 
 def test_bag_generator_copies():
     gen = BagGenerator(copies=1)
-    pool = list(SHAPES.keys())
+    pool = SHAPES_TYPES
     bag = [gen.next(pool, False) for _ in range(7)]
     assert sorted(bag) == sorted(SHAPES.keys())
 
 
 def test_bag_generator_reset_clears_bag():
     gen = SevenBagGenerator()
-    pool = list(SHAPES.keys())
+    pool = SHAPES_TYPES
     gen.next(pool, False)
     assert len(gen.bag_remaining) == 6
     gen.reset()
@@ -307,7 +307,7 @@ def test_bag_generator_reset_clears_bag():
 
 def test_bag_generator_first_piece_swap_keeps_completeness():
     gen = SevenBagGenerator()
-    pool = list(SHAPES.keys())
+    pool = SHAPES_TYPES
     first = gen.next(pool, True)
     assert first in FIRST_PIECE_TYPES
     rest = [gen.next(pool, False) for _ in range(6)]
@@ -318,7 +318,7 @@ def test_replay_generator_serves_queue(tmp_path):
     path = tmp_path / "r.json"
     path.write_text(json.dumps(["I", "O", "T"]))
     gen = ReplayGenerator(path)
-    pool = list(SHAPES.keys())
+    pool = SHAPES_TYPES
     assert gen.next(pool, False) == "I"
     assert gen.next(pool, False) == "O"
     assert gen.next(pool, False) == "T"
@@ -341,7 +341,7 @@ def test_replay_generator_first_piece_filter(tmp_path):
     path = tmp_path / "r.json"
     path.write_text(json.dumps(["S", "Z", "I", "T"]))
     gen = ReplayGenerator(path)
-    pool = list(SHAPES.keys())
+    pool = SHAPES_TYPES
     # S, Z unsafe → skip; I safe → return
     assert gen.next(pool, True) == "I"
 
@@ -351,7 +351,7 @@ def test_replay_generator_reset_does_not_restart_queue(tmp_path):
     path = tmp_path / "r.json"
     path.write_text(json.dumps(["I", "O"]))
     gen = ReplayGenerator(path)
-    pool = list(SHAPES.keys())
+    pool = SHAPES_TYPES
     gen.next(pool, False)
     gen.next(pool, False)
     gen.reset()
@@ -362,7 +362,7 @@ def test_replay_generator_empty_file(tmp_path):
     """ReplayGenerator returns None when the file doesn't exist."""
     path = tmp_path / "nonexistent.json"
     gen = ReplayGenerator(path)
-    pool = list(SHAPES.keys())
+    pool = SHAPES_TYPES
     assert gen.next(pool, False) is None
 
 
@@ -387,7 +387,7 @@ def test_replay_provider_switches_to_fallback(tmp_path):
 def test_weighted_generator_starts_uniform():
     """After one spawn, selected piece at _WT_INIT * _WT_DECAY, others boosted."""
     gen = WeightedGenerator()
-    pool = list(SHAPES.keys())
+    pool = SHAPES_TYPES
     gen.next(pool, False)
     w = gen.weights
     assert len(w) == 7
@@ -404,7 +404,7 @@ def test_weighted_generator_no_bag():
 
 def test_weighted_generator_reset_clears_weights():
     gen = WeightedGenerator()
-    pool = list(SHAPES.keys())
+    pool = SHAPES_TYPES
     gen.next(pool, False)
     assert len(gen.weights) == 7
     gen.reset()
@@ -413,7 +413,7 @@ def test_weighted_generator_reset_clears_weights():
 
 def test_weighted_generator_first_piece_safe():
     gen = WeightedGenerator()
-    pool = list(SHAPES.keys())
+    pool = SHAPES_TYPES
     for _ in range(50):
         gen.reset()
         assert gen.next(pool, True) in FIRST_PIECE_TYPES
@@ -429,7 +429,7 @@ def test_weighted_generator_respects_curriculum():
 def test_weighted_generator_weights_never_below_min():
     """No weight drops below _WT_MIN."""
     gen = WeightedGenerator()
-    pool = list(SHAPES.keys())
+    pool = SHAPES_TYPES
     for _ in range(500):
         gen.next(pool, False)
     assert all(w >= _WT_MIN - 0.001 for w in gen.weights.values())
@@ -438,7 +438,7 @@ def test_weighted_generator_weights_never_below_min():
 def test_weighted_generator_distributes_all_types():
     """Over 500 spawns, all 7 types appear at least once."""
     gen = WeightedGenerator()
-    pool = list(SHAPES.keys())
+    pool = SHAPES_TYPES
     seen = {gen.next(pool, False) for _ in range(500)}
     assert seen == set(SHAPES.keys())
 

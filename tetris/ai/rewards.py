@@ -10,10 +10,9 @@ from __future__ import annotations
 import numpy as np
 
 from tetris.game.rules import find_full_rows, place_cells
-from tetris.game.tetromino import SHAPES
+from tetris.game.shapes import SHAPES_TYPES
 from tetris.settings import BOARD_HEIGHT, BOARD_WIDTH
 
-PIECE_TYPES = list(SHAPES.keys())  # ["I", "O", "T", "S", "Z", "J", "L"]
 
 # Number of features in the DT-20 state vector (10 board + 7 next-piece one-hot).
 FEATURE_SIZE = 17
@@ -88,8 +87,8 @@ def board_to_grid(board) -> np.ndarray:
 
 def one_hot_piece(piece_type: str) -> np.ndarray:
     """7-element one-hot encoding of a piece type."""
-    vec = np.zeros(len(PIECE_TYPES), dtype=np.float32)
-    vec[PIECE_TYPES.index(piece_type)] = 1.0
+    vec = np.zeros(len(SHAPES_TYPES), dtype=np.float32)
+    vec[SHAPES_TYPES.index(piece_type)] = 1.0
     return vec
 
 
@@ -397,9 +396,9 @@ def extract_features_batch(
         m["row_trans"], m["col_trans"], m["wells_score"],
         m["hole_depth_score"], m["rows_with_holes_count"],
     ], axis=1)                                            # (N, 10)
-    one_hot = np.zeros((N, len(PIECE_TYPES)), dtype=np.float64)
+    one_hot = np.zeros((N, len(SHAPES_TYPES)), dtype=np.float64)
     for i, pt in enumerate(next_piece_types):
-        one_hot[i, PIECE_TYPES.index(pt)] = 1.0
+        one_hot[i, SHAPES_TYPES.index(pt)] = 1.0
     features = np.concatenate([board_features, one_hot], axis=1)  # (N, 17)
     return ((features - FEATURE_MEANS) / FEATURE_STDS).astype(np.float32)
 
