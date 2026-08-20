@@ -50,9 +50,7 @@ def render_score_graph(episodes: list[int], scores: list[int]) -> pygame.Surface
         ax.plot(episodes, scores, color="cyan", linewidth=0.8, alpha=0.6, label="Score")
         ma_window = min(20, len(scores))
         avg = _moving_average(scores, ma_window)
-        ax.plot(
-            episodes, avg, color="yellow", linewidth=1.8, label=f"Moy. {ma_window}"
-        )
+        ax.plot(episodes, avg, color="yellow", linewidth=1.8, label=f"Moy. {ma_window}")
         ax.legend(facecolor=_BG, edgecolor=_FG, labelcolor=_FG)
 
     ax.set_xlabel("Épisode", color=_FG, fontsize=12)
@@ -69,4 +67,6 @@ def render_score_graph(episodes: list[int], scores: list[int]) -> pygame.Surface
     plt.close(fig)
 
     surf = pygame.image.frombuffer(bytes(buf), (w, h), "RGBA")
-    return surf.convert()
+    if pygame.display.get_surface() is not None:
+        surf = surf.convert()
+    return surf
