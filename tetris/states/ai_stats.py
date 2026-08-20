@@ -37,7 +37,7 @@ _STAT_LABELS = [
 ]
 
 
-class StatsState(State):
+class AIStatsState(State):
     """AI statistics page: stats table on the left, graph on the right.
 
     The graph surface is built lazily on first ``draw`` and cached for

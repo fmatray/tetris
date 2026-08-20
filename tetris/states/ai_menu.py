@@ -72,9 +72,9 @@ class AIMenuState(MenuBase):
 
                 return HyperparamMenuState(self.screen, self.font, self.audio, self)
             case 3:  # Statistiques
-                from tetris.states.stats import StatsState
+                from tetris.states.ai_stats import AIStatsState
 
-                return StatsState(self.screen, self.font, self.audio, self)
+                return AIStatsState(self.screen, self.font, self.audio, self)
             case 4:  # Réinitialiser IA
                 if not self._confirm_reset:
                     self._confirm_reset = True

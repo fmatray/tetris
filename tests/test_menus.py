@@ -22,7 +22,7 @@ from tetris.states.human_menu import HumanMenuState
 from tetris.states.hyperparam_menu import HyperparamMenuState
 from tetris.states.leaderboard import LeaderboardState
 from tetris.states.menu import MenuState
-from tetris.states.stats import StatsState
+from tetris.states.ai_stats import AIStatsState
 
 import pytest
 
@@ -248,7 +248,7 @@ def test_ai_menu_select_stats_navigates():
     state = _make_state(AIMenuState, menu)
     state.selection = 3
     result = state._on_select()
-    assert isinstance(result, StatsState)
+    assert isinstance(result, AIStatsState)
 
 
 def test_ai_menu_select_reset_first_press_confirms():
@@ -922,7 +922,7 @@ def test_leaderboard_draw_no_error():
     state.draw(screen)
 
 
-# ── StatsState ───────────────────────────────────────────────────────
+# ── AIStatsState ──────────────────────────────────────────────────
 
 
 def _make_stats():
@@ -930,7 +930,7 @@ def _make_stats():
     screen = pygame.Surface((640, 480))
     font = pygame.font.Font(None, 20)
     audio = AudioManager(sound_volume=0, music_volume=0)
-    return StatsState(screen, font, audio, ai_menu)
+    return AIStatsState(screen, font, audio, ai_menu)
 
 
 def test_stats_handle_keydown_returns_ai_menu():
@@ -977,7 +977,7 @@ def test_stats_stat_values_populated_log(tmp_path):
     screen = pygame.Surface((640, 480))
     font = pygame.font.Font(None, 20)
     audio = AudioManager(sound_volume=0, music_volume=0)
-    state = StatsState(screen, font, audio, ai_menu)
+    state = AIStatsState(screen, font, audio, ai_menu)
     state._stats = TrainingLog(str(log_path))
     values = state._stat_values()
     assert values[0] == "5"  # total_episodes

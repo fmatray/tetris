@@ -4,7 +4,7 @@
 
 Le projet repose sur une architecture modulaire et extensible :
 
-- **Machine à États Finis (FSM)** : Utilisation du *State Pattern* pour gérer les transitions fluides entre `MenuState`, `HumanMenuState`, `KeybindState`, `HumanState`, `AIState`, `AIMenuState`, `HyperparamMenuState`, `StatsState`, `GameOverState` et `LeaderboardState`.
+- **Machine à États Finis (FSM)** : Utilisation du *State Pattern* pour gérer les transitions fluides entre `MenuState`, `HumanMenuState`, `KeybindState`, `HumanState`, `AIState`, `AIMenuState`, `HyperparamMenuState`, `AIStatsState`, `GameOverState` et `LeaderboardState`.
 - **Audio Procédural** : Génération d'ondes sinusoïdales via NumPy pour créer des mélodies et effets sonores sans dépendances de fichiers externes.
 - **Système de Particules** : Moteur d'effets visuels gérant la physique (gravité, friction) et le cycle de vie des particules pour des explosions dynamiques.
 - **Rendu Isolé** : Classe `Renderer` dédiée pour séparer la logique de mise à jour du moteur graphique.
@@ -58,7 +58,7 @@ tetris/
 │   │   ├── ai.py                # AIState (DQN agent, HUD apprentissage + stats; candidates/HUD extraits vers tetris/ai/)
 │   │   ├── ai_menu.py           # AIMenuState (mode, vitesse, apprentissage, stats, reset)
 │   │   ├── hyperparam_menu.py   # HyperparamMenuState (13 hyperparamètres DQN + reset)
-│   │   ├── stats.py             # StatsState (tableau stats + graphique)
+│   │   ├── ai_stats.py           # AIStatsState (tableau stats + graphique)
 │   │   ├── game_over.py         # GameOverState
 │   │   └── leaderboard.py       # LeaderboardState
 │   └── storage/                 # Persistance JSON

@@ -32,7 +32,7 @@ Returning a new `State` from `handle_event`/`update` transitions the app; `None`
 MenuState (root, owns settings)
 ├── GameRulesMenuState (generator, preview, handicap)
 ├── HumanMenuState → { KeybindState, HumanStatsState }
-├── AIMenuState → { TrainingMenuState → { HyperparamMenuState, PlaceholderState }, StatsState }
+├── AIMenuState → { TrainingMenuState → { HyperparamMenuState, PlaceholderState }, AIStatsState }
 ├── AudioMenuState
 ├── GameState   (abstract base: board, pieces, gravity, lock delay)
 │   ├── HumanState (human gameplay: keyboard, DAS, pause)

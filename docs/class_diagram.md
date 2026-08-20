@@ -216,7 +216,7 @@ classDiagram
             +handle_event(event: pygame.event.Event) State | None
         }
 
-        class StatsState {
+        class AIStatsState {
             +screen: pygame.Surface
             +font: pygame.font.Font
             +audio: AudioManager
@@ -828,7 +828,7 @@ classDiagram
     State <|-- LeaderboardState
     State <|-- KeybindState
     State <|-- HumanStatsState
-    State <|-- StatsState
+    State <|-- AIStatsState
 
     MenuBase <|-- MenuState
     MenuBase <|-- HumanMenuState
@@ -895,7 +895,7 @@ classDiagram
     Renderer "1" --> "1" Board : reads
     Renderer "1" --> "1" Tetromino : reads
 
-    StatsState "1" --> "1" TrainingLog : reads
+    AIStatsState "1" --> "1" TrainingLog : reads
 
     GameStats "1" --> "1" ScoreEngine : uses
 
@@ -914,11 +914,11 @@ classDiagram
     HumanMenuState "1" --> "0..1" HumanStatsState : navigates
 
     AIMenuState "1" --> "0..1" HyperparamMenuState : navigates
-    AIMenuState "1" --> "0..1" StatsState : navigates
+    AIMenuState "1" --> "0..1" AIStatsState : navigates
 
     KeybindState "1" --> "1" HumanMenuState : returns_to
     GameRulesMenuState "1" --> "1" MenuState : returns_to
     HumanStatsState "1" --> "1" HumanMenuState : returns_to
-    StatsState "1" --> "1" AIMenuState : returns_to
+    AIStatsState "1" --> "1" AIMenuState : returns_to
     LeaderboardState "1" --> "0..1" MenuState : returns_to
 ```
