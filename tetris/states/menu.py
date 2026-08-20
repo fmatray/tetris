@@ -199,6 +199,7 @@ class MenuState(MenuBase):
                     self,
                     ghost_piece=self.ghost_piece,
                     preview_count=self.preview_count,
+                    debug=self.debug,
                     speed_mode=self.speed_mode,
                 )
             case 2:  # Humain sub-menu
@@ -255,7 +256,7 @@ class MenuState(MenuBase):
             warm_start=self.ai_warm_start,
             lookahead=self.ai_lookahead,
             lookahead_depth=self.ai_lookahead_depth,
-            soft_drop=self.ai_soft_drop,
             preview_count=self.preview_count,
+            debug=self.debug,
             speed_mode=self.speed_mode,
         )
