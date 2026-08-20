@@ -14,8 +14,8 @@ from tetris.game.rules import (
     hard_drop_y_batch,
     place_cells,
     shape_fits,
-    soft_drop_placements,
 )
+from tetris.ai.candidates import soft_drop_placements
 from tetris.settings import BOARD_HEIGHT, BOARD_WIDTH, SHAPES
 
 
@@ -350,8 +350,8 @@ def test_soft_drop_placements_numpy_matches_list():
             np_placements = soft_drop_placements(grid_np, piece_type)
             list_placements = soft_drop_placements(grid_list, piece_type)
             # Compare (px, py, rot) — shape is deterministic from piece+rot
-            np_keys = {(px, py, rot) for _, px, py, rot in np_placements}
-            list_keys = {(px, py, rot) for _, px, py, rot in list_placements}
+            np_keys = {(p.px, p.py, p.rot) for p in np_placements}
+            list_keys = {(p.px, p.py, p.rot) for p in list_placements}
             assert np_keys == list_keys, f"{piece_type}: placement set mismatch"
 
 
@@ -361,5 +361,5 @@ def test_soft_drop_placements_empty_board():
     for piece_type in SHAPES:
         placements = soft_drop_placements(grid, piece_type)
         assert len(placements) > 0, f"{piece_type}: no placements on empty board"
-        for shape, px, py, rot in placements:
-            assert shape_fits(grid, shape, px, py)
+        for p in placements:
+            assert shape_fits(grid, SHAPES[p.piece_type][p.rot], p.px, p.py)

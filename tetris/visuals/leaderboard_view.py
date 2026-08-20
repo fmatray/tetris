@@ -5,7 +5,7 @@ rendered identical tables. This module centralizes that logic.
 """
 
 import pygame
-
+from typing import NamedTuple
 from tetris.settings import BLACK, GENERATOR_LABELS, GRAY, SCREEN_WIDTH, WHITE
 from tetris.storage import load_leaderboard
 from tetris.visuals.fonts import (
@@ -15,6 +15,14 @@ from tetris.visuals.fonts import (
     TITLE_Y,
     get_large_font,
 )
+
+
+class ColumnDef(NamedTuple):
+    """A leaderboard table column: header label, pixel width, text alignment."""
+
+    label: str
+    width: int
+    align: str
 
 
 def draw_leaderboard(screen: pygame.Surface, font: pygame.font.Font, scores: list[dict] | None = None) -> None:
@@ -29,14 +37,14 @@ def draw_leaderboard(screen: pygame.Surface, font: pygame.font.Font, scores: lis
     margin = 150
     pad = 15
     columns = [
-        ("#", 60, "right"),
-        ("Name", 240, "left"),
-        ("Score", 130, "right"),
-        ("Lvl", 60, "right"),
-        ("Lines", 80, "right"),
-        ("Générateur", 170, "left"),
-        ("Mode", 130, "left"),
-        ("Date", 330, "left"),
+        ColumnDef("#", 60, "right"),
+        ColumnDef("Name", 240, "left"),
+        ColumnDef("Score", 130, "right"),
+        ColumnDef("Lvl", 60, "right"),
+        ColumnDef("Lines", 80, "right"),
+        ColumnDef("Générateur", 170, "left"),
+        ColumnDef("Mode", 130, "left"),
+        ColumnDef("Date", 330, "left"),
     ]
     x0 = margin
     # Compute absolute x for each column (start of cell).

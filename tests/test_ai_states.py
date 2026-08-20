@@ -27,7 +27,7 @@ from tetris.settings import (
 )
 from tetris.ai.candidates import iter_column_positions, best_next_placement, gen_placements
 from tetris.ai.hud import _hud_table_rows, _trend_arrow, draw_ai_hud
-from tetris.states.ai import AIState, NUM_ROTATIONS
+from tetris.states.ai import AIState, NUM_ROTATIONS, PendingTransition
 from tetris.visuals.particles import ParticleSystem
 
 pygame.init()
@@ -99,10 +99,8 @@ class TestInit:
         assert isinstance(ai.agent, DQNAgent)
         assert isinstance(ai.log, TrainingLog)
         assert ai.episode_steps == 0
-        assert ai._prev_state is None
-        assert ai._prev_reward is None
+        assert ai._pending is None
         assert ai._prev_action is None
-        assert ai._prev_done is False
         assert ai.speed == "fast"
         assert ai.ghost_piece is False
         assert ai.warm_start is True
@@ -179,19 +177,19 @@ class TestGenPlacements:
         grid = np.zeros((BOARD_HEIGHT, BOARD_WIDTH), dtype=np.float32)
         placements = list(gen_placements(grid, "I", soft_drop=True))
         assert len(placements) > 0
-        for shape, px, py, rot in placements:
-            assert len(shape) == 4
-            assert py >= 0
-            assert 0 <= rot < NUM_ROTATIONS
+        for p in placements:
+            assert len(SHAPES[p.piece_type][p.rot]) == 4
+            assert p.py >= 0
+            assert 0 <= p.rot < NUM_ROTATIONS
 
     def test_hard_drop_yields_placements(self):
         grid = np.zeros((BOARD_HEIGHT, BOARD_WIDTH), dtype=np.float32)
         placements = list(gen_placements(grid, "I", soft_drop=False))
         assert len(placements) > 0
-        for shape, px, py, rot in placements:
-            assert len(shape) == 4
-            assert 0 <= px < BOARD_WIDTH
-            assert py >= 0
+        for p in placements:
+            assert len(SHAPES[p.piece_type][p.rot]) == 4
+            assert 0 <= p.px < BOARD_WIDTH
+            assert p.py >= 0
 
     def test_full_grid_soft_drop_yields_spawn(self):
         """Full grid: soft_drop BFS finds spawn position (py=0)."""
@@ -219,14 +217,14 @@ class TestGetCandidateStates:
         ai = _make_ai()
         ai.hold_piece = Tetromino("T")
         ai._get_candidate_states()
-        holds = [p[3] for p in ai._candidate_placements]
+        holds = [p.hold for p in ai._candidate_placements]
         assert True in holds
         assert False in holds
 
     def test_includes_non_hold_candidates(self):
         ai = _make_ai()
         ai._get_candidate_states()
-        holds = [p[3] for p in ai._candidate_placements]
+        holds = [p.hold for p in ai._candidate_placements]
         assert False in holds
 
     def test_full_board_still_yields_candidates(self):
@@ -253,7 +251,7 @@ class TestExecuteMacroAction:
         ai._get_candidate_states()
         assert len(ai._candidate_placements) > 0
         # Find a non-hold candidate
-        idx = next(i for i, p in enumerate(ai._candidate_placements) if not p[3])
+        idx = next(i for i, p in enumerate(ai._candidate_placements) if not p.hold)
         original_y = ai.current_piece.y
         ai._execute_macro_action(idx)
         assert ai.current_piece.y >= original_y
@@ -262,7 +260,7 @@ class TestExecuteMacroAction:
         ai = _make_ai(soft_drop=False)
         ai._get_candidate_states()
         assert len(ai._candidate_placements) > 0
-        idx = next(i for i, p in enumerate(ai._candidate_placements) if not p[3])
+        idx = next(i for i, p in enumerate(ai._candidate_placements) if not p.hold)
         ai._execute_macro_action(idx)
         # Hard-drop path locks immediately
         assert ai._prev_action is None
@@ -270,7 +268,7 @@ class TestExecuteMacroAction:
     def test_hold_candidate(self):
         ai = _make_ai()
         ai._get_candidate_states()
-        hold_idx = next((i for i, p in enumerate(ai._candidate_placements) if p[3]), None)
+        hold_idx = next((i for i, p in enumerate(ai._candidate_placements) if p.hold), None)
         if hold_idx is None:
             pytest.skip("No hold candidate")
         ai._execute_macro_action(hold_idx)
@@ -428,7 +426,7 @@ class TestResetEpisode:
         ai.paused = True
         ai._lock_timer = 999.0
         ai._grounded = True
-        ai._prev_state = np.zeros(17, dtype=np.float32)
+        ai._pending = PendingTransition(state=np.zeros(17, dtype=np.float32), reward=0.0)
         ai._prev_action = 5
         ai._reset_episode()
         assert ai.episode_steps == 0
@@ -436,9 +434,7 @@ class TestResetEpisode:
         assert not ai.paused  # type: ignore[unreachable]
         assert ai._lock_timer == 0.0
         assert not ai._grounded
-        assert ai._prev_state is None
-        assert ai._prev_reward is None
-        assert not ai._prev_done
+        assert ai._pending is None
         assert ai._prev_action is None
         assert ai._action_timer == 0.0
 
@@ -656,13 +652,13 @@ class TestUpdateCycle:
         assert ai.agent.epsilon == 0.0
 
     def test_lock_and_spawn_computes_reward(self):
-        """_lock_and_spawn should compute reward and set _prev_state."""
+        """_lock_and_spawn should compute reward and set _pending."""
         ai = _make_ai(learning=True, speed="fast")
         particles = ParticleSystem()
         # Run one piece lock.
         for _ in range(20):
             ai.update(16, particles)
-        # After at least one lock, _prev_state should be set (or None if game over).
+        # After at least one lock, _pending should be set (or None if game over).
         assert ai.episode_start_grid is not None
 
     def test_paused_returns_none(self):

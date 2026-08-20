@@ -13,7 +13,8 @@ the HUD for real-time learning feedback.
 from __future__ import annotations
 
 import os
-from typing import TYPE_CHECKING
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, NamedTuple
 
 if TYPE_CHECKING:
     from tetris.states.menu import MenuState
@@ -22,7 +23,7 @@ import numpy as np
 import pygame
 
 from tetris.ai.agent import DQNAgent
-from tetris.ai.candidates import NUM_ROTATIONS, get_candidate_states  # noqa: F401
+from tetris.ai.candidates import NUM_ROTATIONS, Placement, get_candidate_states  # noqa: F401
 from tetris.ai.hud import draw_ai_hud
 from tetris.ai.rewards import (
     board_to_grid,
@@ -52,6 +53,25 @@ from tetris.visuals.particles import ParticleSystem
 
 
 logger = get_logger("ai")
+
+
+@dataclass
+class PendingTransition:
+    """Delayed RL transition: state/reward set after placement, stored when
+    the NEXT placement provides the next_state."""
+
+    state: np.ndarray
+    reward: float
+    done: bool = False
+
+
+class MoveRecord(NamedTuple):
+    """A recorded AI move for HUD display: piece type, rotation, column, hold."""
+
+    piece: str
+    rot: int
+    col: int
+    hold: bool
 
 
 class AIState(GameState):
@@ -169,19 +189,16 @@ class AIState(GameState):
         self.lookahead = lookahead
         self.lookahead_depth = lookahead_depth
         self.soft_drop = soft_drop
-        # Candidate placements: [(rot, px, py, hold), ...]
-        self._candidate_placements: list[tuple[int, int, int, bool]] = []
-        # Last 5 moves for HUD display: [(piece, rot, col, hold), ...]
-        self._last_moves: list[tuple[str, int, int, bool]] = []
+        self._candidate_placements: list[Placement] = []
+        # Last 5 moves for HUD display
+        self._last_moves: list[MoveRecord] = []
         # Per-episode tracking
         self.episode_steps = 0
         self.episode_start_grid: np.ndarray = board_to_grid(self.board)
 
-        # Pending transition data (delayed storage: state set after placement,
+        # Pending transition (delayed storage: state set after placement,
         # stored when NEXT placement provides next_state)
-        self._prev_state: np.ndarray | None = None
-        self._prev_reward: float | None = None
-        self._prev_done: bool = False
+        self._pending: PendingTransition | None = None
         self._prev_action: int | None = None
 
         # Action delay accumulator (normal mode only — human-like reaction speed)
@@ -236,7 +253,8 @@ class AIState(GameState):
 
     def _execute_macro_action(self, action: int) -> None:
         """Rotate, move to target position, then drop (and lock if hard-drop)."""
-        rot, px, py, hold = self._candidate_placements[action]
+        p = self._candidate_placements[action]
+        rot, px, py, hold = p.rot, p.px, p.py, p.hold
 
         if hold:
             self._hold()  # GameState._hold swaps current with held/next
@@ -300,15 +318,14 @@ class AIState(GameState):
         current_state = extract_features(new_grid, cleared, self.current_piece.type)
 
         if self.ai_mode == "learning":
-            # Store previous transition (delayed: prev_state + current as next_state)
-            if self._prev_state is not None:
-                assert self._prev_reward is not None  # set alongside _prev_state
+            # Store previous transition (delayed: _pending.state + current as next_state)
+            if self._pending is not None:
                 self.agent.store(
-                    self._prev_state,
+                    self._pending.state,
                     0,
-                    self._prev_reward,
+                    self._pending.reward,
                     current_state,
-                    self._prev_done,
+                    self._pending.done,
                 )
             # Terminal: store current transition
             if self.game_over:
@@ -317,15 +334,11 @@ class AIState(GameState):
             for _ in range(self.learn_per_action):
                 self.agent.learn()
 
-        # Update pending state for next transition
+        # Update pending transition for next lock
         if self.game_over:
-            self._prev_state = None
-            self._prev_reward = None
-            self._prev_done = False
+            self._pending = None
         else:
-            self._prev_state = current_state
-            self._prev_reward = reward
-            self._prev_done = False
+            self._pending = PendingTransition(state=current_state, reward=reward)
 
         self._prev_action = None
         self.episode_start_grid = new_grid
@@ -362,12 +375,13 @@ class AIState(GameState):
                 chosen_idx = self.agent.select_action(candidates, dellvals)
                 self._prev_action = actions[chosen_idx]
                 self.episode_steps += 1
-                rot, px, _py, hold = self._candidate_placements[chosen_idx]
+                p = self._candidate_placements[chosen_idx]
+                rot, px, hold = p.rot, p.px, p.hold
                 if hold:
                     placed = self.hold_piece.type if self.hold_piece else self.next_piece.type
                 else:
                     placed = self.current_piece.type
-                self._last_moves.append((placed, rot, px, hold))
+                self._last_moves.append(MoveRecord(placed, rot, px, hold))
                 if len(self._last_moves) > 5:
                     self._last_moves.pop(0)
                 self._execute_macro_action(actions[chosen_idx])
@@ -434,12 +448,10 @@ class AIState(GameState):
         self._lock_timer: float = 0.0
         self._lock_resets: int = 0
         self._grounded: bool = False
-        self._prev_state: np.ndarray | None = None
-        self._prev_reward: float | None = None
-        self._prev_done: bool = False
+        self._pending: PendingTransition | None = None
         self._prev_action: int | None = None
         self._last_level = 0
-        self._last_moves: list[tuple[str, int, int, bool]] = []
+        self._last_moves: list[MoveRecord] = []
         self._pending_level_up = False
         self.audio.set_music_speed(1.0)
 

@@ -23,9 +23,9 @@ from tetris.ai.rewards import (
 from tetris.game.rules import (
     hard_drop_y,
     shape_fits,
-    soft_drop_placements,
     try_rotation,
 )
+from tetris.ai.candidates import soft_drop_placements
 from tetris.game.tetromino import SHAPES
 from tetris.settings import BOARD_HEIGHT, BOARD_WIDTH
 
@@ -41,6 +41,7 @@ def _grid_with_row(row, value=1):
 
 
 # --- count_holes ----------------------------------------------------
+
 
 def test_count_holes_empty():
     assert count_holes(_empty_grid()) == 0
@@ -64,6 +65,7 @@ def test_count_holes_multiple():
 
 # --- aggregate_height -----------------------------------------------
 
+
 def test_aggregate_height_empty():
     assert aggregate_height(_empty_grid()) == 0
 
@@ -71,7 +73,7 @@ def test_aggregate_height_empty():
 def test_aggregate_height_with_blocks():
     grid = _empty_grid()
     grid[10, 0] = 1  # height 10 in column 0
-    grid[5, 3] = 1   # height 15 in column 3
+    grid[5, 3] = 1  # height 15 in column 3
     # aggregate_height sums (BOARD_HEIGHT - topmost_filled_row)
     expected = (BOARD_HEIGHT - 10) + (BOARD_HEIGHT - 5)
     assert aggregate_height(grid) == expected
@@ -79,10 +81,12 @@ def test_aggregate_height_with_blocks():
 
 # --- bumpiness ------------------------------------------------------
 
+
 def test_bumpiness_flat():
     """A flat surface has zero bumpiness."""
     grid = _grid_with_row(BOARD_HEIGHT - 1)
     assert bumpiness(grid) == 0
+
 
 def test_bumpiness_uneven():
     grid = _empty_grid()
@@ -93,6 +97,7 @@ def test_bumpiness_uneven():
 
 
 # --- compute_reward -------------------------------------------------
+
 
 def test_compute_reward_game_over():
     assert compute_reward(0, _empty_grid(), _empty_grid(), True, False) == -50.0
@@ -129,6 +134,7 @@ def test_compute_reward_no_step_survived():
 
 # --- column_heights ------------------------------------------------
 
+
 def test_column_heights_empty():
     h = column_heights(_empty_grid())
     assert h.shape == (BOARD_WIDTH,)
@@ -147,6 +153,7 @@ def test_column_heights_with_blocks():
 
 # --- max_height ----------------------------------------------------
 
+
 def test_max_height_empty():
     assert max_height(_empty_grid()) == 0
 
@@ -159,6 +166,7 @@ def test_max_height_with_blocks():
 
 
 # --- row_transitions -----------------------------------------------
+
 
 def test_row_transitions_empty():
     """Empty board: each row has 2 transitions (wall↔empty at each edge)."""
@@ -174,6 +182,7 @@ def test_row_transitions_with_blocks():
 
 # --- column_transitions --------------------------------------------
 
+
 def test_column_transitions_empty():
     """Empty board: each column has 1 transition (empty↔floor)."""
     assert column_transitions(_empty_grid()) == BOARD_WIDTH
@@ -186,6 +195,7 @@ def test_column_transitions_with_blocks():
 
 
 # --- wells ---------------------------------------------------------
+
 
 def test_wells_flat():
     """Flat surface has no wells."""
@@ -202,6 +212,7 @@ def test_wells_with_well():
 
 # --- hole_depth ----------------------------------------------------
 
+
 def test_hole_depth_empty():
     assert hole_depth(_empty_grid()) == 0
 
@@ -214,6 +225,7 @@ def test_hole_depth_with_holes():
 
 # --- rows_with_holes -----------------------------------------------
 
+
 def test_rows_with_holes_empty():
     assert rows_with_holes(_empty_grid()) == 0
 
@@ -225,6 +237,7 @@ def test_rows_with_holes_with_holes():
 
 
 # --- extract_features ----------------------------------------------
+
 
 def test_extract_features_shape():
     features = extract_features(_empty_grid(), 0, "I")
@@ -243,6 +256,7 @@ def test_extract_features_values():
 
 # --- dellacherie_value ---------------------------------------------
 
+
 def test_dellacherie_value_empty():
     assert dellacherie_value(_empty_grid()) == 0.0
 
@@ -255,6 +269,7 @@ def test_dellacherie_value_bad_board():
 
 
 # --- hard_drop_y ---------------------------------------------------
+
 
 def test_hard_drop_y_empty():
     """O-piece dropped on empty board lands at the bottom row."""
@@ -276,6 +291,7 @@ def test_hard_drop_y_with_blocks():
 
 
 # --- place_and_clear ------------------------------------------------
+
 
 def test_place_and_clear_no_lines():
     """Place O-piece on empty board, no lines cleared."""
@@ -303,6 +319,7 @@ def test_place_and_clear_full_line():
 
 # --- compute_reward PBRS -------------------------------------------
 
+
 def test_compute_reward_pbrs_nonempty():
     """Non-empty grids get PBRS shaping term (reward differs from gamma=0)."""
     prev = _empty_grid()
@@ -323,10 +340,13 @@ def test_compute_reward_pbrs_empty_no_change():
 
 # --- normalize_features ----------------------------------------------
 
+
 def test_normalize_features():
     from tetris.ai.rewards import FEATURE_MEANS, FEATURE_STDS, normalize_features
-    raw = np.array([2.0, 5.0, 50.0, 5.0, 10.0, 30.0, 20.0, 5.0, 5.0, 5.0,
-                    0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0], dtype=np.float32)
+
+    raw = np.array(
+        [2.0, 5.0, 50.0, 5.0, 10.0, 30.0, 20.0, 5.0, 5.0, 5.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0], dtype=np.float32
+    )
     norm = normalize_features(raw)
     assert norm.shape == (17,)
     assert norm.dtype == np.float32
@@ -339,9 +359,10 @@ def test_normalize_features():
 
 # --- soft_drop_placements --------------------------------------------
 
+
 def test_soft_drop_placements_empty():
     """Empty board: all standard hard-drop positions reachable."""
-    # soft_drop_placements is imported from tetris.game.rules at top level
+    # soft_drop_placements is imported from tetris.ai.candidates at top level
     placements = soft_drop_placements(_empty_grid(), "O")
     assert len(placements) > 0
     # O-piece has 1 rotation, spans 2 columns → 9 positions on empty board
@@ -350,7 +371,7 @@ def test_soft_drop_placements_empty():
 
 def test_soft_drop_placements_overhang():
     """Board with overhang: placement under overhang is reachable."""
-    # soft_drop_placements is imported from tetris.game.rules at top level
+    # soft_drop_placements is imported from tetris.ai.candidates at top level
     grid = _empty_grid()
     # Create overhang: fill row 17 cols 0-3, leave gap at col 0-1 below
     grid[17, 0] = 1
@@ -361,7 +382,7 @@ def test_soft_drop_placements_overhang():
     placements = soft_drop_placements(grid, "I")
     # Should find placements at bottom (row 18-19) that hard-drop would miss
     # because the overhang blocks direct drop from top
-    y_coords = {py for _, _, py, _ in placements}
+    y_coords = {p.py for p in placements}
     assert 18 in y_coords or 19 in y_coords  # can reach below overhang
 
 
@@ -384,7 +405,7 @@ def _diverse_grids(n=36, seed=42):
     grids = [np.zeros((BOARD_HEIGHT, BOARD_WIDTH), dtype=np.float32)]
     grids.append(np.ones((BOARD_HEIGHT, BOARD_WIDTH), dtype=np.float32))
     g = np.zeros((BOARD_HEIGHT, BOARD_WIDTH), dtype=np.float32)
-    g[BOARD_HEIGHT // 2:, :] = 1.0
+    g[BOARD_HEIGHT // 2 :, :] = 1.0
     grids.append(g)
     for _ in range(n - 3):
         g = np.zeros((BOARD_HEIGHT, BOARD_WIDTH), dtype=np.float32)
@@ -452,7 +473,7 @@ def test_dellacherie_value_batch_full_board():
 def test_dellacherie_value_batch_half_board():
     """Half-filled board."""
     g = np.zeros((BOARD_HEIGHT, BOARD_WIDTH), dtype=np.float32)
-    g[BOARD_HEIGHT // 2:, :] = 1.0
+    g[BOARD_HEIGHT // 2 :, :] = 1.0
     stacked = np.stack([g])
     vals = dellacherie_value_batch(stacked)
     assert np.isclose(vals[0], dellacherie_value(g), atol=1e-5)
@@ -468,6 +489,7 @@ def test_dellacherie_value_batch_preserves_input():
 
 
 # --- slice-based transition equivalence -----------------------------
+
 
 def test_row_transitions_slice_matches_pad():
     """Slice-based row_transitions matches known-good values."""
@@ -608,6 +630,7 @@ def test_vectorized_heuristics_diverse_consistency():
 
 # --- extract_features_batch equivalence -----------------------------
 
+
 def test_extract_features_batch_empty():
     """Empty batch → (0, 17) array."""
     grids = np.zeros((0, BOARD_HEIGHT, BOARD_WIDTH), dtype=np.float32)
@@ -619,7 +642,7 @@ def test_extract_features_batch_empty():
 def test_extract_features_batch_single():
     """N=1 matches scalar extract_features."""
     g = np.zeros((BOARD_HEIGHT, BOARD_WIDTH), dtype=np.float32)
-    g[BOARD_HEIGHT // 2:, :] = 1.0
+    g[BOARD_HEIGHT // 2 :, :] = 1.0
     stacked = g[np.newaxis]
     lines = np.array([2], dtype=np.int32)
     piece_types = [_PIECE_TYPES[0]]
@@ -637,10 +660,7 @@ def test_extract_features_batch_matches_scalar():
     lines = rng.integers(0, 5, size=36).astype(np.int32)
     piece_types = [_PIECE_TYPES[i % len(_PIECE_TYPES)] for i in range(36)]
     batch = extract_features_batch(stacked, lines, piece_types)
-    scalar = np.array([
-        extract_features(g, int(l), pt)
-        for g, l, pt in zip(grids, lines, piece_types)
-    ])
+    scalar = np.array([extract_features(g, int(l), pt) for g, l, pt in zip(grids, lines, piece_types)])
     assert batch.shape == (36, 17)
     assert np.allclose(batch, scalar, atol=1e-5), f"max diff={np.max(np.abs(batch - scalar))}"
 

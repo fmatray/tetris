@@ -296,6 +296,19 @@ classDiagram
         %% Module-level functions: _drop_interval(level: int) -> float
         %% Module-level functions: _music_speed_for_level(level: int) -> float
 
+        class PendingTransition {
+            +state: np.ndarray
+            +reward: float
+            +done: bool
+        }
+
+        class MoveRecord {
+            +piece: str
+            +rot: int
+            +col: int
+            +hold: bool
+        }
+
         class AIState {
             +ghost_piece: bool
             +agent: DQNAgent
@@ -307,13 +320,12 @@ classDiagram
             +lookahead: bool
             +lookahead_depth: int
             +soft_drop: bool
-            - _candidate_placements: list~tuple~int, int, int, bool~~
+            - _candidate_placements: list~Placement~
             - _handicap: int
             +episode_steps: int
             +episode_start_grid: np.ndarray
-            - _prev_state: np.ndarray | None
-            - _prev_reward: float | None
-            - _prev_done: bool
+            - _pending: PendingTransition | None
+            - _last_moves: list~MoveRecord~
             - _prev_action: int | None
             - _action_timer: float
             +curriculum: bool
@@ -339,6 +351,7 @@ classDiagram
         %% Module-level function: iter_column_positions(piece_type: str) -> Iterator
         %% Module-level function: best_next_placement(grid: np.ndarray, piece_type: str) -> np.ndarray
         %% Module-level function: gen_placements(base_grid: np.ndarray, piece_type: str, soft_drop: bool) -> Iterator
+        %% Module-level function: soft_drop_placements(grid, piece_type: str) -> list[Placement]
         %% Module-level function: get_candidate_states(...) -> tuple
         %% Module-level function: draw_ai_hud(ai_state) -> None
         %% Module-level function: _hud_table_rows(log, stats, episode_steps: int) -> list
@@ -405,7 +418,7 @@ classDiagram
 
 
         %% rules.py — grid-agnostic game-rule functions (module-level, not a class):
-        %% shape_fits, try_rotation, hard_drop_y, soft_drop_placements, place_cells, find_full_rows
+        %% shape_fits, try_rotation, hard_drop_y, place_cells, find_full_rows
         %% Shared between Board (list grid) and AI simulation (numpy grid)
         class Tetromino {
             +type: str
@@ -532,6 +545,14 @@ classDiagram
             +reward: float
             +next_state: np.ndarray
             +done: bool
+        }
+
+        class Placement {
+            +piece_type: str
+            +rot: int
+            +px: int
+            +py: int
+            +hold: bool
         }
 
         class DQNAgent {
@@ -720,6 +741,12 @@ classDiagram
             +fade_alpha() float
             +draw(screen: pygame.Surface) None
         }
+
+        class ColumnDef {
+            +label: str
+            +width: int
+            +align: str
+        }
     }
     %% Module-level functions: draw_leaderboard(screen, font) -> None
     %% Module-level functions: render_score_graph(episodes, scores) -> pygame.Surface
@@ -749,7 +776,7 @@ classDiagram
             +__init__(sound_volume: int, music_volume: int, song: str) None
             - _init_sounds() None
             %% static
-            +_parse_midi(path: str) list~tuple~float, float, int~~
+            +_parse_midi(path: str) list~MidiNote~
             %% static
             +_apply_envelope(n: int, attack_max: int, release_max: int) np.ndarray
             - _generate_music() None
@@ -762,6 +789,12 @@ classDiagram
             +set_music_speed(speed: float) None
             +toggle_mute() None
             +apply_settings(sound_volume: int, music_volume: int, song: str) None
+        }
+
+        class MidiNote {
+            +start: float
+            +duration: float
+            +note: int
         }
     }
     %% Module-level functions: ensure_midi_files() -> None

@@ -16,8 +16,24 @@ from tetris.ai.rewards import (
     place_and_clear_batch,
 )
 from tetris.game import rules
-from tetris.game.rules import hard_drop_y, hard_drop_y_batch, soft_drop_placements
+from tetris.game.rules import hard_drop_y, hard_drop_y_batch, try_rotation
 from tetris.settings import BOARD_WIDTH, SHAPES
+
+from typing import NamedTuple
+
+
+class Placement(NamedTuple):
+    """A piece placement: piece type, rotation, column, row, hold flag.
+
+    shape is derivable: SHAPES[piece_type][rot].
+    """
+
+    piece_type: str
+    rot: int
+    px: int
+    py: int
+    hold: bool
+
 
 NUM_ROTATIONS = 4
 
@@ -67,10 +83,69 @@ def best_next_placement(grid: np.ndarray, piece_type: str) -> np.ndarray:
     return sim_grids[best_idx]
 
 
-def gen_placements(
-    base_grid: np.ndarray, piece_type: str, soft_drop: bool
-) -> Iterator[tuple[list[tuple[int, int]], int, int, int]]:
-    """Yield (shape, px, py, rot) for all valid placements of a piece type."""
+def soft_drop_placements(
+    grid,
+    piece_type: str,
+) -> list[Placement]:
+    """Enumerate ALL reachable placements via BFS over (x, y, rotation).
+
+    Returns list of Placement — every position the piece can reach by
+    moving left/right, soft-dropping, and rotating (with SRS wall kicks).
+    This includes placements under overhangs that hard-drop cannot reach.
+    """
+    # ponytail: numpy scalar indexing (grid[y][x]) is ~5× slower than list
+    # indexing. Convert once — amortized over ~750 shape_fits calls.
+    if isinstance(grid, np.ndarray):
+        grid = grid.tolist()
+    num_rots = len(SHAPES[piece_type])
+    spawn_x = BOARD_WIDTH // 2 - 2
+    spawn_y = 0
+    # ponytail: BFS frontier — state = (x, y, rot). O(W*H*4) states.
+    visited: set[tuple[int, int, int]] = set()
+    frontier: list[tuple[int, int, int]] = [(spawn_x, spawn_y, 0)]
+    visited.add((spawn_x, spawn_y, 0))
+    placements: list[Placement] = []
+    seen_placements: set[tuple[int, int, int]] = set()
+
+    while frontier:
+        x, y, rot = frontier.pop()
+        shape = SHAPES[piece_type][rot]
+
+        # Try left
+        if rules.shape_fits(grid, shape, x - 1, y) and (x - 1, y, rot) not in visited:
+            visited.add((x - 1, y, rot))
+            frontier.append((x - 1, y, rot))
+
+        # Try right
+        if rules.shape_fits(grid, shape, x + 1, y) and (x + 1, y, rot) not in visited:
+            visited.add((x + 1, y, rot))
+            frontier.append((x + 1, y, rot))
+
+        # Try soft drop (y+1)
+        if rules.shape_fits(grid, shape, x, y + 1):
+            if (x, y + 1, rot) not in visited:
+                visited.add((x, y + 1, rot))
+                frontier.append((x, y + 1, rot))
+        else:
+            # Can't drop further — this is a landing position
+            key = (x, y, rot)
+            if key not in seen_placements:
+                seen_placements.add(key)
+                placements.append(Placement(piece_type, rot, x, y, False))
+
+        # Try rotations CW and CCW
+        for direction in (1, -1):
+            to_rot = (rot + direction) % num_rots
+            result = try_rotation(grid, piece_type, rot, to_rot, x, y)
+            if result and (*result, to_rot) not in visited:
+                visited.add((*result, to_rot))
+                frontier.append((*result, to_rot))
+
+    return placements
+
+
+def gen_placements(base_grid: np.ndarray, piece_type: str, soft_drop: bool) -> Iterator[Placement]:
+    """Yield Placement for all valid placements of a piece type."""
     if soft_drop:
         yield from soft_drop_placements(base_grid, piece_type)
     else:
@@ -80,7 +155,7 @@ def gen_placements(
             py = hard_drop_y(base_grid, shape, px)
             if py < 0:
                 continue
-            yield (shape, px, py, rot)
+            yield Placement(piece_type, rot, px, py, False)
 
 
 def get_candidate_states(
@@ -93,13 +168,12 @@ def get_candidate_states(
     soft_drop: bool,
     lookahead: bool,
     lookahead_depth: int,
-) -> tuple[np.ndarray, list[int], np.ndarray, list[tuple[int, int, int, bool]]]:
+) -> tuple[np.ndarray, list[int], np.ndarray, list[Placement]]:
     """Enumerate valid placements, simulate drop + line clear, extract features.
 
     Returns (candidate_states[N,17], action_ids[N], dellacherie_values[N],
-    placements). action_id = placement index (0..N-1). Placements stored as
-    [(rot, px, py, hold), ...]. Includes hold candidates when ``can_hold`` is
-    True.
+    placements). action_id = placement index (0..N-1). Includes hold
+    candidates when ``can_hold`` is True.
 
     Batched: collects all placements first, then runs place_and_clear_batch,
     lookahead, extract_features_batch, and dellacherie_value_batch in two
@@ -107,20 +181,14 @@ def get_candidate_states(
     """
     upcoming_types = [next_piece_type] + preview_piece_types
 
+    all_placements: list[Placement] = []
     all_shapes: list[list[tuple[int, int]]] = []
-    all_pxs: list[int] = []
-    all_pys: list[int] = []
-    all_rots: list[int] = []
-    all_holds: list[bool] = []
     all_next_piece_types: list[str] = []
 
     # Non-hold candidates: place current piece
-    for shape, px, py, rot in gen_placements(base_grid, current_piece_type, soft_drop):
-        all_shapes.append(shape)
-        all_pxs.append(px)
-        all_pys.append(py)
-        all_rots.append(rot)
-        all_holds.append(False)
+    for p in gen_placements(base_grid, current_piece_type, soft_drop):
+        all_placements.append(p)
+        all_shapes.append(SHAPES[p.piece_type][p.rot])
         all_next_piece_types.append(upcoming_types[0] if upcoming_types else "I")
 
     # Hold candidates (if can hold): place the held/next piece instead
@@ -132,15 +200,12 @@ def get_candidate_states(
             # No held piece: current → hold, next → current, preview shifts.
             hold_upcoming = preview_piece_types
             hold_piece_type = next_piece_type
-        for shape, px, py, rot in gen_placements(base_grid, hold_piece_type, soft_drop):
-            all_shapes.append(shape)
-            all_pxs.append(px)
-            all_pys.append(py)
-            all_rots.append(rot)
-            all_holds.append(True)
+        for p in gen_placements(base_grid, hold_piece_type, soft_drop):
+            all_placements.append(Placement(p.piece_type, p.rot, p.px, p.py, True))
+            all_shapes.append(SHAPES[p.piece_type][p.rot])
             all_next_piece_types.append(hold_upcoming[0] if hold_upcoming else "I")
 
-    if not all_shapes:
+    if not all_placements:
         return (
             np.empty((0, 17), dtype=np.float32),
             [],
@@ -148,14 +213,14 @@ def get_candidate_states(
             [],
         )
 
-    placements = list(zip(all_rots, all_pxs, all_pys, all_holds))
-
     # Batch place + clear
+    all_pxs = [p.px for p in all_placements]
+    all_pys = [p.py for p in all_placements]
     sim_grids, lines_cleared = place_and_clear_batch(base_grid, all_shapes, all_pxs, all_pys)
 
     # Lookahead (per-candidate — each depends on its own sim_grid)
     if lookahead:
-        for i in range(len(all_shapes)):
+        for i in range(len(all_placements)):
             for pt in upcoming_types[:lookahead_depth]:
                 sim_grids[i] = best_next_placement(sim_grids[i], pt)
 
@@ -163,5 +228,5 @@ def get_candidate_states(
     candidates = extract_features_batch(sim_grids, lines_cleared, all_next_piece_types)
     dellacherie_values = dellacherie_value_batch(sim_grids)
 
-    actions = list(range(len(all_shapes)))
-    return candidates, actions, dellacherie_values, placements
+    actions = list(range(len(all_placements)))
+    return candidates, actions, dellacherie_values, all_placements

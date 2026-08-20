@@ -1,5 +1,6 @@
 """Procedural audio: NumPy-generated SFX + MIDI-based polyphonic music."""
 
+from typing import NamedTuple
 import mido
 import numpy as np
 import pygame
@@ -10,6 +11,14 @@ from tetris.settings import (
     MUSIC_SONG_PATHS,
     VOLUME_LEVELS,
 )
+
+
+class MidiNote(NamedTuple):
+    """A parsed MIDI note: start time, duration, MIDI note number."""
+
+    start: float
+    duration: float
+    note: int
 
 
 class AudioManager:
@@ -83,14 +92,14 @@ class AudioManager:
     # --- MIDI parsing ---------------------------------------------------
 
     @staticmethod
-    def _parse_midi(path: str) -> list[tuple[float, float, int]]:
+    def _parse_midi(path: str) -> list[MidiNote]:
         """Parse a MIDI file into a list of (start_sec, duration_sec, note).
 
         Handles tempo changes mid-file. Overlapping notes are preserved
         for polyphony. Returns notes sorted by start time.
         """
         mid = mido.MidiFile(path)
-        notes: list[tuple[float, float, int]] = []
+        notes: list[MidiNote] = []
         # Iterate merged tracks — mido yields events in chronological order
         # across all tracks, with correct delta times including tempo changes.
         abs_sec = 0.0
@@ -102,7 +111,7 @@ class AudioManager:
             elif msg.type == "note_off" or (msg.type == "note_on" and msg.velocity == 0):
                 start = active.pop(msg.note, None)
                 if start is not None:
-                    notes.append((start, abs_sec - start, msg.note))
+                    notes.append(MidiNote(start, abs_sec - start, msg.note))
         notes.sort(key=lambda n: n[0])
         return notes
 
@@ -125,7 +134,7 @@ class AudioManager:
         notes = self._parse_midi(path)
         if not notes:
             return
-        self._music_duration = max(n[0] + n[1] for n in notes)
+        self._music_duration = max(n.start + n.duration for n in notes)
         total_samples = int(self._SAMPLE_RATE * self._music_duration)
         if total_samples <= 0:
             return

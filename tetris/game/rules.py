@@ -109,68 +109,6 @@ def hard_drop_y_batch(
     return results
 
 
-def soft_drop_placements(
-    grid,
-    piece_type: str,
-) -> list[tuple[list[tuple[int, int]], int, int, int]]:
-    """Enumerate ALL reachable placements via BFS over (x, y, rotation).
-
-    Returns list of (shape, px, py, rotation) tuples — every position the
-    piece can reach by moving left/right, soft-dropping, and rotating (with
-    SRS wall kicks). This includes placements under overhangs that hard-drop
-    cannot reach.
-    """
-    # ponytail: numpy scalar indexing (grid[y][x]) is ~5× slower than list
-    # indexing. Convert once — amortized over ~750 shape_fits calls.
-    if isinstance(grid, np.ndarray):
-        grid = grid.tolist()
-    num_rots = len(SHAPES[piece_type])
-    spawn_x = BOARD_WIDTH // 2 - 2
-    spawn_y = 0
-    # ponytail: BFS frontier — state = (x, y, rot). O(W*H*4) states.
-    visited: set[tuple[int, int, int]] = set()
-    frontier: list[tuple[int, int, int]] = [(spawn_x, spawn_y, 0)]
-    visited.add((spawn_x, spawn_y, 0))
-    placements: list[tuple[list[tuple[int, int]], int, int, int]] = []
-    seen_placements: set[tuple[int, int, int]] = set()
-
-    while frontier:
-        x, y, rot = frontier.pop()
-        shape = SHAPES[piece_type][rot]
-
-        # Try left
-        if shape_fits(grid, shape, x - 1, y) and (x - 1, y, rot) not in visited:
-            visited.add((x - 1, y, rot))
-            frontier.append((x - 1, y, rot))
-
-        # Try right
-        if shape_fits(grid, shape, x + 1, y) and (x + 1, y, rot) not in visited:
-            visited.add((x + 1, y, rot))
-            frontier.append((x + 1, y, rot))
-
-        # Try soft drop (y+1)
-        if shape_fits(grid, shape, x, y + 1):
-            if (x, y + 1, rot) not in visited:
-                visited.add((x, y + 1, rot))
-                frontier.append((x, y + 1, rot))
-        else:
-            # Can't drop further — this is a landing position
-            key = (x, y, rot)
-            if key not in seen_placements:
-                seen_placements.add(key)
-                placements.append((shape, x, y, rot))
-
-        # Try rotations CW and CCW
-        for direction in (1, -1):
-            to_rot = (rot + direction) % num_rots
-            result = try_rotation(grid, piece_type, rot, to_rot, x, y)
-            if result and (*result, to_rot) not in visited:
-                visited.add((*result, to_rot))
-                frontier.append((*result, to_rot))
-
-    return placements
-
-
 def place_cells(grid, shape, x: int, y: int, value) -> None:
     """Write *value* at each shape cell. Mutates grid in place.
 
