@@ -35,7 +35,7 @@ from tetris.audio import AudioManager
 from tetris.game.board import Board, LineClearResult
 from tetris.game.piece_provider import PieceProvider
 from tetris.game.stats import GameStats
-from tetris.game.tetromino import Tetromino
+from tetris.game.tetromino import SHAPES, Tetromino
 from tetris.logger import get_logger
 from tetris.settings import (
     AI_ACTION_DELAY_MS,
@@ -45,7 +45,6 @@ from tetris.settings import (
     LOCK_DELAY_MS,
     LOG_PATH,
     MODEL_PATH,
-    SHAPES,
 )
 from tetris.states.base import State
 from tetris.states.game import GameState

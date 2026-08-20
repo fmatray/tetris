@@ -12,6 +12,7 @@ import random
 
 import pygame
 
+from tetris.game.tetromino import SHAPES
 from tetris.settings import (
     MENU_ANIM_BLOCK_SIZE,
     MENU_ANIM_EXPLODE_CHANCE,
@@ -26,7 +27,6 @@ from tetris.settings import (
     MENU_ANIM_ROT_INTERVAL,
     SCREEN_HEIGHT,
     SCREEN_WIDTH,
-    SHAPES,
     SHAPES_COLORS,
 )
 from tetris.visuals.particles import ParticleSystem

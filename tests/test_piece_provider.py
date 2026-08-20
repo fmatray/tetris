@@ -14,7 +14,8 @@ from tetris.game.piece_provider import (
     SevenBagGenerator,
     WeightedGenerator,
 )
-from tetris.settings import FIRST_PIECE_TYPES, SHAPES
+from tetris.game.tetromino import SHAPES
+from tetris.settings import FIRST_PIECE_TYPES
 
 
 def test_normal_mode_returns_valid_types():

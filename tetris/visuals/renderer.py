@@ -15,7 +15,7 @@ from typing import TYPE_CHECKING
 import pygame
 
 from tetris.game.board import Board
-from tetris.game.tetromino import Tetromino
+from tetris.game.tetromino import SHAPES, Tetromino
 from tetris.settings import (
     BLACK,
     BLOCK_SIZE,
@@ -32,7 +32,6 @@ from tetris.settings import (
     HUD_POSITIONS,
     SCREEN_HEIGHT,
     SCREEN_WIDTH,
-    SHAPES,
     SHAPES_COLORS,
     VISIBLE_ROWS,
     WHITE,

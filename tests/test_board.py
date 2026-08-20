@@ -3,8 +3,8 @@
 import pytest
 
 from tetris.game.board import Board
-from tetris.game.tetromino import Tetromino
-from tetris.settings import BOARD_HEIGHT, BOARD_WIDTH, SHAPES
+from tetris.game.tetromino import SHAPES, Tetromino
+from tetris.settings import BOARD_HEIGHT, BOARD_WIDTH
 
 
 @pytest.fixture

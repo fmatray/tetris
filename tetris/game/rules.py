@@ -9,13 +9,35 @@ from __future__ import annotations
 
 import numpy as np
 
+from tetris.game.tetromino import SHAPES
 from tetris.settings import (
     BOARD_HEIGHT,
     BOARD_WIDTH,
-    SHAPES,
-    SRS_KICKS_I,
-    SRS_KICKS_JLSTZ,
 )
+
+# --- SRS wall kick data (https://tetris.wiki/Super_Rotation_System) -----
+# Format: {(from_state, to_state): [(dx, dy), ...]}
+# dx: horizontal offset, dy: vertical offset (positive = up, screen y inverted)
+SRS_KICKS_JLSTZ: dict[tuple[int, int], list[tuple[int, int]]] = {
+    (0, 1): [(0, 0), (-1, 0), (-1, 1), (0, -2), (-1, -2)],
+    (1, 0): [(0, 0), (1, 0), (1, -1), (0, 2), (1, 2)],
+    (1, 2): [(0, 0), (1, 0), (1, -1), (0, 2), (1, 2)],
+    (2, 1): [(0, 0), (-1, 0), (-1, 1), (0, -2), (-1, -2)],
+    (2, 3): [(0, 0), (1, 0), (1, 1), (0, -2), (1, -2)],
+    (3, 2): [(0, 0), (-1, 0), (-1, -1), (0, 2), (-1, 2)],
+    (3, 0): [(0, 0), (-1, 0), (-1, -1), (0, 2), (-1, 2)],
+    (0, 3): [(0, 0), (1, 0), (1, 1), (0, -2), (1, -2)],
+}
+SRS_KICKS_I: dict[tuple[int, int], list[tuple[int, int]]] = {
+    (0, 1): [(0, 0), (-2, 0), (1, 0), (-2, -1), (1, 2)],
+    (1, 0): [(0, 0), (2, 0), (-1, 0), (2, 1), (-1, -2)],
+    (1, 2): [(0, 0), (-1, 0), (2, 0), (-1, 2), (2, -1)],
+    (2, 1): [(0, 0), (1, 0), (-2, 0), (1, -2), (-2, 1)],
+    (2, 3): [(0, 0), (2, 0), (-1, 0), (2, 1), (-1, -2)],
+    (3, 2): [(0, 0), (1, 0), (-2, 0), (1, 2), (-2, -1)],
+    (3, 0): [(0, 0), (1, 0), (-2, 0), (1, -2), (-2, 1)],
+    (0, 3): [(0, 0), (-1, 0), (2, 0), (-1, 2), (2, -1)],
+}
 
 
 def is_occupied(grid, x: int, y: int) -> bool:

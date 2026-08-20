@@ -4,12 +4,11 @@ import random
 from typing import NamedTuple
 
 from tetris.game import rules
-from tetris.game.tetromino import Tetromino
+from tetris.game.tetromino import SHAPES, Tetromino
 from tetris.settings import (
     BOARD_HEIGHT,
     BOARD_WIDTH,
     GRAY,
-    SHAPES,
 )
 
 

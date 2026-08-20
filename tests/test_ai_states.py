@@ -16,14 +16,13 @@ from tetris.ai.agent import DQNAgent
 from tetris.ai.trainer import TrainingLog
 from tetris.audio import AudioManager
 from tetris.game.piece_provider import PieceProvider
-from tetris.game.tetromino import Tetromino
+from tetris.game.tetromino import SHAPES, Tetromino
 from tetris.settings import (
     BOARD_HEIGHT,
     BOARD_WIDTH,
     GRAY,
     LOG_PATH,
     MODEL_PATH,
-    SHAPES,
 )
 from tetris.ai.candidates import iter_column_positions, best_next_placement, gen_placements
 from tetris.ai.hud import _hud_table_rows, _trend_arrow, draw_ai_hud

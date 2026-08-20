@@ -10,7 +10,8 @@ from __future__ import annotations
 import numpy as np
 
 from tetris.game.rules import find_full_rows, place_cells
-from tetris.settings import BOARD_HEIGHT, BOARD_WIDTH, SHAPES
+from tetris.game.tetromino import SHAPES
+from tetris.settings import BOARD_HEIGHT, BOARD_WIDTH
 
 PIECE_TYPES = list(SHAPES.keys())  # ["I", "O", "T", "S", "Z", "J", "L"]
 

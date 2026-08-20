@@ -15,7 +15,8 @@ from tetris.game.rules import (
     shape_fits,
 )
 from tetris.ai.candidates import hard_drop_y_batch, soft_drop_placements
-from tetris.settings import BOARD_HEIGHT, BOARD_WIDTH, SHAPES
+from tetris.game.tetromino import SHAPES
+from tetris.settings import BOARD_HEIGHT, BOARD_WIDTH
 
 
 def _empty_grid():

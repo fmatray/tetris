@@ -1,7 +1,6 @@
 """Tests for Tetromino: type, shape, rotation, movement."""
 
-from tetris.game.tetromino import Tetromino
-from tetris.settings import SHAPES
+from tetris.game.tetromino import SHAPES, Tetromino
 
 
 def test_default_type_is_valid():

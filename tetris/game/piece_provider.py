@@ -29,7 +29,8 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 
 from tetris.logger import get_logger
-from tetris.settings import FIRST_PIECE_TYPES, REPLAY_PATH, SHAPES
+from tetris.game.tetromino import SHAPES
+from tetris.settings import FIRST_PIECE_TYPES, REPLAY_PATH
 
 _logger = get_logger("piece_provider")
 

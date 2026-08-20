@@ -17,7 +17,8 @@ from tetris.ai.rewards import (
 )
 from tetris.game import rules
 from tetris.game.rules import hard_drop_y, try_rotation
-from tetris.settings import BOARD_HEIGHT, BOARD_WIDTH, SHAPES
+from tetris.game.tetromino import SHAPES
+from tetris.settings import BOARD_HEIGHT, BOARD_WIDTH
 
 from typing import NamedTuple
 
