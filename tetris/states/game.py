@@ -40,6 +40,8 @@ _logger = get_logger("game")
 
 def _drop_interval(level: int, drop_step: float) -> float:
     """Seconds per row at the given level (Tetris Guideline gravity)."""
+    if drop_step == 0:
+        return DROP_BASE
     base = max(DROP_MIN_INTERVAL, DROP_BASE - level * drop_step)
     return max(DROP_MIN_INTERVAL, base**level)
 
