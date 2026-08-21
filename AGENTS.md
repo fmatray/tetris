@@ -25,7 +25,7 @@ Returning a new `State` from `handle_event`/`update` transitions the app; `None`
 - `tetris/storage/` — JSON persistence (leaderboard, human stats)
 - `tetris/states/` — FSM states binding input → game logic → rendering
 - `tetris/ai/` — V-network DQN agent, DT-20 features, PBRS reward shaping, PER, n-step returns, soft-drop BFS, training log
-- `tetris/mcp_server.py` — MCP HTTP server (FastMCP): exposes `play` tool + board/rules resources to external agents
+- `tetris/mcp_server.py` — MCP HTTP server (FastMCP): exposes `play` + `start_game` tools and board/rules resources to external agents
 ### State Machine Tree
 
 ```
@@ -33,7 +33,7 @@ MenuState (root, owns settings)
 ├── GameRulesMenuState (generator, preview, handicap, speed, ghost piece)
 ├── HumanMenuState → { KeybindState, HumanStatsState }
 ├── AIMenuState → { TrainingMenuState → { HyperparamMenuState, PlaceholderState }, AIStatsState }
-├── MCPMenuState (port, jouer, retour)
+├── MCPMenuState (port, retour)
 ├── AudioMenuState
 ├── GameState   (abstract base: board, pieces, gravity, lock delay)
 │   ├── HumanState (human gameplay: keyboard, DAS, pause)
@@ -117,8 +117,8 @@ python -m tetris.verify_training
 | `tetris/states/human.py` | `HumanState` — human gameplay: keyboard, DAS, pause, keybind setup |
 | `tetris/states/ai.py` | AI gameplay state + RL training integration (candidate generation and HUD rendering extracted to `tetris/ai/candidates.py` and `tetris/ai/hud.py`); `AIConfig` dataclass (DQN hyperparameters) |
 | `tetris/states/mcp.py` | `MCPState` — MCP gameplay (inherits `GameState`); `MCPConfig` dataclass (port); `draw_mcp_hud()` debug HUD. Game frozen between `play()` calls |
-| `tetris/states/mcp_menu.py` | `MCPMenuState` — MCP sub-menu: port selection, start, back |
-| `tetris/mcp_server.py` | `TetrisMCPServer` — MCP HTTP server (FastMCP streamable-http): `play` tool + `board://state` + `tetris://rules` resources. Daemon thread, queue-based communication with `MCPState` |
+| `tetris/states/mcp_menu.py` | `MCPMenuState` — MCP sub-menu: port selection, back |
+| `tetris/mcp_server.py` | `TetrisMCPServer` — MCP HTTP server (FastMCP streamable-http): `play` + `start_game` tools, `board://state` + `tetris://rules` resources. Daemon thread, queue-based communication with `MCPState` |
 | `tetris/ai/agent.py` | `DQNAgent` — `select_action`, `store`, `learn`, `save`, `load` |
 | `tetris/ai/candidates.py` | Candidate placement generation — `iter_column_positions`, `best_next_placement`, `gen_placements`, `get_candidate_states`, `soft_drop_placements`, `hard_drop_y_batch` (moved from `tetris/game/rules.py`). `Placement` NamedTuple. Pure functions, no instance state |
 | `tetris/ai/hud.py` | AI training HUD rendering — training params table, stats table, last-5-moves. Pure presentation |

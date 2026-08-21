@@ -14,9 +14,12 @@ from typing import TYPE_CHECKING, Any, ClassVar
 import pygame
 
 from tetris.ai.rewards import board_to_grid
+from tetris.game.board import Board
+from tetris.game.stats import GameStats
+from tetris.game.tetromino import Tetromino
 from tetris.logger import get_logger
-from tetris.settings import HUD_POSITIONS
-from tetris.states.game import GameConfig, GameState
+from tetris.settings import HUD_POSITIONS, SPEED_MODES
+from tetris.states.game import GameConfig, GameState, _drop_interval
 from tetris.visuals.particles import ParticleSystem
 
 if TYPE_CHECKING:
@@ -52,6 +55,7 @@ class MCPState(GameState):
         "soft_drop": "_soft_drop",
         "hard_drop": "_hard_drop",
         "hold": "_hold",
+        "start_game": "_reset_game",
     }
 
     def __init__(
@@ -68,6 +72,7 @@ class MCPState(GameState):
         super().__init__(screen, font, audio, config, piece_provider, menu)
         self.player_type = "MCP"
         self.mcp_config = mcp_config
+        self._handicap = config.handicap
         self._action_queue: queue.Queue[tuple[list[str], int, queue.Queue[dict[str, Any]]]] = queue.Queue()
         self._server: TetrisMCPServer | None = None
         self._last_tool_call: dict[str, Any] | None = None
@@ -100,6 +105,28 @@ class MCPState(GameState):
                 results.append(f"unknown:{action}")
         return results
 
+    def _reset_game(self) -> None:
+        """Reset all game state for a fresh game (called via ``start_game`` tool)."""
+        self.game_over = False
+        self.paused = False
+        self.drop_time = 0.0
+        self.down_pressed = False
+        self._lock_timer = 0.0
+        self._lock_resets = 0
+        self._grounded = False
+        self._last_level = 0
+        self._pending_level_up = False
+        self.pieces.reset()
+        self.board = Board()
+        self.board.apply_handicap(self._handicap)
+        self.current_piece = Tetromino(self.pieces.next_type())
+        self.next_piece = Tetromino(self.pieces.next_type())
+        self.preview_pieces = [Tetromino(self.pieces.next_type()) for _ in range(max(0, self.preview_count - 1))]
+        self.hold_piece = None
+        self._can_hold = True
+        self.stats = GameStats()
+        self.current_speed = _drop_interval(0, SPEED_MODES[self.speed_mode])
+
     def _board_snapshot(self, action_results: list[str] | None = None) -> dict[str, Any]:
         """Return current board state as a dict for the MCP client."""
         grid = board_to_grid(self.board)
@@ -107,6 +134,7 @@ class MCPState(GameState):
             "board": grid.astype(int).tolist(),
             "current_piece": self.current_piece.type,
             "next_piece": self.next_piece.type,
+            "preview_pieces": [p.type for p in self.preview_pieces],
             "hold_piece": self.hold_piece.type if self.hold_piece else None,
             "can_hold": self._can_hold,
             "score": self.stats.score,
@@ -176,7 +204,7 @@ def draw_mcp_hud(screen: pygame.Surface, font: pygame.font.Font, state: MCPState
     x, y = HUD_POSITIONS["mcp_hud"]
     lines: list[str] = []
     server_status = "Actif" if state._server is not None else "Arrêté"
-    lines.append(f"MCP: {server_status} :{state.mcp_config.port}")
+    lines.append(f"MCP (127.0.0.1:{state.mcp_config.port}) — {server_status}")
     if state._last_tool_call is not None:
         tc = state._last_tool_call
         lines.append(f"Actions: {', '.join(tc['actions']) or '(aucune)'}")
@@ -188,4 +216,4 @@ def draw_mcp_hud(screen: pygame.Surface, font: pygame.font.Font, state: MCPState
         lines.append(f"Game Over: {'Oui' if snap['game_over'] else 'Non'}")
     for i, text in enumerate(lines):
         surf = font.render(text, True, (200, 200, 200))
-        screen.blit(surf, (x, y + i * 20))
+        screen.blit(surf, (x, y + i * 28))

@@ -35,7 +35,6 @@ Menu principal
 │       Retour                    [ENTER | ESC]
 ├── MCP                            [ENTER]          (grisé si Joueur≠MCP)
 │   └── Port                       [toggle ◄ ►]     8765 ↔ 8766 ↔ 8767 ↔ 8768
-│       Jouer                     [ENTER]          → lance la partie MCP
 │       Retour                    [ENTER | ESC]
 ├── Règles du jeu                 [ENTER]          → game rules submenu
 │   └── Générateur                [toggle ◄ ►]     Aléatoire ↔ 7-bag ↔ 35-bag ↔ Pondéré

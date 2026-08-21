@@ -1,4 +1,4 @@
-"""MCP sub-menu: port selection and game launch."""
+"""MCP sub-menu: port selection."""
 
 from __future__ import annotations
 
@@ -12,9 +12,9 @@ if TYPE_CHECKING:
 
 
 class MCPMenuState(MenuBase):
-    """MCP sub-menu: port configuration, start, back."""
+    """MCP sub-menu: port configuration and back."""
 
-    _OPTIONS = ("Port", "Jouer", "Retour")
+    _OPTIONS = ("Port", "Retour")
     _toggle_indices = frozenset({0})  # only Port toggles
     _title = "MCP"
     _instructions = "← →: Changer    Entrée: Valider    Échap: Retour"
@@ -50,8 +50,6 @@ class MCPMenuState(MenuBase):
         match self.selection:
             case 0:  # Port — toggle only
                 return None
-            case 1:  # Jouer
-                return self.menu._build_mcp_state()
-            case 2:  # Retour
+            case 1:  # Retour
                 return self._on_back()
         return None

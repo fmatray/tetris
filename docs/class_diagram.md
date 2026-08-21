@@ -446,6 +446,7 @@ classDiagram
             - _server: TetrisMCPServer | None
             - _last_tool_call: dict | None
             - _last_snapshot: dict | None
+            - _handicap: int
             # _ACTIONS: dict~str, str~ ClassVar
             +__init__(screen, font, audio, config, mcp_config, piece_provider, menu, start_server) None
             - _start_server() None
@@ -454,6 +455,7 @@ classDiagram
             - _board_snapshot(action_results: list~str~ | None) dict
             +update(dt: float, particles: ParticleSystem) State | None
             - _do_game_over() State | None
+            - _reset_game() None
             +draw(screen: pygame.Surface, particles: ParticleSystem | None) None
         }
         %% Module-level function: draw_mcp_hud(screen, font, state: MCPState) -> None

@@ -87,7 +87,7 @@ def test_mcp_state_execute_actions():
 
 def test_mcp_state_actions_dict_keys():
     """_ACTIONS dict has all expected action names."""
-    expected = {"left", "right", "rotate_cw", "rotate_ccw", "soft_drop", "hard_drop", "hold"}
+    expected = {"left", "right", "rotate_cw", "rotate_ccw", "soft_drop", "hard_drop", "hold", "start_game"}
     assert set(MCPState._ACTIONS.keys()) == expected
 
 
@@ -102,6 +102,7 @@ def test_mcp_state_board_snapshot_keys():
         "board",
         "current_piece",
         "next_piece",
+        "preview_pieces",
         "hold_piece",
         "can_hold",
         "score",
@@ -127,6 +128,26 @@ def test_mcp_state_board_snapshot_board_is_2d_list():
     assert isinstance(snap["board"], list)
     assert all(isinstance(row, list) for row in snap["board"])
     assert all(cell in (0, 1) for row in snap["board"] for cell in row)
+
+
+def test_mcp_state_reset_game_via_queue():
+    """start_game action resets the board and returns a fresh snapshot."""
+    import queue as q_mod
+
+    state = _make_mcp_state(start_server=False)
+    # Simulate some progress: lock a piece to get non-zero score
+    state._hard_drop()
+    assert state.stats.score > 0
+    # Queue a start_game reset
+    result_q: q_mod.Queue = q_mod.Queue()
+    state._action_queue.put((["start_game"], 0, result_q))
+    state.update(1.0 / 60.0, ParticleSystem())
+    snap = result_q.get()
+    assert snap["score"] == 0
+    assert snap["lines"] == 0
+    assert snap["level"] == 0
+    assert snap["game_over"] is False
+    assert snap["action_results"] == ["ok"]
 
 
 # ── Queue processing ─────────────────────────────────────────────────

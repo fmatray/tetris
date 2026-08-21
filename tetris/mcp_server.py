@@ -57,12 +57,24 @@ class TetrisMCPServer:
 
             Returns:
                 Board snapshot dict with keys: ``board`` (0/1 grid),
-                ``current_piece``, ``next_piece``, ``hold_piece``, ``can_hold``,
-                ``score``, ``lines``, ``level``, ``game_over``, ``action_results``.
+                ``current_piece``, ``next_piece``, ``preview_pieces``,
+                ``hold_piece``, ``can_hold``, ``score``, ``lines``,
+                ``level``, ``game_over``, ``action_results``.
             """
             result_q: queue.Queue[dict[str, Any]] = queue.Queue()
             self._action_queue.put((actions, frames, result_q))
             return result_q.get()  # blocks until MCPState processes
+
+        @self._mcp.tool()
+        def start_game() -> dict[str, Any]:
+            """Reset the board and start a fresh game.
+
+            Clears all locked pieces, resets score/lines/level to zero,
+            spawns new pieces, and returns the initial board snapshot.
+            """
+            result_q: queue.Queue[dict[str, Any]] = queue.Queue()
+            self._action_queue.put((["start_game"], 0, result_q))
+            return result_q.get()
 
         @self._mcp.resource("board://state")
         def board_state() -> str:
