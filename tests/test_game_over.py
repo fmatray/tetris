@@ -1,4 +1,4 @@
-"""Tests for GameOverState: animation -> name entry -> leaderboard -> menu."""
+"""Tests for GameOverState: animation -> [name entry] -> leaderboard (highlighted) -> menu."""
 
 import os
 
@@ -54,7 +54,7 @@ def test_init_defaults():
 
 
 def test_update_transitions_animation_to_name(monkeypatch):
-    """update() runs the game-over animation then advances step to NAME.
+    """update() runs the game-over animation then advances to NAME when the score qualifies.
 
     The real animation is a blocking 4-second loop that calls
     pygame.display.flip() (incompatible with the dummy video driver), so
@@ -63,9 +63,39 @@ def test_update_transitions_animation_to_name(monkeypatch):
     state = _make_game_over()
     assert state.step == "ANIMATION"
     monkeypatch.setattr(state.renderer, "play_game_over_animation", lambda *a, **k: None)
+    monkeypatch.setattr("tetris.states.game_over.load_leaderboard", list)
     result = state.update(16, ParticleSystem())
     assert result is None
     assert state.step == "NAME"
+
+
+def test_update_skips_name_when_score_not_qualifying(monkeypatch):
+    """update() skips NAME and goes straight to LEADERBOARD when the score is too low."""
+    state = _make_game_over()
+    assert state.step == "ANIMATION"
+    monkeypatch.setattr(state.renderer, "play_game_over_animation", lambda *a, **k: None)
+    # Full leaderboard with a high minimum — score 0 won't qualify.
+    monkeypatch.setattr(
+        "tetris.states.game_over.load_leaderboard",
+        lambda: [{"name": "A", "score": 999, "level": 1, "lines": 1}] * 10,
+    )
+    result = state.update(16, ParticleSystem())
+    assert result is None
+    assert state.step == "LEADERBOARD"
+    assert state._highlight_index is None
+
+
+def test_name_entry_sets_highlight_index(tmp_path, monkeypatch):
+    """After saving, _highlight_index points to the just-saved entry."""
+    monkeypatch.setattr("tetris.storage.LEADERBOARD_PATH", str(tmp_path / "lb.json"))
+    monkeypatch.setattr("tetris.storage.HUMAN_STATS_PATH", str(tmp_path / "hs.json"))
+    state = _make_game_over()
+    state.step = "NAME"
+    state.name = "Alice"
+    state.handle_event(_keydown(pygame.K_RETURN))
+    assert state.step == "LEADERBOARD"
+    assert state._highlight_index == 0
+    assert state._scores[0]["name"] == "Alice"
 
 
 def test_handle_event_name_typing():
@@ -123,7 +153,7 @@ def test_handle_event_name_return_saves_and_transitions(tmp_path, monkeypatch):
     assert state.step == "LEADERBOARD"
     assert len(state._scores) == 1
     assert state._scores[0]["name"] == "Alice"
-    assert state._scores[0]["speed_mode"] == "normal"
+    assert state._highlight_index == 0
 
 
 def test_handle_event_leaderboard_returns_menu(tmp_path, monkeypatch):
@@ -182,6 +212,19 @@ def test_draw_leaderboard(tmp_path, monkeypatch):
     state.name = "Alice"
     state.handle_event(_keydown(pygame.K_RETURN))
     assert state.step == "LEADERBOARD"
+    state.draw(state.screen)
+
+
+def test_draw_leaderboard_non_qualifying(monkeypatch):
+    """draw() during LEADERBOARD with no highlight renders without error."""
+    monkeypatch.setattr(
+        "tetris.states.game_over.load_leaderboard",
+        lambda: [{"name": "A", "score": 999, "level": 1, "lines": 1}] * 10,
+    )
+    state = _make_game_over()
+    state.step = "LEADERBOARD"
+    state._scores = [{"name": "A", "score": 999, "level": 1, "lines": 1}] * 10
+    state._highlight_index = None
     state.draw(state.screen)
 
 

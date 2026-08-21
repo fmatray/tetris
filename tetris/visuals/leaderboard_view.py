@@ -6,7 +6,7 @@ rendered identical tables. This module centralizes that logic.
 
 import pygame
 from typing import NamedTuple
-from tetris.settings import BLACK, GENERATOR_LABELS, GRAY, SCREEN_WIDTH, SPEED_MODE_LABELS, WHITE
+from tetris.settings import BLACK, GENERATOR_LABELS, GRAY, RED, SCREEN_WIDTH, SPEED_MODE_LABELS, WHITE
 from tetris.storage import load_leaderboard
 from tetris.visuals.fonts import (
     CONTENT_Y,
@@ -25,8 +25,13 @@ class ColumnDef(NamedTuple):
     align: str
 
 
-def draw_leaderboard(screen: pygame.Surface, font: pygame.font.Font, scores: list[dict] | None = None) -> None:
-    """Render the top-10 leaderboard table onto *screen*."""
+def draw_leaderboard(
+    screen: pygame.Surface, font: pygame.font.Font, scores: list[dict] | None = None, highlight_index: int | None = None
+) -> None:
+    """Render the top-10 leaderboard table onto *screen*.
+
+    When *highlight_index* is set, that row (0-based) is rendered in red.
+    """
     screen.fill(BLACK)
     if scores is None:
         scores = load_leaderboard()
@@ -76,7 +81,8 @@ def draw_leaderboard(screen: pygame.Surface, font: pygame.font.Font, scores: lis
             entry.get("date", "Unknown"),
         ]
         for val, (label, w, align), cx in zip(values, columns, xs):
-            surf = font.render(val, True, WHITE)
+            color = RED if highlight_index == i - 1 else WHITE
+            surf = font.render(val, True, color)
             px = cx + pad if align == "left" else cx + w - pad - surf.get_width()
             screen.blit(surf, (px, y))
     instr = font.render("Press any key to continue", True, GRAY)

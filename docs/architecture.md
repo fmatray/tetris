@@ -101,7 +101,7 @@ Le code est organisé en packages (`game/`, `audio/`, `visuals/`, `states/`, `st
 
 ### DRY (Don't Repeat Yourself)
 
-- `draw_leaderboard()` dans `visuals/leaderboard_view.py` centralise le rendu du tableau des scores, partagé par `LeaderboardState` et `GameOverState` (auparavant dupliqué).
+- `draw_leaderboard()` dans `visuals/leaderboard_view.py` centralise le rendu du tableau des scores, partagé par `LeaderboardState` et `GameOverState` (auparavant dupliqué). Le paramètre `highlight_index` permet à `GameOverState` de surligner en rouge la nouvelle entrée du joueur.
 - Le tableau des points de ligne (`LINE_CLEAR_POINTS`) est défini une fois dans `settings.py` et utilisé par `ScoreEngine` — pas de logique de score dupliquée.
 
 ### KISS (Keep It Simple)

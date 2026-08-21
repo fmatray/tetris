@@ -415,7 +415,9 @@ classDiagram
             +name: str
             +step: str
             - _scores: list~dict~
+            - _highlight_index: int | None
             +__init__(screen, font, audio, game, menu) None
+            - _score_qualifies() bool
             +update(dt: float, particles) State | None
             +handle_event(event: pygame.event.Event) State | None
             - _handle_name_event(event: pygame.event.Event) State | None
@@ -836,7 +838,7 @@ classDiagram
             +align: str
         }
     }
-    %% Module-level functions: draw_leaderboard(screen, font) -> None
+    %% Module-level functions: draw_leaderboard(screen, font, scores, highlight_index) -> None
     %% Module-level functions: render_score_graph(episodes, scores) -> pygame.Surface
     %% Module-level functions: get_large_font() -> pygame.font.Font
     %% Module-level functions: get_small_font() -> pygame.font.Font
