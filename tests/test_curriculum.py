@@ -7,7 +7,8 @@ import os
 
 os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
 os.environ.setdefault("SDL_AUDIODRIVER", "dummy")
-from tetris.states.game import GameConfig, AIConfig
+from tetris.states.game import GameConfig
+from tetris.states.ai import AIConfig
 
 import pygame
 import pytest

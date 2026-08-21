@@ -27,7 +27,8 @@ from tetris.settings import (
 )
 from tetris.ai.candidates import iter_column_positions, best_next_placement, gen_placements
 from tetris.ai.hud import _hud_table_rows, _trend_arrow, draw_ai_hud
-from tetris.states.game import GameConfig, AIConfig
+from tetris.states.game import GameConfig
+from tetris.states.ai import AIConfig
 from tetris.states.ai import AIState, NUM_ROTATIONS, PendingTransition
 from tetris.visuals.particles import ParticleSystem
 

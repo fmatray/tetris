@@ -7,7 +7,8 @@ import sys
 from typing import ClassVar
 
 import pygame
-from tetris.states.game import GameConfig, AIConfig
+from tetris.states.game import GameConfig
+from tetris.states.ai import AIConfig
 
 from tetris.logger import configure_logging, get_logger
 from tetris.settings import (

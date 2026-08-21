@@ -13,7 +13,32 @@ the HUD for real-time learning feedback.
 from __future__ import annotations
 
 import os
+
+
 from dataclasses import dataclass
+
+
+@dataclass(frozen=True)
+class AIConfig:
+    """DQN hyperparameters."""
+
+    epsilon_decay: float
+    epsilon_end: float
+    lr: float
+    gamma: float
+    batch_size: int
+    buffer_size: int
+    ai_mode: str
+    curriculum: bool
+    curriculum_freq: int
+    curriculum_epsilon: str
+    warm_start: bool
+    learn_per_action: int
+    lookahead: bool
+    lookahead_depth: int
+    soft_drop: bool
+
+
 from typing import TYPE_CHECKING, NamedTuple
 
 if TYPE_CHECKING:
@@ -47,7 +72,7 @@ from tetris.settings import (
     MODEL_PATH,
 )
 from tetris.states.base import State
-from tetris.states.game import GameConfig, AIConfig, GameState
+from tetris.states.game import GameConfig, GameState
 from tetris.visuals.particles import ParticleSystem
 
 

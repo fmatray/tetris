@@ -24,27 +24,6 @@ class GameConfig:
     speed_mode: str
 
 
-@dataclass(frozen=True)
-class AIConfig:
-    """DQN hyperparameters."""
-
-    epsilon_decay: float
-    epsilon_end: float
-    lr: float
-    gamma: float
-    batch_size: int
-    buffer_size: int
-    ai_mode: str
-    curriculum: bool
-    curriculum_freq: int
-    curriculum_epsilon: str
-    warm_start: bool
-    learn_per_action: int
-    lookahead: bool
-    lookahead_depth: int
-    soft_drop: bool
-
-
 import pygame
 
 from tetris.audio import AudioManager
