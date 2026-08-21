@@ -13,6 +13,7 @@ from tetris.states.ai import AIConfig
 from tetris.logger import configure_logging, get_logger
 from tetris.settings import (
     DEFAULT_SPEED_MODE,
+    MCP_SERVER_PORT,
     SETTINGS_PATH,
 )
 from tetris.states.base import State
@@ -28,17 +29,18 @@ class MenuState(MenuBase):
 
     _OPTIONS = (
         "Démarrer le jeu",  # 0
-        "Joueur",  # 1 — toggle ◄ ► Humain ↔ IA
-        "Humain",  # 2  (grisé si Joueur=IA)
-        "IA",  # 3  (grisé si Joueur=Humain)
-        "Règles du jeu",  # 4
-        "Leaderboard",  # 5
-        "Audio",  # 6
-        "Débogage",  # 7 — toggle ◄ ► ON ↔ OFF
-        "Quitter",  # 8
+        "Joueur",  # 1 — toggle ◄ ► Humain ↔ IA ↔ MCP
+        "Humain",  # 2  (grisé si Joueur != Humain)
+        "IA",  # 3  (grisé si Joueur != IA)
+        "MCP",  # 4  (grisé si Joueur != MCP)
+        "Règles du jeu",  # 5
+        "Leaderboard",  # 6
+        "Audio",  # 7
+        "Débogage",  # 8 — toggle ◄ ► ON ↔ OFF
+        "Quitter",  # 9
     )
     _GENERATOR_CYCLE: ClassVar[tuple[str, ...]] = ("random", "7bag", "35bag", "weighted")
-    _toggle_indices = frozenset({1, 7})  # Joueur, Débogage
+    _toggle_indices = frozenset({1, 8})  # Joueur, Débogage
     _title = "TETRIS"
 
     _instructions = "Flèches: Navigation | Entrée: Valider | Échap: Quitter"
@@ -76,8 +78,9 @@ class MenuState(MenuBase):
         self.ai_warm_start = True
         self.ai_learn_per_action = 2
         self.ai_lookahead = True
-        self.ai_lookahead_depth = 3
+        self.ai_lookahead_depth = 1
         self.ai_soft_drop = True
+        self.mcp_port = MCP_SERVER_PORT
 
         # DEFAULT_KEYBINDS imported locally to avoid circular import at module load.
         from tetris.settings import DEFAULT_KEYBINDS
@@ -115,6 +118,7 @@ class MenuState(MenuBase):
         "preview_count": "preview_count",
         "debug": "debug",
         "speed_mode": "speed_mode",
+        "mcp_port": "mcp_port",
     }
 
     def _load_settings(self) -> None:
@@ -154,19 +158,24 @@ class MenuState(MenuBase):
         match i:
             case 1:  # Joueur
                 return self.player
-            case 7:  # Débogage
+            case 8:  # Débogage
                 return "ON" if self.debug else "OFF"
             case _:
                 return ""
 
     def _is_disabled(self, i: int) -> bool:
-        return bool(i == 3 and self.player == "Humain" or i == 2 and self.player == "IA")
+        return bool(
+            (i == 2 and self.player != "Humain")
+            or (i == 3 and self.player != "IA")
+            or (i == 4 and self.player != "MCP")
+        )
 
     def _toggle(self, direction: int) -> None:
         match self.selection:
-            case 1:  # Joueur
-                self.player = "IA" if self.player == "Humain" else "Humain"
-            case 7:  # Débogage
+            case 1:  # Joueur — 3-way cycle
+                cycle = {"Humain": "IA", "IA": "MCP", "MCP": "Humain"}
+                self.player = cycle[self.player]
+            case 8:  # Débogage
                 self.debug = not self.debug
                 configure_logging(self.debug)
 
@@ -181,7 +190,6 @@ class MenuState(MenuBase):
         match self.selection:
             case 0:  # Start
                 from tetris.game.piece_provider import PieceProvider
-                from tetris.states.human import HumanState
 
                 provider = PieceProvider(
                     mode="replay" if self.mode == "Replay" else "normal",
@@ -189,6 +197,10 @@ class MenuState(MenuBase):
                 )
                 if self.player == "IA":
                     return self._build_ai_state()
+                if self.player == "MCP":
+                    return self._build_mcp_state()
+                from tetris.states.human import HumanState
+
                 return HumanState(
                     self.screen,
                     self.font,
@@ -214,19 +226,23 @@ class MenuState(MenuBase):
                 from tetris.states.ai_menu import AIMenuState
 
                 return AIMenuState(self.screen, self.font, self.audio, self)
-            case 4:  # Règles du jeu submenu
+            case 4:  # MCP sub-menu
+                from tetris.states.mcp_menu import MCPMenuState
+
+                return MCPMenuState(self.screen, self.font, self.audio, self)
+            case 5:  # Règles du jeu submenu
                 from tetris.states.game_rules_menu import GameRulesMenuState
 
                 return GameRulesMenuState(self.screen, self.font, self.audio, self)
-            case 5:  # Leaderboard
+            case 6:  # Leaderboard
                 from tetris.states.leaderboard import LeaderboardState
 
                 return LeaderboardState(self.screen, self.font, self.audio, self)
-            case 6:  # Audio submenu
+            case 7:  # Audio submenu
                 from tetris.states.audio_menu import AudioMenuState
 
                 return AudioMenuState(self.screen, self.font, self.audio, self)
-            case 8:  # Quit
+            case 9:  # Quit
                 pygame.quit()
                 sys.exit()
         return None
@@ -269,5 +285,29 @@ class MenuState(MenuBase):
             ),
             ai_provider,
             self.ai_speed,
+            self,
+        )
+
+    def _build_mcp_state(self) -> State:
+        from tetris.game.piece_provider import PieceProvider
+        from tetris.states.mcp import MCPConfig, MCPState
+
+        mcp_provider = PieceProvider(mode="normal", generator=self.piece_generator)
+        return MCPState(
+            self.screen,
+            self.font,
+            self.audio,
+            GameConfig(
+                handicap=self.handicap,
+                sound_volume=self.sound_volume,
+                music_volume=self.music_volume,
+                music_song=self.music_song,
+                debug=self.debug,
+                ghost_piece=self.ghost_piece,
+                preview_count=self.preview_count,
+                speed_mode=self.speed_mode,
+            ),
+            MCPConfig(port=self.mcp_port),
+            mcp_provider,
             self,
         )

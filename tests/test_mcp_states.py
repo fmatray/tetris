@@ -1,0 +1,264 @@
+"""Tests for MCPState: construction, action dispatch, frozen game, board snapshot, game over."""
+
+import os
+
+os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
+os.environ.setdefault("SDL_AUDIODRIVER", "dummy")
+
+import pygame
+
+pygame.init()
+pygame.mixer.init()
+
+from tetris.audio import AudioManager
+from tetris.states.game import GameConfig
+from tetris.states.mcp import MCPConfig, MCPState, draw_mcp_hud
+from tetris.visuals.particles import ParticleSystem
+
+
+def _make_mcp_state(start_server: bool = True) -> MCPState:
+    screen = pygame.Surface((640, 480))
+    font = pygame.font.Font(None, 24)
+    audio = AudioManager(sound_volume=0, music_volume=0)
+    return MCPState(
+        screen,
+        font,
+        audio,
+        GameConfig(
+            handicap=0,
+            sound_volume=0,
+            music_volume=0,
+            music_song="korobeiniki",
+            debug=False,
+            ghost_piece=True,
+            preview_count=1,
+            speed_mode="normal",
+        ),
+        MCPConfig(port=8765),
+        start_server=start_server,
+    )
+
+
+# ── Construction ──────────────────────────────────────────────────────
+
+
+def test_mcp_state_construction_no_server():
+    """MCPState can be constructed without starting the server."""
+    state = _make_mcp_state(start_server=False)
+    assert state.player_type == "MCP"
+    assert state.mcp_config.port == 8765
+    assert state._server is None
+    assert state.game_over is False
+
+
+def test_mcp_state_action_queue_empty_on_init():
+    """Action queue starts empty."""
+    state = _make_mcp_state(start_server=False)
+    assert state._action_queue.empty()
+
+
+# ── Frozen game ───────────────────────────────────────────────────────
+
+
+def test_mcp_state_frozen_when_queue_empty():
+    """update() returns None and does not advance gravity when queue is empty."""
+    state = _make_mcp_state(start_server=False)
+    particles = ParticleSystem()
+    dt = 1.0 / 60.0
+    initial_y = state.current_piece.y
+    for _ in range(120):  # 2 seconds of game time
+        result = state.update(dt, particles)
+        assert result is None
+    # Piece should not have moved (frozen)
+    assert state.current_piece.y == initial_y
+
+
+# ── Action dispatch ───────────────────────────────────────────────────
+
+
+def test_mcp_state_execute_actions():
+    """_execute_actions dispatches valid actions and reports unknown ones."""
+    state = _make_mcp_state(start_server=False)
+    results = state._execute_actions(["left", "right", "bad_action"])
+    assert results[0] == "ok"
+    assert results[1] == "ok"
+    assert results[2].startswith("unknown:")
+
+
+def test_mcp_state_actions_dict_keys():
+    """_ACTIONS dict has all expected action names."""
+    expected = {"left", "right", "rotate_cw", "rotate_ccw", "soft_drop", "hard_drop", "hold"}
+    assert set(MCPState._ACTIONS.keys()) == expected
+
+
+# ── Board snapshot ────────────────────────────────────────────────────
+
+
+def test_mcp_state_board_snapshot_keys():
+    """_board_snapshot returns dict with all expected keys."""
+    state = _make_mcp_state(start_server=False)
+    snap = state._board_snapshot(["ok"])
+    expected_keys = {
+        "board",
+        "current_piece",
+        "next_piece",
+        "hold_piece",
+        "can_hold",
+        "score",
+        "lines",
+        "level",
+        "game_over",
+        "action_results",
+    }
+    assert set(snap.keys()) == expected_keys
+
+
+def test_mcp_state_board_snapshot_no_action_results():
+    """_board_snapshot without action_results omits that key."""
+    state = _make_mcp_state(start_server=False)
+    snap = state._board_snapshot()
+    assert "action_results" not in snap
+
+
+def test_mcp_state_board_snapshot_board_is_2d_list():
+    """board field is a 2D list of 0/1 ints."""
+    state = _make_mcp_state(start_server=False)
+    snap = state._board_snapshot()
+    assert isinstance(snap["board"], list)
+    assert all(isinstance(row, list) for row in snap["board"])
+    assert all(cell in (0, 1) for row in snap["board"] for cell in row)
+
+
+# ── Queue processing ─────────────────────────────────────────────────
+
+
+def test_mcp_state_processes_queue_request():
+    """update() processes a queued request and returns the snapshot via result_queue."""
+    import queue as q_mod
+
+    state = _make_mcp_state(start_server=False)
+    particles = ParticleSystem()
+    result_q: q_mod.Queue = q_mod.Queue()
+    state._action_queue.put((["left"], 0, result_q))
+    state.update(1.0 / 60.0, particles)
+    assert not result_q.empty()
+    snap = result_q.get()
+    assert snap["action_results"] == ["ok"]
+    assert state._last_tool_call is not None
+    assert state._last_tool_call["actions"] == ["left"]
+
+
+def test_mcp_state_advances_frames():
+    """update() advances N frames when frames > 0."""
+    import queue as q_mod
+
+    state = _make_mcp_state(start_server=False)
+    particles = ParticleSystem()
+    result_q: q_mod.Queue = q_mod.Queue()
+    # Request 60 frames = 1 second at 60 FPS
+    state._action_queue.put(([], 60, result_q))
+    state.update(1.0 / 60.0, particles)
+    snap = result_q.get()
+    assert "score" in snap
+
+
+# ── Game over ────────────────────────────────────────────────────────
+
+
+def test_mcp_state_game_over_returns_menu():
+    """When game_over is True, update() calls _do_game_over which returns menu."""
+    from tetris.states.menu import MenuState
+
+    screen = pygame.Surface((640, 480))
+    font = pygame.font.Font(None, 24)
+    audio = AudioManager(sound_volume=0, music_volume=0)
+    menu = MenuState(screen, font, audio)
+    state = MCPState(
+        screen,
+        font,
+        audio,
+        GameConfig(
+            handicap=0,
+            sound_volume=0,
+            music_volume=0,
+            music_song="korobeiniki",
+            debug=False,
+            ghost_piece=True,
+            preview_count=1,
+            speed_mode="normal",
+        ),
+        MCPConfig(port=8765),
+        start_server=False,
+        menu=menu,
+    )
+    state.game_over = True
+    result = state.update(1.0 / 60.0, ParticleSystem())
+    assert result is menu
+
+
+# ── MCPConfig ─────────────────────────────────────────────────────────
+
+
+def test_mcp_config_is_frozen():
+    """MCPConfig is a frozen dataclass."""
+    from dataclasses import is_dataclass
+
+    config = MCPConfig(port=9999)
+    assert is_dataclass(config)
+    try:
+        config.port = 8888  # type: ignore[misc]
+        assert False, "Should have raised FrozenInstanceError"
+    except AttributeError:
+        pass
+
+
+def test_mcp_config_port():
+    """MCPConfig stores port correctly."""
+    config = MCPConfig(port=8766)
+    assert config.port == 8766
+
+
+# ── Debug HUD ─────────────────────────────────────────────────────────
+
+
+def test_mcp_state_draw_debug_hud_no_error():
+    """draw() with debug=True renders the MCP HUD without error."""
+    state = _make_mcp_state(start_server=False)
+    state.debug = True
+    screen = pygame.Surface((1500, 800))
+    particles = ParticleSystem()
+    state.draw(screen, particles=particles)
+
+
+def test_mcp_state_draw_no_debug_no_hud():
+    """draw() with debug=False does not raise."""
+    state = _make_mcp_state(start_server=False)
+    screen = pygame.Surface((1500, 800))
+    particles = ParticleSystem()
+    state.draw(screen, particles=particles)
+
+
+def test_draw_mcp_hud_with_last_tool_call():
+    """draw_mcp_hud renders without error when last_tool_call is set."""
+    state = _make_mcp_state(start_server=False)
+    state._last_tool_call = {"actions": ["left", "rotate_cw"], "frames": 5, "results": ["ok", "ok"]}
+    state._last_snapshot = {
+        "score": 1000,
+        "lines": 5,
+        "level": 2,
+        "game_over": False,
+    }
+    screen = pygame.Surface((1500, 800))
+    font = pygame.font.Font(None, 24)
+    draw_mcp_hud(screen, font, state)
+
+
+# ── Server lifecycle ─────────────────────────────────────────────────
+
+
+def test_mcp_state_stop_server_clears_reference():
+    """_stop_server clears the server reference."""
+    state = _make_mcp_state(start_server=False)
+    state._server = None  # already None
+    state._stop_server()
+    assert state._server is None

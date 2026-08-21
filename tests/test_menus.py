@@ -733,9 +733,9 @@ def test_menu_base_prev_enabled_skips_disabled():
     menu.player = "Humain"
     state = menu  # MenuState itself
     # IA (index 3) is disabled when player is Humain
-    state.selection = 4  # Règles du jeu
-    new = state._prev_enabled(4)
-    # Should skip index 3 (disabled)
+    state.selection = 5  # Règles du jeu (shifted +1)
+    new = state._prev_enabled(5)
+    # Should skip index 4 (MCP disabled) and 3 (IA disabled)
     assert new == 2  # Humain
 
 
@@ -812,54 +812,73 @@ def test_menu_base_update_drives_animation():
 def test_menu_state_value_labels():
     menu = _make_menu()
     assert menu._value_label(1) == "Humain"  # Joueur
-    assert menu._value_label(7) == "OFF"  # debug default False
+    assert menu._value_label(8) == "OFF"  # debug default False (shifted +1)
     assert menu._value_label(0) == ""  # Démarrer
 
 
 def test_menu_state_disabled_ia_when_human():
     menu = _make_menu()
     menu.player = "Humain"
-    assert menu._is_disabled(3) is True  # IA (new idx 3)
+    assert menu._is_disabled(3) is True  # IA
 
 
 def test_menu_state_disabled_human_when_ai():
     menu = _make_menu()
     menu.player = "IA"
-    assert menu._is_disabled(2) is True  # Humain (new idx 2)
+    assert menu._is_disabled(2) is True  # Humain
+
+
+def test_menu_state_disabled_mcp_when_not_mcp():
+    menu = _make_menu()
+    menu.player = "Humain"
+    assert menu._is_disabled(4) is True  # MCP disabled when player != MCP
+    menu.player = "MCP"
+    assert menu._is_disabled(4) is False  # MCP enabled when player == MCP
 
 
 def test_menu_state_toggle_player():
     menu = _make_menu()
-    menu.selection = 1  # Joueur (new idx 1)
+    menu.selection = 1  # Joueur
     menu._toggle(1)
     assert menu.player == "IA"
+    menu._toggle(1)
+    assert menu.player == "MCP"
+    menu._toggle(1)
+    assert menu.player == "Humain"
 
 
 def test_menu_state_toggle_debug():
     menu = _make_menu()
-    menu.selection = 7  # Débogage (new idx 7)
+    menu.selection = 8  # Débogage (shifted +1)
     menu._toggle(1)
     assert menu.debug is True
 
 
 def test_menu_state_select_audio():
     menu = _make_menu()
-    menu.selection = 6  # Audio (new idx 6)
+    menu.selection = 7  # Audio (shifted +1)
     result = menu._on_select()
     assert isinstance(result, AudioMenuState)
 
 
 def test_menu_state_select_game_rules():
     menu = _make_menu()
-    menu.selection = 4  # Règles du jeu (new idx 4)
+    menu.selection = 5  # Règles du jeu (shifted +1)
     result = menu._on_select()
     assert isinstance(result, GameRulesMenuState)
+
+
+def test_menu_state_select_leaderboard():
+    menu = _make_menu()
+    menu.selection = 6  # Leaderboard (shifted +1)
+    result = menu._on_select()
+    assert isinstance(result, LeaderboardState)
 
 
 def test_menu_state_select_human():
     menu = _make_menu()
     menu.player = "Humain"
-    menu.selection = 2  # Humain (new idx 2)
+    menu.selection = 2  # Humain
     result = menu._on_select()
     assert isinstance(result, HumanMenuState)
 
@@ -867,16 +886,19 @@ def test_menu_state_select_human():
 def test_menu_state_select_ai():
     menu = _make_menu()
     menu.player = "IA"
-    menu.selection = 3  # IA (new idx 3)
+    menu.selection = 3  # IA
     result = menu._on_select()
     assert isinstance(result, AIMenuState)
 
 
-def test_menu_state_select_leaderboard():
+def test_menu_state_select_mcp():
+    from tetris.states.mcp_menu import MCPMenuState
+
     menu = _make_menu()
-    menu.selection = 5  # Leaderboard (new idx 5)
+    menu.player = "MCP"
+    menu.selection = 4  # MCP
     result = menu._on_select()
-    assert isinstance(result, LeaderboardState)
+    assert isinstance(result, MCPMenuState)
 
 
 def test_menu_state_draw_no_error():
@@ -1122,7 +1144,7 @@ def test_menu_save_persists_keybinds():
 def test_menu_toggle_debug_via_event():
     """Toggling debug via K_LEFT/K_RIGHT persists."""
     menu = _make_menu()
-    menu.selection = 7  # Débogage (new idx 7)
+    menu.selection = 8  # Débogage (shifted +1)
     menu.handle_event(_key(pygame.K_RIGHT))
     assert menu.debug is True
     menu.handle_event(_key(pygame.K_LEFT))
@@ -1130,12 +1152,14 @@ def test_menu_toggle_debug_via_event():
 
 
 def test_menu_toggle_player_via_event():
-    """Toggling player via K_LEFT/K_RIGHT changes player."""
+    """Toggling player via K_LEFT/K_RIGHT cycles: Humain → IA → MCP → Humain."""
     menu = _make_menu()
-    menu.selection = 1  # Joueur (new idx 1)
+    menu.selection = 1  # Joueur
     menu.handle_event(_key(pygame.K_RIGHT))
     assert menu.player == "IA"
-    menu.handle_event(_key(pygame.K_LEFT))
+    menu.handle_event(_key(pygame.K_RIGHT))
+    assert menu.player == "MCP"
+    menu.handle_event(_key(pygame.K_RIGHT))
     assert menu.player == "Humain"
 
 
@@ -1161,6 +1185,17 @@ def test_menu_select_start_ai():
     assert isinstance(result, AIState)
 
 
+def test_menu_select_start_mcp():
+    """Selecting 'Démarrer' with MCP player creates MCPState."""
+    from tetris.states.mcp import MCPState
+
+    menu = _make_menu()
+    menu.player = "MCP"
+    menu.selection = 0  # Démarrer
+    result = menu._on_select()
+    assert isinstance(result, MCPState)
+
+
 def test_menu_save_calls_save_settings():
     """_save hook persists settings."""
     menu = _make_menu()
@@ -1182,7 +1217,7 @@ def test_menu_handle_enter_on_disabled_returns_none():
 def test_menu_handle_left_on_non_toggle_does_nothing():
     """LEFT on non-toggle index does nothing."""
     menu = _make_menu()
-    menu.selection = 6  # Audio — not a toggle index
+    menu.selection = 7  # Audio (shifted +1) — not a toggle index
     menu.handle_event(_key(pygame.K_LEFT))
     assert menu.player == "Humain"
 
@@ -1190,6 +1225,6 @@ def test_menu_handle_left_on_non_toggle_does_nothing():
 def test_menu_handle_right_on_non_toggle_does_nothing():
     """RIGHT on non-toggle index does nothing."""
     menu = _make_menu()
-    menu.selection = 4  # Règles du jeu — not a toggle index
+    menu.selection = 5  # Règles du jeu (shifted +1) — not a toggle index
     menu.handle_event(_key(pygame.K_RIGHT))
     assert menu.player == "Humain"

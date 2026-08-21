@@ -120,7 +120,7 @@ HUD_POSITIONS = {
     "speed_mode": (20, 760),
     "ai_moves": (800, 100),
     "debug_bag": (800, 50),  # bag/weights debug panel
-    "pause": (750, 400),  # pause overlay center (screen center)
+    "mcp_hud": (570, 450),
 }
 
 # --- Game-over animation -----------------------------------------------
@@ -205,3 +205,6 @@ MODEL_PATH = os.path.join(DATA_DIR, "ai_model.pt")
 LOG_PATH = os.path.join(DATA_DIR, "ai_training_log.json")
 REPLAY_PATH = os.path.join(DATA_DIR, "replay_pieces.json")
 DEBUG_LOG_PATH = os.path.join(DATA_DIR, "debug.log")
+
+# --- MCP ---------------------------------------------------------------
+MCP_SERVER_PORT = 8765

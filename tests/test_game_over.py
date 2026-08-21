@@ -222,3 +222,44 @@ def test_handle_event_animation_step_returns_none():
     assert state.step == "ANIMATION"
     result = state.handle_event(_keydown(pygame.K_RETURN))
     assert result is None
+
+
+def test_mcp_player_does_not_save_human_stats(monkeypatch):
+    """When player_type == 'MCP', save_human_game() is NOT called."""
+    from tetris.settings import HUMAN_STATS_PATH
+
+    # Ensure clean state
+    if os.path.exists(HUMAN_STATS_PATH):
+        os.remove(HUMAN_STATS_PATH)
+
+    screen = pygame.Surface((640, 480))
+    font = pygame.font.Font(None, 20)
+    audio = AudioManager(sound_volume=0, music_volume=0)
+    from tetris.states.mcp import MCPConfig, MCPState
+
+    game = MCPState(
+        screen,
+        font,
+        audio,
+        GameConfig(
+            handicap=0,
+            sound_volume=0,
+            music_volume=0,
+            music_song="korobeiniki",
+            debug=False,
+            ghost_piece=True,
+            preview_count=1,
+            speed_mode="normal",
+        ),
+        MCPConfig(port=8765),
+        start_server=False,
+    )
+    assert game.player_type == "MCP"
+
+    state = GameOverState(screen, font, audio, game)
+    state.step = "NAME"
+    state.name = "TestBot"
+    monkeypatch.setattr("tetris.states.game_over.save_score", lambda *a, **kw: None)
+    state.handle_event(_keydown(pygame.K_RETURN))
+    # human_stats.json should NOT exist for MCP player
+    assert not os.path.exists(HUMAN_STATS_PATH)

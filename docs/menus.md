@@ -4,14 +4,14 @@
 
 ```
 Menu principal
-├── Démarrer le jeu               [ENTER]          → lance la partie (Humain ou IA selon Joueur)
-├── Joueur                        [toggle ◄ ►]     Humain ↔ IA
-├── Humain                        [ENTER]          (grisé si Joueur=IA)
+├── Démarrer le jeu               [ENTER]          → lance la partie (Humain, IA ou MCP selon Joueur)
+├── Joueur                        [toggle ◄ ►]     Humain ↔ IA ↔ MCP
+├── Humain                        [ENTER]          (grisé si Joueur≠Humain)
 │   └── Mode                      [toggle ◄ ►]     Normal ↔ Replay
 │       Touches                   [ENTER]          → keybinding config
 │       Statistiques              [ENTER]          → human stats page
 │       Retour                    [ENTER | ESC]
-├── IA                            [ENTER]          (grisé si Joueur=Humain)
+├── IA                            [ENTER]          (grisé si Joueur≠IA)
 │   └── Mode                      [toggle ◄ ►]     Apprentissage ↔ Jeu
 │       Vitesse                   [toggle ◄ ►]     normal ↔ fast
 │       Apprentissage             [ENTER]          (grisé si Mode=Jeu)
@@ -32,6 +32,10 @@ Menu principal
 │       │       Retour            [ENTER | ESC]
 │       Statistiques              [ENTER]          → stats + graph (une page)
 │       Réinitialiser IA          [ENTER ×2]       supprime modèle + log
+│       Retour                    [ENTER | ESC]
+├── MCP                            [ENTER]          (grisé si Joueur≠MCP)
+│   └── Port                       [toggle ◄ ►]     8765 ↔ 8766 ↔ 8767 ↔ 8768
+│       Jouer                     [ENTER]          → lance la partie MCP
 │       Retour                    [ENTER | ESC]
 ├── Règles du jeu                 [ENTER]          → game rules submenu
 │   └── Générateur                [toggle ◄ ►]     Aléatoire ↔ 7-bag ↔ 35-bag ↔ Pondéré

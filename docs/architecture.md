@@ -62,9 +62,11 @@ tetris/
 │   │   ├── hyperparam_menu.py   # HyperparamMenuState (13 hyperparamètres DQN + reset)
 │   │   ├── ai_stats.py           # AIStatsState (tableau stats + graphique)
 │   │   ├── game_over.py         # GameOverState
-│   │   └── leaderboard.py       # LeaderboardState
+│   │   ├── leaderboard.py       # LeaderboardState
+│   │   ├── mcp.py               # MCPState (jeu MCP, hérite GameState ; MCPConfig)
+│   │   └── mcp_menu.py          # MCPMenuState (port, démarrage)
 │   └── storage/                 # Persistance JSON
-│       └── __init__.py          # load_leaderboard, save_score, save_human_game
+│   ├── mcp_server.py            # TetrisMCPServer (serveur MCP HTTP, outils play + resources)
 ├── tests/                       # Tests unitaires
 │   ├── __init__.py
 │   ├── conftest.py              # Fixtures partagées
@@ -74,6 +76,7 @@ tetris/
 │   ├── test_scoring.py          # Tests ScoreEngine
 │   ├── test_stats.py            # Tests GameStats
 │   ├── test_agent.py            # Tests DQNAgent
+│   ├── test_mcp_states.py     # Tests MCPState
 │   ├── test_rewards.py          # Tests features + récompense
 │   └── test_curriculum.py       # Tests curriculum learning
 ├── data/                        # Données générées (settings, leaderboard, stats, IA)

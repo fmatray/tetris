@@ -80,13 +80,14 @@ class GameOverState(State):
                 self.game.menu.mode if self.game.menu else "Normal",
                 speed_mode=self.game.speed_mode,
             )
-            save_human_game(
-                self.name,
-                self.game.stats.score,
-                self.game.stats.level,
-                self.game.stats.total_lines,
-                self.game.stats.piece_count,
-            )
+            if self.game.player_type == "Humain":
+                save_human_game(
+                    self.name,
+                    self.game.stats.score,
+                    self.game.stats.level,
+                    self.game.stats.total_lines,
+                    self.game.stats.piece_count,
+                )
             self._scores = load_leaderboard()
             self.step = "LEADERBOARD"
         elif event.key == pygame.K_BACKSPACE:

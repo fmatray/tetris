@@ -135,6 +135,7 @@ class GameState(State):
 
         kb = menu.keybinds if menu is not None else dict(DEFAULT_KEYBINDS)
         self._mute_key: int = kb["mute"]
+        self.player_type: str = "Humain"
 
     # --- Input handlers (SLAP: one operation each) ---------------------
 

@@ -96,6 +96,7 @@ classDiagram
             +ai_lookahead: bool
             +ai_lookahead_depth: int
             +ai_soft_drop: bool
+            +mcp_port: int
             +speed_mode: str
             +__init__(screen, font, audio) None
             - _load_settings() None
@@ -107,6 +108,7 @@ classDiagram
             # _on_back() State | None
             # _on_select() State | None
             - _build_ai_state() State
+            - _build_mcp_state() State
         }
 
         class HumanMenuState {
@@ -164,6 +166,21 @@ classDiagram
             # _toggle_indices: frozenset~int~ ClassVar
             # _title: str ClassVar
             +menu: MenuState
+            +__init__(screen, font, audio, menu) None
+            # _value_label(i: int) str
+            # _toggle(direction: int) None
+            # _save() None
+            # _on_back() State | None
+            # _on_select() State | None
+        }
+
+        class MCPMenuState {
+            # _OPTIONS: tuple~str, ...~ ClassVar
+            # _toggle_indices: frozenset~int~ ClassVar
+            # _title: str ClassVar
+            # _PORTS: list~int~ ClassVar
+            +menu: MenuState
+            +mcp_port: int
             +__init__(screen, font, audio, menu) None
             # _value_label(i: int) str
             # _toggle(direction: int) None
@@ -270,6 +287,7 @@ classDiagram
             - _lock_resets: int
             - _grounded: bool
             - _mute_key: int
+            +player_type: str
             +__init__(screen, font, audio, config, piece_provider, menu) None
             - _move_left() None
             - _move_right() None
@@ -415,6 +433,45 @@ classDiagram
             - _load() None
             +handle_event(event: pygame.event.Event) State | None
             +draw(screen: pygame.Surface, particles: ParticleSystem | None) None
+        }
+
+        class MCPConfig {
+            +port: int
+        }
+
+        class MCPState {
+            +player_type: str
+            +mcp_config: MCPConfig
+            - _action_queue: Queue~tuple~list~str~, int, Queue~~
+            - _server: TetrisMCPServer | None
+            - _last_tool_call: dict | None
+            - _last_snapshot: dict | None
+            # _ACTIONS: dict~str, str~ ClassVar
+            +__init__(screen, font, audio, config, mcp_config, piece_provider, menu, start_server) None
+            - _start_server() None
+            - _stop_server() None
+            - _execute_actions(actions: list~str~) list~str~
+            - _board_snapshot(action_results: list~str~ | None) dict
+            +update(dt: float, particles: ParticleSystem) State | None
+            - _do_game_over() State | None
+            +draw(screen: pygame.Surface, particles: ParticleSystem | None) None
+        }
+        %% Module-level function: draw_mcp_hud(screen, font, state: MCPState) -> None
+    }
+
+    %% ====================================================================
+    %%  MCP Server
+    %% ====================================================================
+    namespace MCPServer {
+        class TetrisMCPServer {
+            - _action_queue: Queue
+            - _port: int
+            - _thread: Thread | None
+            - _mcp: FastMCP | None
+            +__init__(action_queue, port) None
+            - _setup_mcp() None
+            +start() None
+            +stop() None
         }
     }
 
@@ -865,9 +922,12 @@ classDiagram
     MenuBase <|-- HyperparamMenuState
     MenuBase <|-- AudioMenuState
     MenuBase <|-- GameRulesMenuState
+    MenuBase <|-- MCPMenuState
 
     GameState <|-- HumanState
     GameState <|-- AIState
+    GameState <|-- MCPState
+
     nn_Module <|-- DQNetwork
     PieceGenerator <|-- RandomGenerator
     PieceGenerator <|-- BagGenerator
@@ -895,6 +955,9 @@ classDiagram
     AIState "1" *-- "1" TrainingLog : owns
     AIState "1" *-- "1" AIConfig : owns
 
+    MCPState "1" *-- "1" MCPConfig : owns
+    MCPState "1" *-- "0..1" TetrisMCPServer : owns
+
     DQNAgent "1" *-- "1" DQNetwork : online_net
     DQNAgent "1" *-- "1" DQNetwork : target_net
     DQNAgent "1" *-- "1" PrioritizedReplayBuffer : owns
@@ -915,6 +978,10 @@ classDiagram
     AIState "1" --> "1" ScoreEngine : uses
     AIState "1" --> "1" AudioManager : uses
     AIState "1" --> "0..1" MenuState : references
+
+    MCPState "1" --> "1" ScoreEngine : uses
+    MCPState "1" --> "1" AudioManager : uses
+    MCPState "1" --> "0..1" MenuState : references
 
     GameOverState "1" --> "1" GameState : references
     GameOverState "1" --> "0..1" MenuState : returns_to
@@ -939,6 +1006,11 @@ classDiagram
     MenuState "1" --> "0..1" HumanState : navigates
     MenuState "1" --> "0..1" AIState : navigates
     MenuState "1" --> "0..1" LeaderboardState : navigates
+
+    MenuState "1" --> "0..1" MCPMenuState : navigates
+    MenuState "1" --> "0..1" MCPState : navigates
+    MCPMenuState "1" --> "0..1" MCPState : navigates
+    MCPMenuState "1" --> "1" MenuState : returns_to
 
     HumanMenuState "1" --> "0..1" KeybindState : navigates
     HumanMenuState "1" --> "0..1" HumanStatsState : navigates
