@@ -111,10 +111,10 @@ python -m tetris.verify_training
 | `tetris/states/menu.py` | Root menu, settings load/save, navigation hub |
 | `tetris/states/audio_menu.py` | Audio sub-menu: sound/music volume, song selection |
 | `tetris/states/game_rules_menu.py` | Game rules sub-menu: generator, preview count, handicap, speed mode |
-| `tetris/states/game.py` | `GameState` abstract base: board, pieces, gravity, lock delay, movement primitives |
+| `tetris/states/game.py` | `GameState` abstract base: board, pieces, gravity, lock delay, movement primitives; `GameConfig` dataclass (shared gameplay settings) |
 | `tetris/states/human.py` | `HumanState` — human gameplay: keyboard, DAS, pause, keybind setup |
 | `tetris/states/keybind.py` | Keybinding state, `key_name()` (moved from settings.py) |
-| `tetris/states/ai.py` | AI gameplay state + RL training integration (candidate generation and HUD rendering extracted to `tetris/ai/candidates.py` and `tetris/ai/hud.py`) |
+| `tetris/states/ai.py` | AI gameplay state + RL training integration (candidate generation and HUD rendering extracted to `tetris/ai/candidates.py` and `tetris/ai/hud.py`); `AIConfig` dataclass (DQN hyperparameters) |
 | `tetris/ai/agent.py` | `DQNAgent` — `select_action`, `store`, `learn`, `save`, `load` |
 | `tetris/ai/candidates.py` | Candidate placement generation — `iter_column_positions`, `best_next_placement`, `gen_placements`, `get_candidate_states`, `soft_drop_placements`, `hard_drop_y_batch` (moved from `tetris/game/rules.py`). `Placement` NamedTuple. Pure functions, no instance state |
 | `tetris/ai/hud.py` | AI training HUD rendering — training params table, stats table, last-5-moves. Pure presentation |
@@ -197,15 +197,20 @@ screen = pygame.Surface((800, 600))
 font = pygame.font.Font(None, 20)
 from tetris.audio import AudioManager
 from tetris.states.ai import AIState
+from tetris.states.game import GameConfig
+from tetris.states.ai import AIConfig
 from tetris.game.piece_provider import PieceProvider
 from tetris.visuals.particles import ParticleSystem
 audio = AudioManager(sound_volume=0, music_volume=0)
 particles = ParticleSystem()
-state = AIState(screen=screen, font=font, audio=audio, handicap=0,
-    sound_volume=0, music_volume=0,
-    piece_provider=PieceProvider(generator='7bag'),
-    speed='fast', ai_mode='learning', lookahead=True, lookahead_depth=1,
-    soft_drop=True, preview_count=1, warm_start=True, learn_per_action=2)
+config = GameConfig(handicap=0, sound_volume=0, music_volume=0, music_song='korobeiniki',
+    debug=False, ghost_piece=True, preview_count=1, speed_mode='normal')
+ai_config = AIConfig(epsilon_decay=0.999, epsilon_end=0.1, lr=1e-3, gamma=0.97,
+    batch_size=64, buffer_size=50_000, ai_mode='learning', curriculum=False,
+    curriculum_freq=50, curriculum_epsilon='reset', warm_start=True,
+    learn_per_action=2, lookahead=True, lookahead_depth=1, soft_drop=True)
+state = AIState(screen=screen, font=font, audio=audio, config=config, ai_config=ai_config,
+    piece_provider=PieceProvider(generator='7bag'), speed='fast')
 dt = 1/60
 pr = cProfile.Profile()
 pr.enable()

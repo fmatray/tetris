@@ -231,7 +231,16 @@ classDiagram
             +draw(screen: pygame.Surface, particles: ParticleSystem | None) None
             +handle_event(event: pygame.event.Event) State | None
         }
-
+        class GameConfig {
+            +handicap: int
+            +sound_volume: int
+            +music_volume: int
+            +music_song: str
+            +debug: bool
+            +ghost_piece: bool
+            +preview_count: int
+            +speed_mode: str
+        }
         class GameState {
             +screen: pygame.Surface
             +font: pygame.font.Font
@@ -261,7 +270,7 @@ classDiagram
             - _lock_resets: int
             - _grounded: bool
             - _mute_key: int
-            +__init__(screen, font, audio, handicap, sound_volume, music_volume, music_song, piece_provider, menu, debug, ghost_piece, preview_count, speed_mode) None
+            +__init__(screen, font, audio, config, piece_provider, menu) None
             - _move_left() None
             - _move_right() None
             - _rotate_cw() None
@@ -290,7 +299,7 @@ classDiagram
             - _left_key: int
             - _right_key: int
             - _hold_key: int
-            +__init__(screen, font, audio, handicap, sound_volume, music_volume, music_song, piece_provider, menu, debug, ghost_piece, preview_count, speed_mode) None
+            +__init__(screen, font, audio, config, piece_provider, menu) None
             - _setup_keybinds(menu) None
             +handle_event(event: pygame.event.Event) State | None
             +update(dt: float, particles: ParticleSystem) State | None
@@ -310,7 +319,23 @@ classDiagram
             +col: int
             +hold: bool
         }
-
+        class AIConfig {
+            +epsilon_decay: float
+            +epsilon_end: float
+            +lr: float
+            +gamma: float
+            +batch_size: int
+            +buffer_size: int
+            +ai_mode: str
+            +curriculum: bool
+            +curriculum_freq: int
+            +curriculum_epsilon: str
+            +warm_start: bool
+            +learn_per_action: int
+            +lookahead: bool
+            +lookahead_depth: int
+            +soft_drop: bool
+        }
         class AIState {
             +ghost_piece: bool
             +agent: DQNAgent
@@ -337,7 +362,7 @@ classDiagram
             - _curriculum_types: list~str~ | None
             - _curriculum_level: int
             - _curriculum_episode_count: int
-            +__init__(screen, font, audio, handicap, sound_volume, music_volume, music_song, piece_provider, speed, menu, epsilon_decay, epsilon_end, lr, gamma, batch_size, buffer_size, ai_mode, curriculum, curriculum_freq, curriculum_epsilon, warm_start, learn_per_action, lookahead, lookahead_depth, soft_drop, preview_count, speed_mode, debug, seed, device) None
+            +__init__(screen, font, audio, config, ai_config, piece_provider, speed, menu, seed, device) None
             - _get_candidate_states() tuple~np.ndarray, list~int~, np.ndarray~
             - _execute_macro_action(action: int) None
             - _lock_and_spawn(hard_drop: bool) tuple~int, list~
@@ -864,10 +889,11 @@ classDiagram
     GameState "1" *-- "1" Board : owns
     GameState "1" *-- "1" PieceProvider : owns
     GameState "1" *-- "1" GameStats : owns
-    GameState "1" *-- "1" Renderer : owns
+    GameState "1" *-- "1" GameConfig : owns
 
     AIState "1" *-- "1" DQNAgent : owns
     AIState "1" *-- "1" TrainingLog : owns
+    AIState "1" *-- "1" AIConfig : owns
 
     DQNAgent "1" *-- "1" DQNetwork : online_net
     DQNAgent "1" *-- "1" DQNetwork : target_net
