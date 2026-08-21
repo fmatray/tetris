@@ -27,6 +27,7 @@ from tetris.settings import (
 )
 from tetris.ai.candidates import iter_column_positions, best_next_placement, gen_placements
 from tetris.ai.hud import _hud_table_rows, _trend_arrow, draw_ai_hud
+from tetris.states.game import GameConfig, AIConfig
 from tetris.states.ai import AIState, NUM_ROTATIONS, PendingTransition
 from tetris.visuals.particles import ParticleSystem
 
@@ -48,6 +49,9 @@ def _make_ai(learning: bool = True, **kwargs: object) -> AIState:
     return _make_ai_full(learning=learning, speed=speed, **kwargs)
 
 
+from typing import cast
+
+
 def _make_ai_full(learning: bool = True, speed: str = "fast", **kwargs: object) -> AIState:
     soft_drop = bool(kwargs.pop("soft_drop", True))
     audio = AudioManager(sound_volume=0, music_volume=0)
@@ -56,19 +60,35 @@ def _make_ai_full(learning: bool = True, speed: str = "fast", **kwargs: object) 
         screen=_screen,
         font=_font,
         audio=audio,
-        handicap=0,
-        sound_volume=0,
-        music_volume=0,
+        config=GameConfig(
+            handicap=0,
+            sound_volume=0,
+            music_volume=0,
+            music_song="korobeiniki",
+            debug=False,
+            ghost_piece=True,
+            preview_count=1,
+            speed_mode="normal",
+        ),
+        ai_config=AIConfig(
+            epsilon_decay=0.999,
+            epsilon_end=0.1,
+            lr=1e-3,
+            gamma=0.97,
+            batch_size=64,
+            buffer_size=50_000,
+            ai_mode="learning" if learning else "playing",
+            curriculum=cast(bool, kwargs.get("curriculum", False)),
+            curriculum_freq=cast(int, kwargs.get("curriculum_freq", 50)),
+            curriculum_epsilon=cast(str, kwargs.get("curriculum_epsilon", "reset")),
+            warm_start=cast(bool, kwargs.get("warm_start", True)),
+            learn_per_action=cast(int, kwargs.get("learn_per_action", 2)),
+            lookahead=cast(bool, kwargs.get("lookahead", True)),
+            lookahead_depth=cast(int, kwargs.get("lookahead_depth", 1)),
+            soft_drop=soft_drop,
+        ),
         piece_provider=provider,
         speed=speed,
-        ai_mode="learning" if learning else "playing",
-        lookahead=True,
-        lookahead_depth=1,
-        soft_drop=soft_drop,
-        preview_count=1,
-        warm_start=True,
-        learn_per_action=2,
-        **kwargs,  # type: ignore[arg-type]
     )
     ai.log.path = _unique_path()
     return ai

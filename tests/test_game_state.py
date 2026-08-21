@@ -20,6 +20,7 @@ from tetris.settings import (
     DAS_REPEAT_MS,
     LOCK_DELAY_MS,
 )
+from tetris.states.game import GameConfig
 from tetris.states.human import HumanState
 from tetris.visuals.particles import ParticleSystem
 
@@ -30,7 +31,21 @@ def _make_game():
     screen = pygame.Surface((640, 480))
     font = pygame.font.Font(None, 24)
     audio = AudioManager(sound_volume=0, music_volume=0)
-    return HumanState(screen, font, audio, handicap=0, sound_volume=0, music_volume=0)
+    return HumanState(
+        screen,
+        font,
+        audio,
+        GameConfig(
+            handicap=0,
+            sound_volume=0,
+            music_volume=0,
+            music_song="korobeiniki",
+            debug=False,
+            ghost_piece=True,
+            preview_count=3,
+            speed_mode="normal",
+        ),
+    )
 
 
 def _fill_all_but_col0(board: Board) -> None:
@@ -122,7 +137,22 @@ def test_handle_event_esc_returns_existing_menu():
     font = pygame.font.Font(None, 24)
     audio = AudioManager(sound_volume=0, music_volume=0)
     menu = MenuState(screen, font, audio)
-    game = HumanState(screen, font, audio, handicap=0, menu=menu)
+    game = HumanState(
+        screen,
+        font,
+        audio,
+        GameConfig(
+            handicap=0,
+            sound_volume=0,
+            music_volume=0,
+            music_song="korobeiniki",
+            debug=False,
+            ghost_piece=True,
+            preview_count=3,
+            speed_mode="normal",
+        ),
+        menu=menu,
+    )
     result = game.handle_event(_key_down(pygame.K_ESCAPE))
     assert result is menu
 
@@ -485,7 +515,22 @@ def test_return_to_menu_with_existing():
     font = pygame.font.Font(None, 24)
     audio = AudioManager(sound_volume=0, music_volume=0)
     menu = MenuState(screen, font, audio)
-    game = HumanState(screen, font, audio, handicap=0, menu=menu)
+    game = HumanState(
+        screen,
+        font,
+        audio,
+        GameConfig(
+            handicap=0,
+            sound_volume=0,
+            music_volume=0,
+            music_song="korobeiniki",
+            debug=False,
+            ghost_piece=True,
+            preview_count=3,
+            speed_mode="normal",
+        ),
+        menu=menu,
+    )
     assert game._return_to_menu() is menu
 
 

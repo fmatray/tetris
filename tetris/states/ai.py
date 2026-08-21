@@ -42,14 +42,12 @@ from tetris.settings import (
     AI_ACTION_DELAY_MS,
     AI_MODEL_SAVE_INTERVAL,
     CURRICULUM_ORDER,
-    DEFAULT_SPEED_MODE,
-    LEARN_PER_ACTION,
     LOCK_DELAY_MS,
     LOG_PATH,
     MODEL_PATH,
 )
 from tetris.states.base import State
-from tetris.states.game import GameState
+from tetris.states.game import GameConfig, AIConfig, GameState
 from tetris.visuals.particles import ParticleSystem
 
 
@@ -90,31 +88,11 @@ class AIState(GameState):
         screen: pygame.Surface,
         font: pygame.font.Font,
         audio: AudioManager,
-        handicap: int,
-        sound_volume: int = 3,
-        music_volume: int = 3,
-        music_song: str = "korobeiniki",
+        config: GameConfig,
+        ai_config: AIConfig,
         piece_provider: PieceProvider | None = None,
         speed: str = "fast",
         menu: MenuState | None = None,
-        epsilon_decay: float = 0.999,
-        epsilon_end: float = 0.1,
-        lr: float = 1e-3,
-        gamma: float = 0.97,
-        batch_size: int = 64,
-        buffer_size: int = 50_000,
-        ai_mode: str = "learning",
-        curriculum: bool = False,
-        curriculum_freq: int = 50,
-        curriculum_epsilon: str = "reset",
-        warm_start: bool = True,
-        learn_per_action: int = LEARN_PER_ACTION,
-        lookahead: bool = True,
-        lookahead_depth: int = 3,
-        soft_drop: bool = True,
-        preview_count: int = 3,
-        debug: bool = False,
-        speed_mode: str = DEFAULT_SPEED_MODE,
         seed: int | None = None,
         device: str = "auto",
     ) -> None:
@@ -128,70 +106,45 @@ class AIState(GameState):
             screen: Pygame display surface.
             font: Font for HUD text.
             audio: Audio manager.
-            handicap: Pre-filled bottom rows (0–5).
-            sound_volume: SFX volume (0–3).
-            music_volume: Music volume (0–3).
-            music_song: Song key.
+            config: Gameplay settings (handicap, sound, debug, etc.).
+            ai_config: DQN hyperparameters.
             piece_provider: Spawn controller.
             speed: ``"fast"`` (act immediately) or ``"normal"`` (80ms delay).
             menu: Parent :class:`MenuState`.
-            epsilon_decay: Per-episode exploration decay.
-            epsilon_end: Minimum exploration rate.
-            lr: Learning rate.
-            gamma: Discount factor.
-            batch_size: Training mini-batch size.
-            buffer_size: Replay buffer capacity.
-            ai_mode: ``"learning"`` (train + log) or ``"playing"`` (greedy).
-            curriculum: Restrict piece pool progressively.
-            curriculum_freq: Episodes between curriculum level-ups.
-            curriculum_epsilon: Epsilon policy on level-up (``"reset"``,
-                ``"boost"``, ``"decay"``).
-            warm_start: Use Dellacherie values for warm-start selection.
-            learn_per_action: Gradient updates per locked piece.
-            lookahead: Enable chained look-ahead through preview pieces.
-            lookahead_depth: Number of upcoming pieces to simulate (1–3).
-            soft_drop: Use soft-drop BFS for candidate generation.
-            debug: Enable debug overlays.
             seed: Random seed for reproducible training (``None`` = non-deterministic).
             device: Torch device (``"auto"``, ``"cpu"``, or ``"cuda"``).
         """
         # Curriculum: restrict piece pool BEFORE super().__init__() spawns pieces
-        if curriculum and ai_mode == "learning" and piece_provider is not None:
+        if ai_config.curriculum and ai_config.ai_mode == "learning" and piece_provider is not None:
             piece_provider.set_allowed_types(["O"])
         super().__init__(
             screen,
             font,
             audio,
-            handicap,
-            sound_volume,
-            music_volume,
-            music_song,
+            config,
             piece_provider,
             menu,
-            preview_count=preview_count,
-            debug=debug,
-            speed_mode=speed_mode,
         )
-        self._handicap = handicap
+        self._handicap = config.handicap
         self.ghost_piece = False  # AI never shows ghost piece
         self.agent = DQNAgent(
-            epsilon_decay=epsilon_decay,
-            epsilon_end=epsilon_end,
-            lr=lr,
-            gamma=gamma,
-            batch_size=batch_size,
-            buffer_size=buffer_size,
+            epsilon_decay=ai_config.epsilon_decay,
+            epsilon_end=ai_config.epsilon_end,
+            lr=ai_config.lr,
+            gamma=ai_config.gamma,
+            batch_size=ai_config.batch_size,
+            buffer_size=ai_config.buffer_size,
             device=device,
             seed=seed,
         )
         self.log = TrainingLog(LOG_PATH)
         self.episode = self.log.total_episodes
         self.speed = speed
-        self.ai_mode = ai_mode
-        self.learn_per_action = learn_per_action
-        self.lookahead = lookahead
-        self.lookahead_depth = lookahead_depth
-        self.soft_drop = soft_drop
+        self.ai_mode = ai_config.ai_mode
+        self.learn_per_action = ai_config.learn_per_action
+        self.lookahead = ai_config.lookahead
+        self.lookahead_depth = ai_config.lookahead_depth
+        self.soft_drop = ai_config.soft_drop
         self._candidate_placements: list[Placement] = []
         # Last 5 moves for HUD display
         self._last_moves: list[MoveRecord] = []
@@ -219,12 +172,12 @@ class AIState(GameState):
             self.agent.epsilon = 0.0
 
         # Curriculum learning: restrict piece pool in learning mode
-        self.curriculum: bool = curriculum
-        self.warm_start: bool = warm_start
-        self.curriculum_freq: int = curriculum_freq
-        self.curriculum_epsilon: str = curriculum_epsilon
+        self.curriculum: bool = ai_config.curriculum
+        self.warm_start: bool = ai_config.warm_start
+        self.curriculum_freq: int = ai_config.curriculum_freq
+        self.curriculum_epsilon: str = ai_config.curriculum_epsilon
         self._curriculum_types: list[str] | None = None
-        if curriculum and self.ai_mode == "learning":
+        if ai_config.curriculum and self.ai_mode == "learning":
             self._curriculum_types = ["O"]
             self._curriculum_level = 0
             self._curriculum_episode_count = 0

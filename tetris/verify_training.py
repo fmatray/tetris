@@ -18,6 +18,7 @@ pygame.mixer.init()
 
 from tetris.audio import AudioManager
 from tetris.settings import DATA_DIR, MODEL_PATH
+from tetris.states.game import GameConfig, AIConfig
 from tetris.states.ai import AIState
 from tetris.visuals.fonts import get_small_font
 from tetris.visuals.particles import ParticleSystem
@@ -39,10 +40,39 @@ def run_training(n_episodes: int) -> None:
     font = get_small_font()
     audio = AudioManager(sound_volume=0, music_volume=0)
 
+    config = GameConfig(
+        handicap=0,
+        sound_volume=0,
+        music_volume=0,
+        music_song="korobeiniki",
+        debug=False,
+        ghost_piece=True,
+        preview_count=1,
+        speed_mode="normal",
+    )
+    ai_config = AIConfig(
+        epsilon_decay=0.999,
+        epsilon_end=0.1,
+        lr=1e-3,
+        gamma=0.97,
+        batch_size=64,
+        buffer_size=50_000,
+        ai_mode="learning",
+        curriculum=False,
+        curriculum_freq=50,
+        curriculum_epsilon="reset",
+        warm_start=True,
+        learn_per_action=2,
+        lookahead=True,
+        lookahead_depth=1,
+        soft_drop=True,
+    )
     state = AIState(
-        screen, font, audio, 0,
-        sound_volume=0, music_volume=0,
-        lookahead_depth=1, preview_count=1,
+        screen,
+        font,
+        audio,
+        config,
+        ai_config,
     )
     particles = ParticleSystem()
     initial_episodes = state.log.total_episodes
@@ -82,16 +112,16 @@ def run_training(n_episodes: int) -> None:
     avg_duration = sum(s * 0.1 for s in steps) / len(steps)
     max_loss = max(abs(e["loss"]) for e in episodes)
 
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print(f"Training Results ({len(episodes)} episodes)")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
     print(f"Best score:       {best_score}")
     print(f"Avg score:         {avg_score:.1f}")
     print(f"Avg duration:      {avg_duration:.1f}s")
     print(f"Max loss:          {max_loss:.4f}")
     print(f"Final epsilon:     {state.agent.epsilon:.4f}")
     print(f"Total frames:      {frame}")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
 
     # Check criteria
     c1 = best_score > 10000

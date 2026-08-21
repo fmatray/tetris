@@ -16,9 +16,9 @@ import pygame
 
 from tetris.audio import AudioManager
 from tetris.game.piece_provider import PieceProvider
-from tetris.settings import DEFAULT_SPEED_MODE, DAS_DELAY_MS, DAS_REPEAT_MS
+from tetris.settings import DAS_DELAY_MS, DAS_REPEAT_MS
 from tetris.states.base import State
-from tetris.states.game import GameState
+from tetris.states.game import GameConfig, GameState
 from tetris.visuals.particles import ParticleSystem
 
 
@@ -36,50 +36,29 @@ class HumanState(GameState):
         screen: pygame.Surface,
         font: pygame.font.Font,
         audio: AudioManager,
-        handicap: int,
-        sound_volume: int = 3,
-        music_volume: int = 3,
-        music_song: str = "korobeiniki",
+        config: GameConfig,
         piece_provider: PieceProvider | None = None,
         menu: MenuState | None = None,
-        debug: bool = False,
-        ghost_piece: bool = True,
-        preview_count: int = 3,
-        speed_mode: str = DEFAULT_SPEED_MODE,
     ) -> None:
         """Initialize a human gameplay session.
 
         Sets up the board (with handicap), piece provider, keybinds, lock-delay
         state, DAS state, and the preview/hold piece queues.
 
-        Args:
             screen: Pygame display surface.
             font: Font for HUD text.
             audio: Audio manager.
-            handicap: Number of pre-filled bottom rows (0–5).
-            sound_volume: SFX volume (0–3).
-            music_volume: Music volume (0–3).
-            music_song: Song key (``"korobeiniki"`` or ``"kalinka"``).
+            config: Gameplay settings (handicap, sound, debug, etc.).
             piece_provider: Spawn controller (created if ``None``).
             menu: Parent :class:`MenuState` for settings access.
-            debug: Enable debug overlays (7-bag viz, speed).
-            ghost_piece: Show the ghost piece.
-            preview_count: Number of next pieces to show (0, 1, or 3).
         """
         super().__init__(
             screen,
             font,
             audio,
-            handicap,
-            sound_volume,
-            music_volume,
-            music_song,
+            config,
             piece_provider,
             menu,
-            debug=debug,
-            ghost_piece=ghost_piece,
-            preview_count=preview_count,
-            speed_mode=speed_mode,
         )
         self._setup_keybinds(menu)
         self._das_held: dict[int, float] = {}

@@ -7,6 +7,44 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from tetris.states.menu import MenuState
 
+from dataclasses import dataclass
+
+
+@dataclass(frozen=True)
+class GameConfig:
+    """Shared gameplay settings."""
+
+    handicap: int
+    sound_volume: int
+    music_volume: int
+    music_song: str
+    debug: bool
+    ghost_piece: bool
+    preview_count: int
+    speed_mode: str
+
+
+@dataclass(frozen=True)
+class AIConfig:
+    """DQN hyperparameters."""
+
+    epsilon_decay: float
+    epsilon_end: float
+    lr: float
+    gamma: float
+    batch_size: int
+    buffer_size: int
+    ai_mode: str
+    curriculum: bool
+    curriculum_freq: int
+    curriculum_epsilon: str
+    warm_start: bool
+    learn_per_action: int
+    lookahead: bool
+    lookahead_depth: int
+    soft_drop: bool
+
+
 import pygame
 
 from tetris.audio import AudioManager
@@ -19,7 +57,6 @@ from tetris.settings import (
     BLOCK_SIZE,
     BOARD_OFFSET_X,
     BOARD_OFFSET_Y,
-    DEFAULT_SPEED_MODE,
     DROP_BASE,
     DROP_MIN_INTERVAL,
     HIDDEN_ROWS,
@@ -67,16 +104,9 @@ class GameState(State):
         screen: pygame.Surface,
         font: pygame.font.Font,
         audio: AudioManager,
-        handicap: int,
-        sound_volume: int = 3,
-        music_volume: int = 3,
-        music_song: str = "korobeiniki",
+        config: GameConfig,
         piece_provider: PieceProvider | None = None,
         menu: MenuState | None = None,
-        debug: bool = False,
-        ghost_piece: bool = True,
-        preview_count: int = 3,
-        speed_mode: str = DEFAULT_SPEED_MODE,
     ) -> None:
         """Initialize the shared game infrastructure.
 
@@ -88,32 +118,26 @@ class GameState(State):
             screen: Pygame display surface.
             font: Font for HUD text.
             audio: Audio manager.
-            handicap: Number of pre-filled bottom rows (0–5).
-            sound_volume: SFX volume (0–3).
-            music_volume: Music volume (0–3).
-            music_song: Song key (``"korobeiniki"`` or ``"kalinka"``).
+            config: Gameplay settings (handicap, sound, debug, etc.).
             piece_provider: Spawn controller (created if ``None``).
             menu: Parent :class:`MenuState` for settings access.
-            debug: Enable debug overlays (7-bag viz, speed).
-            ghost_piece: Show the ghost piece.
-            preview_count: Number of next pieces to show (0, 1, or 3).
         """
         self.screen, self.font, self.audio = screen, font, audio
-        self.audio.apply_settings(sound_volume, music_volume, music_song)
+        self.audio.apply_settings(config.sound_volume, config.music_volume, config.music_song)
         self._last_level = 0
         self._pending_level_up = False
         self.menu = menu
-        self.debug = debug
-        self.ghost_piece = ghost_piece
-        self.preview_count = preview_count
+        self.debug = config.debug
+        self.ghost_piece = config.ghost_piece
+        self.preview_count = config.preview_count
         self.renderer = Renderer(screen, font)
-        self.speed_mode = speed_mode
+        self.speed_mode = config.speed_mode
         self.board = Board()
-        self.board.apply_handicap(handicap)
+        self.board.apply_handicap(config.handicap)
         self.pieces = piece_provider or PieceProvider()
         self.current_piece = Tetromino(self.pieces.next_type())
         self.next_piece = Tetromino(self.pieces.next_type())
-        self.preview_pieces = [Tetromino(self.pieces.next_type()) for _ in range(max(0, preview_count - 1))]
+        self.preview_pieces = [Tetromino(self.pieces.next_type()) for _ in range(max(0, config.preview_count - 1))]
         self.drop_time: float = 0.0
         self.stats = GameStats()
         self.current_speed = _drop_interval(0, SPEED_MODES[self.speed_mode])

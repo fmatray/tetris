@@ -13,6 +13,7 @@ pygame.mixer.init()
 
 from tetris.audio import AudioManager
 from tetris.settings import BLOCK_SIZE, BOARD_OFFSET_X, BOARD_OFFSET_Y, HIDDEN_ROWS
+from tetris.states.game import GameConfig
 from tetris.states.human import HumanState
 from tetris.visuals.fonts import (
     CONTENT_Y,
@@ -41,7 +42,22 @@ def _make_game(**kwargs) -> HumanState:
     screen = pygame.Surface((640, 480))
     font = pygame.font.Font(None, 24)
     audio = AudioManager(sound_volume=0, music_volume=0)
-    return HumanState(screen, font, audio, handicap=0, sound_volume=0, music_volume=0, **kwargs)
+    return HumanState(
+        screen,
+        font,
+        audio,
+        GameConfig(
+            handicap=0,
+            sound_volume=0,
+            music_volume=0,
+            music_song="korobeiniki",
+            debug=False,
+            ghost_piece=True,
+            preview_count=3,
+            speed_mode="normal",
+        ),
+        **kwargs,
+    )
 
 
 # ---------------------------------------------------------------------------
