@@ -1,4 +1,4 @@
-"""Game rules sub-menu: random generator, preview count, handicap, speed mode, back."""
+"""Game rules sub-menu: random generator, preview count, handicap, speed mode, ghost piece, back."""
 
 from __future__ import annotations
 
@@ -12,10 +12,10 @@ _PREVIEW_VALUES = (0, 1, 3)
 
 
 class GameRulesMenuState(MenuBase):
-    """Game rules sub-menu: random generator, preview count, handicap, speed mode, back."""
+    """Game rules sub-menu: random generator, preview count, handicap, speed mode, ghost piece, back."""
 
-    _OPTIONS = ("Générateur", "Prévisualisation", "Handicap", "Vitesse", "Retour")
-    _toggle_indices = frozenset({0, 1, 2, 3})
+    _OPTIONS = ("Générateur", "Prévisualisation", "Handicap", "Vitesse", "Fantôme", "Retour")
+    _toggle_indices = frozenset({0, 1, 2, 3, 4})
     _title = "Règles du jeu"
 
     def __init__(self, screen, font, audio, menu) -> None:
@@ -33,6 +33,8 @@ class GameRulesMenuState(MenuBase):
                 return str(self.menu.handicap)
             case 3:
                 return SPEED_MODE_LABELS.get(self.menu.speed_mode, "Normal")
+            case 4:
+                return "ON" if self.menu.ghost_piece else "OFF"
             case _:
                 return ""
 
@@ -49,6 +51,8 @@ class GameRulesMenuState(MenuBase):
             case 3:
                 idx = SPEED_MODE_ORDER.index(self.menu.speed_mode)
                 self.menu.speed_mode = SPEED_MODE_ORDER[(idx + direction) % len(SPEED_MODE_ORDER)]
+            case 4:
+                self.menu.ghost_piece = not self.menu.ghost_piece
 
     def _save(self) -> None:
         self.menu.save_settings()
@@ -57,7 +61,7 @@ class GameRulesMenuState(MenuBase):
         return self.menu
 
     def _on_select(self) -> State | None:
-        if self.selection == 4:  # Retour
+        if self.selection == 5:  # Retour
             return self.menu
         self._toggle(1)
         self._save()

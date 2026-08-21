@@ -151,7 +151,6 @@ class AIState(GameState):
             menu,
         )
         self._handicap = config.handicap
-        self.ghost_piece = False  # AI never shows ghost piece
         self.agent = DQNAgent(
             epsilon_decay=ai_config.epsilon_decay,
             epsilon_end=ai_config.epsilon_end,

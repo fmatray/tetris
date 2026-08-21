@@ -381,10 +381,16 @@ def test_game_rules_value_label_speed():
     assert state._value_label(3) == "Normal"
 
 
+def test_game_rules_value_label_ghost():
+    menu = _make_menu()
+    state = _make_state(GameRulesMenuState, menu)
+    assert state._value_label(4) == "ON"  # ghost_piece default True
+
+
 def test_game_rules_value_label_retour():
     menu = _make_menu()
     state = _make_state(GameRulesMenuState, menu)
-    assert state._value_label(4) == ""
+    assert state._value_label(5) == ""
 
 
 # ── HyperparamMenuState ───────────────────────────────────────────────
@@ -1003,10 +1009,9 @@ def test_human_menu_value_labels():
     menu = _make_menu()
     state = _make_state(HumanMenuState, menu)
     assert state._value_label(0) == "Normal"  # mode default
-    assert state._value_label(1) == "ON"  # ghost_piece default True
-    assert state._value_label(2) == ""  # Touches
-    assert state._value_label(3) == ""  # Statistiques
-    assert state._value_label(4) == ""  # Retour
+    assert state._value_label(1) == ""  # Touches
+    assert state._value_label(2) == ""  # Statistiques
+    assert state._value_label(3) == ""  # Retour
 
 
 def test_human_menu_toggle_mode():
@@ -1017,18 +1022,10 @@ def test_human_menu_toggle_mode():
     assert menu.mode == "Replay"
 
 
-def test_human_menu_toggle_ghost():
-    menu = _make_menu()
-    state = _make_state(HumanMenuState, menu)
-    state.selection = 1
-    state._toggle(1)
-    assert menu.ghost_piece is False
-
-
 def test_human_menu_select_keybind_navigates():
     menu = _make_menu()
     state = _make_state(HumanMenuState, menu)
-    state.selection = 2
+    state.selection = 1
     result = state._on_select()
     assert result is not None
     assert result is not state
@@ -1037,7 +1034,7 @@ def test_human_menu_select_keybind_navigates():
 def test_human_menu_select_stats_navigates():
     menu = _make_menu()
     state = _make_state(HumanMenuState, menu)
-    state.selection = 3
+    state.selection = 2
     result = state._on_select()
     assert result is not None
     assert result is not state
@@ -1046,7 +1043,7 @@ def test_human_menu_select_stats_navigates():
 def test_human_menu_select_retour_returns_menu():
     menu = _make_menu()
     state = _make_state(HumanMenuState, menu)
-    state.selection = 4
+    state.selection = 3
     result = state._on_select()
     assert result is menu
 

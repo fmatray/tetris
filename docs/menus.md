@@ -8,7 +8,6 @@ Menu principal
 ├── Joueur                        [toggle ◄ ►]     Humain ↔ IA
 ├── Humain                        [ENTER]          (grisé si Joueur=IA)
 │   └── Mode                      [toggle ◄ ►]     Normal ↔ Replay
-│       Fantôme                   [toggle ◄ ►]     ON ↔ OFF
 │       Touches                   [ENTER]          → keybinding config
 │       Statistiques              [ENTER]          → human stats page
 │       Retour                    [ENTER | ESC]
@@ -39,6 +38,7 @@ Menu principal
 │       Prévisualisation          [toggle ◄ ►]     Désactivé ↔ 1 pièce ↔ 3 pièces
 │       Handicap                  [toggle ◄ ►]     0–5
 │       Vitesse                   [toggle ◄ ►]     Aucune ↔ Facile ↔ Normal ↔ Moyen ↔ Difficile ↔ Fou ↔ Infernal
+│       Fantôme                   [toggle ◄ ►]     ON ↔ OFF
 │       Retour                    [ENTER | ESC]
 ├── Leaderboard                   [ENTER]          → top 10 scores
 ├── Audio                         [ENTER]          → audio submenu

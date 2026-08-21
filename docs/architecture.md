@@ -52,7 +52,7 @@ tetris/
 │   │   ├── base.py              # State (classe de base)
 │   │   ├── menu_base.py         # MenuStateBase (logique de menu réutilisable)
 │   │   ├── menu.py              # MenuState (persistance settings.json)
-│   │   ├── human_menu.py        # HumanMenuState (mode, fantôme, touches, stats)
+│   │   ├── human_menu.py        # HumanMenuState (mode, touches, stats)
 │   │   ├── human_stats.py       # HumanStatsState (page de statistiques humaines)
 │   │   ├── keybind.py           # KeybindState (configuration des touches)
 │   │   ├── game.py              # GameState (base abstraite: board, pieces, gravité, GameConfig)

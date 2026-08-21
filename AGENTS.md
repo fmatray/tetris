@@ -30,7 +30,7 @@ Returning a new `State` from `handle_event`/`update` transitions the app; `None`
 
 ```
 MenuState (root, owns settings)
-├── GameRulesMenuState (generator, preview, handicap, speed)
+├── GameRulesMenuState (generator, preview, handicap, speed, ghost piece)
 ├── HumanMenuState → { KeybindState, HumanStatsState }
 ├── AIMenuState → { TrainingMenuState → { HyperparamMenuState, PlaceholderState }, AIStatsState }
 ├── AudioMenuState
@@ -110,7 +110,7 @@ python -m tetris.verify_training
 | `tetris/states/base.py` | `State` base class contract |
 | `tetris/states/menu.py` | Root menu, settings load/save, navigation hub |
 | `tetris/states/audio_menu.py` | Audio sub-menu: sound/music volume, song selection |
-| `tetris/states/game_rules_menu.py` | Game rules sub-menu: generator, preview count, handicap, speed mode |
+| `tetris/states/game_rules_menu.py` | Game rules sub-menu: generator, preview count, handicap, speed mode, ghost piece |
 | `tetris/states/game.py` | `GameState` abstract base: board, pieces, gravity, lock delay, movement primitives; `GameConfig` dataclass (shared gameplay settings) |
 | `tetris/states/human.py` | `HumanState` — human gameplay: keyboard, DAS, pause, keybind setup |
 | `tetris/states/keybind.py` | Keybinding state, `key_name()` (moved from settings.py) |

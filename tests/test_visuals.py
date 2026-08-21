@@ -42,20 +42,21 @@ def _make_game(**kwargs) -> HumanState:
     screen = pygame.Surface((640, 480))
     font = pygame.font.Font(None, 24)
     audio = AudioManager(sound_volume=0, music_volume=0)
+    config = GameConfig(
+        handicap=0,
+        sound_volume=0,
+        music_volume=0,
+        music_song="korobeiniki",
+        debug=kwargs.pop("debug", False),
+        ghost_piece=kwargs.pop("ghost_piece", True),
+        preview_count=kwargs.pop("preview_count", 3),
+        speed_mode="normal",
+    )
     return HumanState(
         screen,
         font,
         audio,
-        GameConfig(
-            handicap=0,
-            sound_volume=0,
-            music_volume=0,
-            music_song="korobeiniki",
-            debug=False,
-            ghost_piece=True,
-            preview_count=3,
-            speed_mode="normal",
-        ),
+        config,
         **kwargs,
     )
 

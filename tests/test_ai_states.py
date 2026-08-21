@@ -123,7 +123,7 @@ class TestInit:
         assert ai._pending is None
         assert ai._prev_action is None
         assert ai.speed == "fast"
-        assert ai.ghost_piece is False
+        assert ai.ghost_piece is True
         assert ai.warm_start is True
         assert ai.lookahead is True
         assert ai.soft_drop is True
