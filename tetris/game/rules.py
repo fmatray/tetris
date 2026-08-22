@@ -109,3 +109,49 @@ def find_full_rows(grid) -> list[int]:
     if isinstance(grid, np.ndarray):
         return list(np.where((grid > 0).all(axis=1))[0])
     return [y for y in range(BOARD_HEIGHT) if all(bool(grid[y][x]) for x in range(BOARD_WIDTH))]
+
+
+def _covered_cells(grid) -> set[tuple[int, int]]:
+    """Empty cells with a filled cell above in the same column."""
+    H, W = len(grid), len(grid[0])
+    covered = set()
+    for x in range(W):
+        seen = False
+        for y in range(H):
+            if bool(grid[y][x]):
+                seen = True
+            elif seen:
+                covered.add((x, y))
+    return covered
+
+
+def _reachable_from_flood(grid) -> set[tuple[int, int]]:
+    """Empty cells reachable from the top row via orthogonal empty-cell moves."""
+    H, W = len(grid), len(grid[0])
+    reachable = set()
+    stack = [(x, 0) for x in range(W) if not bool(grid[0][x])]
+    while stack:
+        x, y = stack.pop()
+        if (x, y) in reachable:
+            continue
+        reachable.add((x, y))
+        for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+            nx, ny = x + dx, y + dy
+            if 0 <= nx < W and 0 <= ny < H and not bool(grid[ny][nx]) and (nx, ny) not in reachable:
+                stack.append((nx, ny))
+    return reachable
+
+
+def find_holes(grid) -> set[tuple[int, int]]:
+    """Unreachable covered empty cells (X board markers)."""
+    return _covered_cells(grid) - _reachable_from_flood(grid)
+
+
+def find_overhangs(grid) -> set[tuple[int, int]]:
+    """Reachable covered empty cells (O board markers)."""
+    return _covered_cells(grid) & _reachable_from_flood(grid)
+
+
+def count_overhangs(grid, mask=None, first_row=None) -> int:
+    """Count of reachable covered empty cells (overhangs)."""
+    return len(find_overhangs(grid))

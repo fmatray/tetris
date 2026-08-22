@@ -42,6 +42,7 @@ Menu principal
 │       Handicap                  [toggle ◄ ►]     0–5
 │       Vitesse                   [toggle ◄ ►]     Aucune ↔ Facile ↔ Normal ↔ Moyen ↔ Difficile ↔ Fou ↔ Infernal
 │       Fantôme                   [toggle ◄ ►]     ON ↔ OFF
+│       Trous et surplombs        [toggle ◄ ►]     Aucun ↔ Trous ↔ Surplombs ↔ Les deux
 │       Retour                    [ENTER | ESC]
 ├── Leaderboard                   [ENTER]          → top 10 scores
 ├── Audio                         [ENTER]          → audio submenu

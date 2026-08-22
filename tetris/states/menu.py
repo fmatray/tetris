@@ -65,6 +65,8 @@ class MenuState(MenuBase):
         self.preview_count = 3
         self.debug = False
         self.speed_mode = DEFAULT_SPEED_MODE
+
+        self.holes_overhangs_help = "none"
         self.ai_epsilon_decay = 0.999
         self.ai_epsilon_end = 0.1
         self.ai_lr = 1e-4
@@ -118,6 +120,7 @@ class MenuState(MenuBase):
         "preview_count": "preview_count",
         "debug": "debug",
         "speed_mode": "speed_mode",
+        "holes_overhangs_help": "holes_overhangs_help",
         "mcp_port": "mcp_port",
     }
 
@@ -265,6 +268,7 @@ class MenuState(MenuBase):
                 ghost_piece=self.ghost_piece,
                 preview_count=self.preview_count,
                 speed_mode=self.speed_mode,
+                holes_overhangs_help=self.holes_overhangs_help,
             ),
             AIConfig(
                 epsilon_decay=self.ai_epsilon_decay,
@@ -306,6 +310,7 @@ class MenuState(MenuBase):
                 ghost_piece=self.ghost_piece,
                 preview_count=self.preview_count,
                 speed_mode=self.speed_mode,
+                holes_overhangs_help=self.holes_overhangs_help,
             ),
             MCPConfig(port=self.mcp_port),
             mcp_provider,

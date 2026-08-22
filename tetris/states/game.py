@@ -23,6 +23,8 @@ class GameConfig:
     preview_count: int
     speed_mode: str
 
+    holes_overhangs_help: str = "none"
+
 
 import pygame
 
@@ -109,6 +111,8 @@ class GameState(State):
         self.debug = config.debug
         self.ghost_piece = config.ghost_piece
         self.preview_count = config.preview_count
+
+        self.holes_overhangs_help = config.holes_overhangs_help
         self.renderer = Renderer(screen, font)
         self.speed_mode = config.speed_mode
         self.board = Board()

@@ -130,3 +130,11 @@ class Board:
             self.grid = new_grid
 
         return LineClearResult(lines_cleared, cleared_rows)
+
+    def find_holes(self) -> set[tuple[int, int]]:
+        """Return coordinates of unreachable covered empty cells (holes)."""
+        return rules.find_holes(self.grid)
+
+    def find_overhangs(self) -> set[tuple[int, int]]:
+        """Return coordinates of reachable covered empty cells (overhangs)."""
+        return rules.find_overhangs(self.grid)

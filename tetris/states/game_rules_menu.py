@@ -10,12 +10,15 @@ _GENERATORS = ("random", "7bag", "35bag", "weighted")
 _PREVIEW_LABELS = ("Désactivé", "1 pièce", "3 pièces")
 _PREVIEW_VALUES = (0, 1, 3)
 
+_HOLES_OVERHANGS_LABELS = ("Aucun", "Trous", "Surplombs", "Les deux")
+_HOLES_OVERHANGS_VALUES = ("none", "holes", "overhangs", "both")
+
 
 class GameRulesMenuState(MenuBase):
     """Game rules sub-menu: random generator, preview count, handicap, speed mode, ghost piece, back."""
 
-    _OPTIONS = ("Générateur", "Prévisualisation", "Handicap", "Vitesse", "Fantôme", "Retour")
-    _toggle_indices = frozenset({0, 1, 2, 3, 4})
+    _OPTIONS = ("Générateur", "Prévisualisation", "Handicap", "Vitesse", "Fantôme", "Trous et surplombs", "Retour")
+    _toggle_indices = frozenset({0, 1, 2, 3, 4, 5})
     _title = "Règles du jeu"
 
     def __init__(self, screen, font, audio, menu) -> None:
@@ -35,6 +38,8 @@ class GameRulesMenuState(MenuBase):
                 return SPEED_MODE_LABELS.get(self.menu.speed_mode, "Normal")
             case 4:
                 return "ON" if self.menu.ghost_piece else "OFF"
+            case 5:
+                return _HOLES_OVERHANGS_LABELS[_HOLES_OVERHANGS_VALUES.index(self.menu.holes_overhangs_help)]
             case _:
                 return ""
 
@@ -53,6 +58,11 @@ class GameRulesMenuState(MenuBase):
                 self.menu.speed_mode = SPEED_MODE_ORDER[(idx + direction) % len(SPEED_MODE_ORDER)]
             case 4:
                 self.menu.ghost_piece = not self.menu.ghost_piece
+            case 5:
+                idx = _HOLES_OVERHANGS_VALUES.index(self.menu.holes_overhangs_help)
+                self.menu.holes_overhangs_help = _HOLES_OVERHANGS_VALUES[
+                    (idx + direction) % len(_HOLES_OVERHANGS_VALUES)
+                ]
 
     def _save(self) -> None:
         self.menu.save_settings()
@@ -61,7 +71,7 @@ class GameRulesMenuState(MenuBase):
         return self.menu
 
     def _on_select(self) -> State | None:
-        if self.selection == 5:  # Retour
+        if self.selection == 6:  # Retour
             return self.menu
         self._toggle(1)
         self._save()

@@ -13,12 +13,11 @@ from typing import TYPE_CHECKING, Any, ClassVar
 
 import pygame
 
-from tetris.ai.rewards import board_to_grid
 from tetris.game.board import Board
 from tetris.game.stats import GameStats
 from tetris.game.tetromino import Tetromino
 from tetris.logger import get_logger
-from tetris.settings import HUD_POSITIONS, SPEED_MODES
+from tetris.settings import BOARD_HEIGHT, BOARD_WIDTH, HUD_POSITIONS, SPEED_MODES
 from tetris.states.game import GameConfig, GameState, _drop_interval
 from tetris.visuals.particles import ParticleSystem
 
@@ -130,13 +129,31 @@ class MCPState(GameState):
         self.stats = GameStats()
         self.current_speed = _drop_interval(0, SPEED_MODES[self.speed_mode])
 
+    def _build_board_repr(self) -> tuple[list, int, int]:
+        holes = self.board.find_holes()
+        overhangs = self.board.find_overhangs()
+        repr_grid = []
+        for y in range(BOARD_HEIGHT):
+            row = []
+            for x in range(BOARD_WIDTH):
+                if self.board.grid[y][x] is not None:
+                    row.append(1)
+                elif (x, y) in holes:
+                    row.append("X")
+                elif (x, y) in overhangs:
+                    row.append("O")
+                else:
+                    row.append(0)
+            repr_grid.append(row)
+        return repr_grid, len(holes), len(overhangs)
+
     def _board_snapshot(
         self, action_results: list[str] | None = None, lines_cleared: int | None = None
     ) -> dict[str, Any]:
         """Return current board state as a dict for the MCP client."""
-        grid = board_to_grid(self.board)
+        repr_grid, holes, overhangs = self._build_board_repr()
         snap: dict[str, Any] = {
-            "board": grid.astype(int).tolist(),
+            "board": repr_grid,
             "current_piece": self.current_piece.type,
             "next_piece": self.next_piece.type,
             "preview_pieces": [p.type for p in self.preview_pieces],
@@ -146,6 +163,8 @@ class MCPState(GameState):
             "lines": self.stats.total_lines,
             "level": self.stats.level,
             "game_over": self.game_over,
+            "holes": holes,
+            "overhangs": overhangs,
         }
         if action_results is not None:
             snap["action_results"] = action_results
@@ -182,8 +201,17 @@ class MCPState(GameState):
                     super().update(dt, particles)
                 snapshot = self._board_snapshot(action_results, lines_cleared)
             except Exception as exc:  # noqa: BLE001  # one bad request must not kill the server
-                grid: list[list[int]] = board_to_grid(self.board).astype(int).tolist() if self.board is not None else []
-                snapshot = {"error": str(exc), "game_over": self.game_over, "board": grid}
+                if self.board is not None:
+                    repr_grid, holes, overhangs = self._build_board_repr()
+                else:
+                    repr_grid, holes, overhangs = [], 0, 0
+                snapshot = {
+                    "error": str(exc),
+                    "game_over": self.game_over,
+                    "board": repr_grid,
+                    "holes": holes,
+                    "overhangs": overhangs,
+                }
             self._last_tool_call = {"actions": actions, "frames": frames, "results": action_results}
             self._last_snapshot = snapshot
             result_queue.put(snapshot)

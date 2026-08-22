@@ -78,11 +78,15 @@ class TetrisMCPServer:
                     actions only with no time passing.
 
             Returns:
-                Board snapshot dict with keys: ``board`` (0/1 grid),
-                ``current_piece``, ``next_piece``, ``preview_pieces``,
-                ``hold_piece``, ``can_hold``, ``score``, ``lines``,
-                ``level``, ``game_over``, ``action_results``, ``lines_cleared``.
-                On processing error: ``error``, ``game_over``, ``board``.
+                Board snapshot dict with keys: ``board`` (grid of
+                0=empty, 1=filled, "X"=hole (unreachable covered empty),
+                "O"=overhang (reachable covered empty)), ``holes`` (int),
+                ``overhangs`` (int), ``current_piece``, ``next_piece``,
+                ``preview_pieces``, ``hold_piece``, ``can_hold``,
+                ``score``, ``lines``, ``level``, ``game_over``,
+                ``action_results``, ``lines_cleared``.
+                On processing error: ``error``, ``game_over``, ``board``,
+                ``holes``, ``overhangs``.
             """
             result_q: queue.Queue[dict[str, Any]] = queue.Queue()
             self._action_queue.put((actions, frames, result_q))
@@ -125,6 +129,7 @@ class TetrisMCPServer:
                     "board_size": "10x20 visible (22 with hidden buffer)",
                     "pieces": SHAPES_TYPES,
                     "scoring": "standard Tetris guideline",
+                    "board_markers": "filled=1, empty=0, hole='X' (unreachable covered), overhang='O' (reachable covered)",
                     "shapes_resource": "tetris://shapes",
                 }
             )

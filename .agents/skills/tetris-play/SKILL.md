@@ -60,7 +60,7 @@ gravity/lock delay, return a board snapshot.
 ### Board snapshot (both tools)
 
 ```text
-board:            list[22] of list[10] int   # 1 = filled, 0 = empty
+board:            list[22] of list[10] of (int|"X"|"O")   # 1 = filled, 0 = empty, "X" = hole (unreachable covered), "O" = overhang (reachable covered)
 current_piece:    str   # "I","O","T","S","Z","J","L"
 next_piece:       str
 preview_pieces:   list[str]                  # extra lookahead (count = preview_count-1)
@@ -70,6 +70,8 @@ score:            int
 lines:            int
 level:            int
 game_over:        bool
+holes:            int                         # count of unreachable covered empty cells ("X")
+overhangs:        int                        # count of reachable covered empty cells ("O")
 action_results:   list[str]                  # "ok" / "blocked" (hold unavailable) / "unknown:<action>" per action (play only)
 lines_cleared:    int | None                  # lines removed by this call's actions (play only)
 error:            str | None                  # present only when processing raised; also game_over/board
@@ -94,7 +96,10 @@ Read it once at session start; no need to open `tetris/game/shapes.py`.
 ## Board representation
 
 - `board[y][x]`: `y=0` is the **top** (2 hidden buffer rows at y=0,1),
-  `y=21` is the bottom. `x=0` is the left wall. `1` = occupied.
+  `y=21` is the bottom. `x=0` is the left wall. `1` = occupied, `0` = empty,
+  `"X"` = hole (empty with a filled cell above and no path from the top),
+  `"O"` = overhang (empty with a filled cell above but still reachable from
+  the top through a side gap). `holes`/`overhangs` count them.
 - Height of column `x` = `22 - (index of first filled row from the top)`.
 - Line clears and scoring (standard Tetris Guideline) happen automatically
   on lock.

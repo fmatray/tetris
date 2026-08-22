@@ -64,6 +64,7 @@ class Renderer:
         if game.ghost_piece:
             self.draw_ghost(game.current_piece, game.board)
         self.draw_tetromino(game.current_piece)
+        self._draw_hole_overhang_markers(game)
         self._draw_text(f"SCORE: {game.stats.score}", HUD_POSITIONS["score"])
         self._draw_text(f"TETROMINOS: {game.stats.piece_count}", HUD_POSITIONS["tetrominos"])
         self._draw_text(f"LIGNES: {game.stats.total_lines}", HUD_POSITIONS["lines"])
@@ -90,6 +91,7 @@ class Renderer:
                     self._draw_debug_bag(game)
                 case "weighted":
                     self._draw_debug_weights(game)
+            self._draw_hole_overhang_debug(game)
         mode = game.menu.mode if game.menu else "Normal"
         gen = GENERATOR_LABELS.get(game.pieces.generator, "Aléatoire")
         self._draw_text(f"MODE: {mode}", HUD_POSITIONS["mode"])
@@ -107,6 +109,31 @@ class Renderer:
     def _draw_text(self, text: str, pos: tuple[int, int]) -> None:
         surf = self.font.render(text, True, WHITE)
         self.screen.blit(surf, pos)
+
+    def _draw_hole_overhang_markers(self, game: GameState) -> None:
+        """Draw white X (unreachable holes) and O (reachable overhangs) per the menu toggle."""
+        opt = getattr(game, "holes_overhangs_help", "none")
+        if opt == "none":
+            return
+        holes = game.board.find_holes() if opt in ("holes", "both") else set()
+        overhangs = game.board.find_overhangs() if opt in ("overhangs", "both") else set()
+        for x, y in holes:
+            if y >= HIDDEN_ROWS:
+                self._draw_cell_letter("X", self._cell_rect(x, y, BOARD_OFFSET_X, BOARD_OFFSET_Y), WHITE)
+        for x, y in overhangs:
+            if y >= HIDDEN_ROWS:
+                self._draw_cell_letter("O", self._cell_rect(x, y, BOARD_OFFSET_X, BOARD_OFFSET_Y), WHITE)
+
+    def _draw_cell_letter(self, letter: str, rect: pygame.Rect, color) -> None:
+        surf = self.font.render(letter, True, color)
+        self.screen.blit(surf, (rect.x + (rect.w - surf.get_width()) // 2, rect.y + (rect.h - surf.get_height()) // 2))
+
+    def _draw_hole_overhang_debug(self, game: GameState) -> None:
+        hx, hy = HUD_POSITIONS["hold_panel"]
+        y = hy + BLOCK_SIZE + 8
+        if y + self.font.get_height() * 2 <= SCREEN_HEIGHT:
+            self._draw_text(f"Trous: {len(game.board.find_holes())}", (hx, y))
+            self._draw_text(f"Surplombs: {len(game.board.find_overhangs())}", (hx, y + self.font.get_height()))
 
     def _draw_debug_bag(self, game: GameState) -> None:
         """Draw remaining bag pieces as colored blocks right of the next-piece panel."""

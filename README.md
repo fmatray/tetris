@@ -11,6 +11,8 @@ Un jeu Tetris complet développé en Python avec Pygame, incluant des effets vis
 - ✅ Niveaux progressifs (la vitesse augmente selon `0.5 × 0.98^niveau` toutes les 10 lignes)
 - ✅ Handicap personnalisable (0-5, chaque niveau ajoute 2 rangées partielles de blocs gris en bas)
 
+- ✅ **Diagnostic des trous et surplombs** : option « Trous et surplombs » (menu Règles du jeu) affichant des marqueurs blancs sur la grille — `X` = trou inaccessible depuis le haut, `O` = surplomb atteignable mais recouvert. L'IA intègre aussi une pénalité sur les surplombs dans sa récompense.
+
 ### Effets visuels
 
 - ✅ **Particules explosives** : 80 particules par ligne détruite, avec physique (gravité, friction).

@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from tetris.game.rules import find_full_rows, place_cells
+from tetris.game.rules import count_overhangs, find_full_rows, place_cells
 from tetris.game.shapes import NB_SHAPES_TYPES, SHAPES_TYPES
 from tetris.settings import BOARD_HEIGHT, BOARD_WIDTH
 
@@ -21,33 +21,51 @@ FEATURE_SIZE = 17
 # Indices: [lines_cleared, holes, aggregate_height, bumpiness, max_height,
 #           row_transitions, column_transitions, wells, hole_depth,
 #           rows_with_holes, *one_hot_piece(7)]
-FEATURE_MEANS = np.array([
-    0.5,   # lines_cleared: 0-4
-    5.0,   # holes: 0-50
-    50.0,  # aggregate_height: 0-200
-    5.0,   # bumpiness: 0-40
-    10.0,  # max_height: 0-20
-    30.0,  # row_transitions: 0-40
-    20.0,  # column_transitions: 0-40
-    5.0,   # wells: 0-40
-    5.0,   # hole_depth: 0-20
-    5.0,   # rows_with_holes: 0-20
-    0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,  # one_hot: 7 entries, already 0/1
-], dtype=np.float32)
+FEATURE_MEANS = np.array(
+    [
+        0.5,  # lines_cleared: 0-4
+        5.0,  # holes: 0-50
+        50.0,  # aggregate_height: 0-200
+        5.0,  # bumpiness: 0-40
+        10.0,  # max_height: 0-20
+        30.0,  # row_transitions: 0-40
+        20.0,  # column_transitions: 0-40
+        5.0,  # wells: 0-40
+        5.0,  # hole_depth: 0-20
+        5.0,  # rows_with_holes: 0-20
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,  # one_hot: 7 entries, already 0/1
+    ],
+    dtype=np.float32,
+)
 
-FEATURE_STDS = np.array([
-    1.0,   # lines_cleared
-    10.0,  # holes
-    40.0,  # aggregate_height
-    5.0,   # bumpiness
-    5.0,   # max_height
-    10.0,  # row_transitions
-    10.0,  # column_transitions
-    5.0,   # wells
-    5.0,   # hole_depth
-    5.0,   # rows_with_holes
-    1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0,  # one_hot: 7 entries, keep binary
-], dtype=np.float32)
+FEATURE_STDS = np.array(
+    [
+        1.0,  # lines_cleared
+        10.0,  # holes
+        40.0,  # aggregate_height
+        5.0,  # bumpiness
+        5.0,  # max_height
+        10.0,  # row_transitions
+        10.0,  # column_transitions
+        5.0,  # wells
+        5.0,  # hole_depth
+        5.0,  # rows_with_holes
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,  # one_hot: 7 entries, keep binary
+    ],
+    dtype=np.float32,
+)
 
 # PBRS scaling: cap potential-based reward shaping contribution.
 PBRS_SCALE = 0.1
@@ -62,6 +80,9 @@ BUMPINESS_PENALTY = 0.3
 WELL_PENALTY = 0.5
 SURVIVAL_REWARD = 1.0
 GAME_OVER_PENALTY = 50.0
+
+OVERHANG_CREATED_PENALTY = 5.0
+OVERHANG_TOTAL_PENALTY = 0.1
 
 # Dellacherie feature weights for PBRS potential function (AI.md §4).
 # Excludes landing_height/eroded_cells (placement-specific, not board-state).
@@ -126,8 +147,7 @@ def max_height(grid: np.ndarray, heights: np.ndarray | None = None) -> int:
     return int(heights.max())
 
 
-def count_holes(grid: np.ndarray, mask: np.ndarray | None = None,
-                first_row: np.ndarray | None = None) -> int:
+def count_holes(grid: np.ndarray, mask: np.ndarray | None = None, first_row: np.ndarray | None = None) -> int:
     """Empty cells with at least one filled cell above them."""
     if mask is None:
         mask = grid > 0
@@ -162,7 +182,7 @@ def row_transitions(grid: np.ndarray) -> int:
     """
     b = (grid > 0).astype(np.int8)
     transitions = np.abs(b[:, :-1] - b[:, 1:]).sum()
-    transitions += np.abs(1 - b[:, 0]).sum()   # left wall
+    transitions += np.abs(1 - b[:, 0]).sum()  # left wall
     transitions += np.abs(b[:, -1] - 1).sum()  # right wall
     return int(transitions)
 
@@ -196,8 +216,7 @@ def wells(grid: np.ndarray, heights: np.ndarray | None = None) -> int:
     return int((depth * (depth + 1) // 2).sum())
 
 
-def hole_depth(grid: np.ndarray, mask: np.ndarray | None = None,
-               first_row: np.ndarray | None = None) -> int:
+def hole_depth(grid: np.ndarray, mask: np.ndarray | None = None, first_row: np.ndarray | None = None) -> int:
     """Max holes in any single column below the first filled cell."""
     if mask is None:
         mask = grid > 0
@@ -210,8 +229,7 @@ def hole_depth(grid: np.ndarray, mask: np.ndarray | None = None,
     return int(holes.sum(axis=0).max())
 
 
-def rows_with_holes(grid: np.ndarray, mask: np.ndarray | None = None,
-                    first_row: np.ndarray | None = None) -> int:
+def rows_with_holes(grid: np.ndarray, mask: np.ndarray | None = None, first_row: np.ndarray | None = None) -> int:
     """Count rows containing at least one hole cell."""
     if mask is None:
         mask = grid > 0
@@ -227,8 +245,6 @@ def rows_with_holes(grid: np.ndarray, mask: np.ndarray | None = None,
 def normalize_features(features: np.ndarray) -> np.ndarray:
     """Standardize DT-20 features: (features - FEATURE_MEANS) / FEATURE_STDS."""
     return ((features - FEATURE_MEANS) / FEATURE_STDS).astype(np.float32)
-
-
 
 
 def extract_features(
@@ -253,19 +269,23 @@ def extract_features(
         mask = m if mask is None else mask
         first_row = fr if first_row is None else first_row
         heights = h if heights is None else heights
-    features = np.array([
-        lines_cleared,
-        count_holes(grid, mask, first_row),
-        aggregate_height(grid, heights),
-        bumpiness(grid, heights),
-        max_height(grid, heights),
-        row_transitions(grid),
-        column_transitions(grid),
-        wells(grid, heights),
-        hole_depth(grid, mask, first_row),
-        rows_with_holes(grid, mask, first_row),
-    ], dtype=np.float32)
+    features = np.array(
+        [
+            lines_cleared,
+            count_holes(grid, mask, first_row),
+            aggregate_height(grid, heights),
+            bumpiness(grid, heights),
+            max_height(grid, heights),
+            row_transitions(grid),
+            column_transitions(grid),
+            wells(grid, heights),
+            hole_depth(grid, mask, first_row),
+            rows_with_holes(grid, mask, first_row),
+        ],
+        dtype=np.float32,
+    )
     return normalize_features(np.concatenate([features, one_hot_piece(next_piece_type)]))
+
 
 def dellacherie_value(
     grid: np.ndarray,
@@ -294,6 +314,7 @@ def dellacherie_value(
         + DELLACHERIE_WEIGHTS["rows_with_holes"] * rows_with_holes(grid, mask, first_row)
     )
 
+
 def _compute_board_metrics_batch(grids: np.ndarray) -> dict:
     """Shared vectorized board metrics for batch functions.
 
@@ -303,24 +324,24 @@ def _compute_board_metrics_batch(grids: np.ndarray) -> dict:
 
     Returns a dict of ``(N,)`` or ``(N, W)`` arrays.
     """
-    mask = grids > 0                                   # (N, H, W)
-    non_empty = mask.any(axis=(1, 2))                   # (N,)
-    any_filled = mask.any(axis=1)                       # (N, W)
-    first_row = np.argmax(mask, axis=1)                # (N, W)
-    heights = (BOARD_HEIGHT - first_row) * any_filled    # (N, W)
+    mask = grids > 0  # (N, H, W)
+    non_empty = mask.any(axis=(1, 2))  # (N,)
+    any_filled = mask.any(axis=1)  # (N, W)
+    first_row = np.argmax(mask, axis=1)  # (N, W)
+    heights = (BOARD_HEIGHT - first_row) * any_filled  # (N, W)
     row_idx = np.arange(BOARD_HEIGHT).reshape(1, BOARD_HEIGHT, 1)
-    below_first = row_idx >= first_row[:, None, :]      # (N, H, W)
+    below_first = row_idx >= first_row[:, None, :]  # (N, H, W)
     holes = below_first & ~mask & any_filled[:, None, :]
-    holes_count = holes.sum(axis=(1, 2))                # (N,)
-    agg_height = heights.sum(axis=1)                    # (N,)
+    holes_count = holes.sum(axis=(1, 2))  # (N,)
+    agg_height = heights.sum(axis=1)  # (N,)
     bumpiness = np.abs(np.diff(heights, axis=1)).sum(axis=1)
-    max_h = heights.max(axis=1)                         # (N,)
+    max_h = heights.max(axis=1)  # (N,)
     binary = mask.astype(np.int8)
     row_trans = np.abs(binary[:, :, :-1] - binary[:, :, 1:]).sum(axis=(1, 2))
-    row_trans += np.abs(1 - binary[:, :, 0]).sum(axis=1)    # left wall
-    row_trans += np.abs(binary[:, :, -1] - 1).sum(axis=1)   # right wall
+    row_trans += np.abs(1 - binary[:, :, 0]).sum(axis=1)  # left wall
+    row_trans += np.abs(binary[:, :, -1] - 1).sum(axis=1)  # right wall
     col_trans = np.abs(binary[:, :-1, :] - binary[:, 1:, :]).sum(axis=(1, 2))
-    col_trans += np.abs(binary[:, -1, :] - 1).sum(axis=1)   # floor
+    col_trans += np.abs(binary[:, -1, :] - 1).sum(axis=1)  # floor
     left_h = np.empty_like(heights)
     right_h = np.empty_like(heights)
     left_h[:, 0] = BOARD_HEIGHT
@@ -329,18 +350,23 @@ def _compute_board_metrics_batch(grids: np.ndarray) -> dict:
     right_h[:, :-1] = heights[:, 1:]
     well_depth = np.maximum(0, np.minimum(left_h, right_h) - heights)
     wells_score = (well_depth * (well_depth + 1) // 2).sum(axis=1)
-    holes_per_col = holes.sum(axis=1)                   # (N, W)
-    hole_depth_score = holes_per_col.max(axis=1)        # (N,)
+    holes_per_col = holes.sum(axis=1)  # (N, W)
+    hole_depth_score = holes_per_col.max(axis=1)  # (N,)
     rows_with_holes_count = holes.any(axis=2).sum(axis=1)
     return {
-        "mask": mask, "non_empty": non_empty,
+        "mask": mask,
+        "non_empty": non_empty,
         "holes_count": holes_count,
-        "agg_height": agg_height, "bumpiness": bumpiness, "max_h": max_h,
-        "row_trans": row_trans, "col_trans": col_trans,
+        "agg_height": agg_height,
+        "bumpiness": bumpiness,
+        "max_h": max_h,
+        "row_trans": row_trans,
+        "col_trans": col_trans,
         "wells_score": wells_score,
         "hole_depth_score": hole_depth_score,
         "rows_with_holes_count": rows_with_holes_count,
     }
+
 
 def dellacherie_value_batch(grids: np.ndarray) -> np.ndarray:
     """Batch Dellacherie evaluation for N grids at once.
@@ -390,12 +416,21 @@ def extract_features_batch(
     """
     N = grids.shape[0]
     m = _compute_board_metrics_batch(grids)
-    board_features = np.stack([
-        lines_cleared.astype(np.float64),
-        m["holes_count"], m["agg_height"], m["bumpiness"], m["max_h"],
-        m["row_trans"], m["col_trans"], m["wells_score"],
-        m["hole_depth_score"], m["rows_with_holes_count"],
-    ], axis=1)                                            # (N, 10)
+    board_features = np.stack(
+        [
+            lines_cleared.astype(np.float64),
+            m["holes_count"],
+            m["agg_height"],
+            m["bumpiness"],
+            m["max_h"],
+            m["row_trans"],
+            m["col_trans"],
+            m["wells_score"],
+            m["hole_depth_score"],
+            m["rows_with_holes_count"],
+        ],
+        axis=1,
+    )  # (N, 10)
     one_hot = np.zeros((N, NB_SHAPES_TYPES), dtype=np.float64)
     for i, pt in enumerate(next_piece_types):
         one_hot[i, SHAPES_TYPES.index(pt)] = 1.0
@@ -406,9 +441,7 @@ def extract_features_batch(
 # --- Simulation helpers (AI.md §3) -----------------------------------
 
 
-def place_and_clear(
-    grid: np.ndarray, shape: list[tuple[int, int]], px: int, py: int
-) -> tuple[np.ndarray, int]:
+def place_and_clear(grid: np.ndarray, shape: list[tuple[int, int]], px: int, py: int) -> tuple[np.ndarray, int]:
     """Place shape cells on a copy of grid, clear full lines.
 
     Returns (new_grid, lines_cleared).
@@ -419,13 +452,16 @@ def place_and_clear(
     if full_rows:
         lines_cleared = len(full_rows)
         keep = [y for y in range(BOARD_HEIGHT) if y not in full_rows]
-        new_grid = np.vstack([
-            np.zeros((lines_cleared, BOARD_WIDTH), dtype=grid.dtype),
-            new_grid[keep],
-        ])
+        new_grid = np.vstack(
+            [
+                np.zeros((lines_cleared, BOARD_WIDTH), dtype=grid.dtype),
+                new_grid[keep],
+            ]
+        )
     else:
         lines_cleared = 0
     return new_grid, lines_cleared
+
 
 def place_and_clear_batch(
     grid: np.ndarray,
@@ -454,18 +490,20 @@ def place_and_clear_batch(
     if all_rows:
         batch[np.array(all_batch_idx), np.array(all_rows), np.array(all_cols)] = 1.0
     mask = batch > 0
-    full = mask.all(axis=2)                                # (N, H)
-    lines = full.sum(axis=1).astype(np.int32)               # (N,)
+    full = mask.all(axis=2)  # (N, H)
+    lines = full.sum(axis=1).astype(np.int32)  # (N,)
     grids_out = np.empty_like(batch)
     for i in range(N):
         if lines[i] == 0:
             grids_out[i] = batch[i]
         else:
             keep = ~full[i]
-            cleared = np.vstack([
-                np.zeros((int(lines[i]), BOARD_WIDTH), dtype=batch.dtype),
-                batch[i][keep],
-            ])
+            cleared = np.vstack(
+                [
+                    np.zeros((int(lines[i]), BOARD_WIDTH), dtype=batch.dtype),
+                    batch[i][keep],
+                ]
+            )
             grids_out[i] = cleared
     return grids_out, lines
 
@@ -516,6 +554,13 @@ def compute_reward(
     # existing holes over time, but the signal is dominated by delta
     reward -= HOLE_TOTAL_PENALTY * new_holes
 
+    # Overhang penalty: reachable covered cells (lighter — still fillable)
+    old_overhangs = count_overhangs(prev_grid, prev_mask, prev_fr)
+    new_overhangs = count_overhangs(new_grid, new_mask, new_fr)
+    overhangs_created = max(0, new_overhangs - old_overhangs)
+    reward -= OVERHANG_CREATED_PENALTY * overhangs_created
+    reward -= OVERHANG_TOTAL_PENALTY * new_overhangs
+
     height = aggregate_height(new_grid, new_heights)
     bumps = bumpiness(new_grid, new_heights)
 
@@ -531,4 +576,3 @@ def compute_reward(
     reward += PBRS_SCALE * (gamma * phi_new - phi_prev)
 
     return reward
-

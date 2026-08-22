@@ -113,6 +113,8 @@ def test_mcp_state_board_snapshot_keys():
         "level",
         "game_over",
         "action_results",
+        "holes",
+        "overhangs",
     }
     assert set(snap.keys()) == expected_keys
 
@@ -125,12 +127,38 @@ def test_mcp_state_board_snapshot_no_action_results():
 
 
 def test_mcp_state_board_snapshot_board_is_2d_list():
-    """board field is a 2D list of 0/1 ints."""
+    """board field is a 2D list of 0/1 ints (and markers X/O when present)."""
     state = _make_mcp_state(start_server=False)
     snap = state._board_snapshot()
-    assert isinstance(snap["board"], list)
     assert all(isinstance(row, list) for row in snap["board"])
-    assert all(cell in (0, 1) for row in snap["board"] for cell in row)
+    assert all(cell in (0, 1, "X", "O") for row in snap["board"] for cell in row)
+
+
+def test_mcp_state_board_snapshot_markers_and_counts():
+    """Board repr marks holes as 'X', overhangs as 'O', and reports counts."""
+    state = _make_mcp_state(start_server=False)
+    g = state.board.grid
+    for y in range(22):
+        g[y][0] = (255, 0, 0)
+        g[y][1] = (255, 0, 0)
+        g[y][2] = (255, 0, 0)
+    # unreachable holes at bottom of capped columns 0/1
+    g[21][0] = None
+    g[21][1] = None
+    # reachable overhang under a ledge in column 5
+    g[0][5] = None
+    g[1][5] = (0, 255, 0)
+    for y in range(3, 22):
+        g[y][5] = (0, 255, 0)
+    repr_grid, holes, overhangs = state._build_board_repr()
+    assert holes == 2
+    assert overhangs == 1
+    flat = [c for row in repr_grid for c in row]
+    assert flat.count("X") == holes
+    assert flat.count("O") == overhangs
+    snap = state._board_snapshot()
+    assert snap["holes"] == holes
+    assert snap["overhangs"] == overhangs
 
 
 def test_mcp_state_reset_game_via_queue():

@@ -8,6 +8,8 @@ from tetris.ai.rewards import (
     column_heights,
     column_transitions,
     compute_reward,
+    OVERHANG_CREATED_PENALTY,
+    OVERHANG_TOTAL_PENALTY,
     count_holes,
     dellacherie_value,
     dellacherie_value_batch,
@@ -128,6 +130,20 @@ def test_compute_reward_step_survived():
 def test_compute_reward_no_step_survived():
     r = compute_reward(0, _empty_grid(), _empty_grid(), False, False)
     assert r == 0.0
+
+
+def test_compute_reward_overhang_penalty():
+    """Adding a reachable overhang penalizes the reward delta vs hole-free."""
+    prev = _empty_grid()
+    new = _empty_grid()
+    new[0, 0] = 0  # top source in column 0
+    new[1, 0] = 1  # ledge
+    new[2, 0] = 0  # single overhang under the ledge
+    new[3:, 0] = 1
+    r_over = compute_reward(0, prev, new, False, True)
+    r_base = compute_reward(0, prev, prev, False, True)
+    assert r_over < r_base
+    assert abs((r_base - r_over) - (OVERHANG_CREATED_PENALTY + OVERHANG_TOTAL_PENALTY)) < 1e-6
 
 
 # --- DT-20 features ------------------------------------------------
