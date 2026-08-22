@@ -548,3 +548,50 @@ def test_do_game_over_returns_state():
     result = game._do_game_over()
     assert type(result).__name__ == "GameOverState"
     assert result is not None
+
+
+def test_holes_overhangs_markers_rendered_for_human():
+    """HumanState carries holes_overhangs_help and draws X/O markers."""
+    from tetris.visuals.particles import ParticleSystem
+    from tetris.visuals.renderer import Renderer
+
+    screen = pygame.Surface((1500, 800))
+    font = pygame.font.Font(None, 24)
+    audio = AudioManager(sound_volume=0, music_volume=0)
+    game = HumanState(
+        screen,
+        font,
+        audio,
+        GameConfig(
+            handicap=0,
+            sound_volume=0,
+            music_volume=0,
+            music_song="korobeiniki",
+            debug=False,
+            ghost_piece=True,
+            preview_count=1,
+            speed_mode="normal",
+            holes_overhangs_help="both",
+        ),
+    )
+    assert game.holes_overhangs_help == "both"
+    # craft a single unreachable hole (capped columns 0/1, bottom gap)
+    g = game.board.grid
+    for y in range(22):
+        g[y][0] = (255, 0, 0)
+        g[y][1] = (255, 0, 0)
+        g[y][2] = (255, 0, 0)
+    g[21][0] = None
+    g[21][1] = None
+    drawn = []
+    orig = Renderer._draw_cell_letter
+
+    def _spy(self, letter, rect, color):
+        drawn.append(letter)
+
+    Renderer._draw_cell_letter = _spy
+    try:
+        game.renderer.render_frame(game, ParticleSystem())
+    finally:
+        Renderer._draw_cell_letter = orig
+    assert drawn.count("X") == 2

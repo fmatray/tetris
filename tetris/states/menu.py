@@ -217,6 +217,7 @@ class MenuState(MenuBase):
                         ghost_piece=self.ghost_piece,
                         preview_count=self.preview_count,
                         speed_mode=self.speed_mode,
+                        holes_overhangs_help=self.holes_overhangs_help,
                     ),
                     provider,
                     self,
