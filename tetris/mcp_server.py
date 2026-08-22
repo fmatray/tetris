@@ -20,6 +20,28 @@ from mcp.server.fastmcp import FastMCP
 from tetris.settings import MCP_SERVER_PORT
 
 
+def _shapes_payload() -> dict[str, Any]:
+    """Full shape/kick geometry for external clients (no source access needed)."""
+    from tetris.game.shapes import SHAPES
+    from tetris.game.rules import SRS_KICKS_JLSTZ, SRS_KICKS_I
+    from tetris.settings import BOARD_WIDTH, BOARD_HEIGHT, HIDDEN_ROWS, VISIBLE_ROWS
+
+    return {
+        "shapes": SHAPES,
+        "srs_kicks": {"JLSTZ": SRS_KICKS_JLSTZ, "I": SRS_KICKS_I},
+        "spawn": {"x": BOARD_WIDTH // 2 - 2, "y": 0},
+        "board": {
+            "width": BOARD_WIDTH,
+            "height": BOARD_HEIGHT,
+            "hidden_rows": HIDDEN_ROWS,
+            "visible_rows": VISIBLE_ROWS,
+        },
+        "coordinate_convention": (
+            "cells (col,row) in piece box; absolute=(piece.x+col,piece.y+row); board y=0 top, y increases downward"
+        ),
+    }
+
+
 class TetrisMCPServer:
     """MCP server exposing ``play`` tool and board/rules resources.
 
@@ -50,7 +72,7 @@ class TetrisMCPServer:
             Args:
                 actions: Action names to execute. Valid: ``left``, ``right``,
                     ``rotate_cw``, ``rotate_ccw``, ``soft_drop``, ``hard_drop``,
-                    ``hold``.
+                    ``hold``. Also ``start_game`` (reset) and ``quit`` (leave MCP).
                 frames: Number of game frames (~16ms each) to advance after
                     actions. Drives gravity and lock delay. ``0`` = execute
                     actions only with no time passing.
@@ -59,7 +81,8 @@ class TetrisMCPServer:
                 Board snapshot dict with keys: ``board`` (0/1 grid),
                 ``current_piece``, ``next_piece``, ``preview_pieces``,
                 ``hold_piece``, ``can_hold``, ``score``, ``lines``,
-                ``level``, ``game_over``, ``action_results``.
+                ``level``, ``game_over``, ``action_results``, ``lines_cleared``.
+                On processing error: ``error``, ``game_over``, ``board``.
             """
             result_q: queue.Queue[dict[str, Any]] = queue.Queue()
             self._action_queue.put((actions, frames, result_q))
@@ -74,6 +97,13 @@ class TetrisMCPServer:
             """
             result_q: queue.Queue[dict[str, Any]] = queue.Queue()
             self._action_queue.put((["start_game"], 0, result_q))
+            return result_q.get()
+
+        @self._mcp.tool()
+        def quit() -> dict[str, Any]:
+            """Stop the MCP session and return to the menu."""
+            result_q: queue.Queue[dict[str, Any]] = queue.Queue()
+            self._action_queue.put((["quit"], 0, result_q))
             return result_q.get()
 
         @self._mcp.resource("board://state")
@@ -95,8 +125,14 @@ class TetrisMCPServer:
                     "board_size": "10x20 visible (22 with hidden buffer)",
                     "pieces": SHAPES_TYPES,
                     "scoring": "standard Tetris guideline",
+                    "shapes_resource": "tetris://shapes",
                 }
             )
+
+        @self._mcp.resource("tetris://shapes")
+        def shapes_resource() -> str:
+            """Full shape rotation data, SRS kicks, spawn, and board geometry."""
+            return json.dumps(_shapes_payload())
 
     def start(self) -> None:
         """Launch the MCP server on a daemon thread."""

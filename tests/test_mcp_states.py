@@ -14,6 +14,9 @@ from tetris.audio import AudioManager
 from tetris.states.game import GameConfig
 from tetris.states.mcp import MCPConfig, MCPState, draw_mcp_hud
 from tetris.visuals.particles import ParticleSystem
+from tetris.game.shapes import get_shape_rot
+from tetris.game.tetromino import Tetromino
+from tetris.settings import BOARD_HEIGHT, BOARD_WIDTH
 
 
 def _make_mcp_state(start_server: bool = True) -> MCPState:
@@ -186,8 +189,8 @@ def test_mcp_state_advances_frames():
 # ── Game over ────────────────────────────────────────────────────────
 
 
-def test_mcp_state_game_over_returns_menu():
-    """When game_over is True, update() calls _do_game_over which returns menu."""
+def test_mcp_state_game_over_stays_in_state():
+    """Top-out no longer leaves MCP; update() stays and server survives."""
     from tetris.states.menu import MenuState
 
     screen = pygame.Surface((640, 480))
@@ -214,7 +217,125 @@ def test_mcp_state_game_over_returns_menu():
     )
     state.game_over = True
     result = state.update(1.0 / 60.0, ParticleSystem())
+    assert result is None
+    assert state.game_over is True
+
+
+def test_mcp_state_quit_returns_menu():
+    """An explicit quit request returns to the menu and stops the server."""
+    import queue as q_mod
+    from tetris.states.menu import MenuState
+
+    screen = pygame.Surface((640, 480))
+    font = pygame.font.Font(None, 24)
+    audio = AudioManager(sound_volume=0, music_volume=0)
+    menu = MenuState(screen, font, audio)
+    state = MCPState(
+        screen,
+        font,
+        audio,
+        GameConfig(
+            handicap=0,
+            sound_volume=0,
+            music_volume=0,
+            music_song="korobeiniki",
+            debug=False,
+            ghost_piece=True,
+            preview_count=1,
+            speed_mode="normal",
+        ),
+        MCPConfig(port=8765),
+        start_server=False,
+        menu=menu,
+    )
+    result_q: q_mod.Queue = q_mod.Queue()
+    state._action_queue.put((["quit"], 0, result_q))
+    result = state.update(1.0 / 60.0, ParticleSystem())
     assert result is menu
+    assert result_q.get()["game_over"] == state.game_over
+
+
+def test_mcp_state_start_game_after_game_over():
+    """start_game resets a topped-out board within the same session."""
+    import queue as q_mod
+
+    state = _make_mcp_state(start_server=False)
+    state.game_over = True
+    result_q: q_mod.Queue = q_mod.Queue()
+    state._action_queue.put((["start_game"], 0, result_q))
+    result = state.update(1.0 / 60.0, ParticleSystem())
+    assert result is None
+    assert all(cell is None for row in state.board.grid for cell in row)
+    assert state.game_over is False
+
+
+def test_mcp_state_snapshot_lines_cleared_field():
+    """_board_snapshot includes lines_cleared only when passed."""
+    state = _make_mcp_state(start_server=False)
+    snap = state._board_snapshot(["ok"], lines_cleared=2)
+    assert "lines_cleared" in snap
+    assert snap["lines_cleared"] == 2
+
+
+def test_mcp_state_lines_cleared_via_queue():
+    """A move that completes a row reports lines_cleared == 1."""
+    import queue as q_mod
+
+    state = _make_mcp_state(start_server=False)
+    for c in range(BOARD_WIDTH - 1):
+        state.board.grid[BOARD_HEIGHT - 1][c] = (1, 1, 1)
+    state.current_piece = Tetromino("I")
+    state.current_piece.rotation = 1
+    state.current_piece.shape = get_shape_rot("I", 1)
+    state.current_piece.x = BOARD_WIDTH - 3
+    state.current_piece.y = 0
+    result_q: q_mod.Queue = q_mod.Queue()
+    state._action_queue.put((["hard_drop"], 0, result_q))
+    state.update(1.0 / 60.0, ParticleSystem())
+    snap = result_q.get()
+    assert snap["lines_cleared"] == 1
+    assert snap["lines"] == 1
+    assert snap["game_over"] is False
+
+
+def test_mcp_state_hold_blocked_when_unavailable():
+    """hold reports 'blocked' when _can_hold is False."""
+    state = _make_mcp_state(start_server=False)
+    state._can_hold = False
+    assert state._execute_actions(["hold"]) == ["blocked"]
+    state._can_hold = True
+    assert state._execute_actions(["hold"]) == ["ok"]
+
+
+def test_mcp_state_update_swallows_exception():
+    """A handler that raises yields an error snapshot; update() never raises."""
+    import queue as q_mod
+
+    state = _make_mcp_state(start_server=False)
+
+    def boom() -> None:
+        raise RuntimeError("kaboom")
+
+    state._move_left = boom  # type: ignore[method-assign]
+    result_q: q_mod.Queue = q_mod.Queue()
+    state._action_queue.put((["left"], 0, result_q))
+    result = state.update(1.0 / 60.0, ParticleSystem())
+    assert result is None
+    snap = result_q.get()
+    assert "error" in snap
+    assert "kaboom" in snap["error"]
+
+
+def test_shapes_payload():
+    """_shapes_payload exposes shapes, kicks, spawn, and board geometry."""
+    from tetris.mcp_server import _shapes_payload
+
+    p = _shapes_payload()
+    assert {"shapes", "srs_kicks", "spawn", "board"} <= set(p)
+    assert len(p["shapes"]["I"]) == 4
+    assert len(p["srs_kicks"]["JLSTZ"]) == 8
+    assert p["spawn"]["x"] == BOARD_WIDTH // 2 - 2
+    assert p["board"]["hidden_rows"] == 2
 
 
 # ── MCPConfig ─────────────────────────────────────────────────────────

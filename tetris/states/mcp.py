@@ -97,6 +97,9 @@ class MCPState(GameState):
         """Dispatch each action name to the corresponding GameState handler."""
         results: list[str] = []
         for action in actions:
+            if action == "hold" and not self._can_hold:
+                results.append("blocked")
+                continue
             handler_name = self._ACTIONS.get(action)
             if handler_name is not None:
                 getattr(self, handler_name)()
@@ -127,7 +130,9 @@ class MCPState(GameState):
         self.stats = GameStats()
         self.current_speed = _drop_interval(0, SPEED_MODES[self.speed_mode])
 
-    def _board_snapshot(self, action_results: list[str] | None = None) -> dict[str, Any]:
+    def _board_snapshot(
+        self, action_results: list[str] | None = None, lines_cleared: int | None = None
+    ) -> dict[str, Any]:
         """Return current board state as a dict for the MCP client."""
         grid = board_to_grid(self.board)
         snap: dict[str, Any] = {
@@ -144,40 +149,51 @@ class MCPState(GameState):
         }
         if action_results is not None:
             snap["action_results"] = action_results
+        if lines_cleared is not None:
+            snap["lines_cleared"] = lines_cleared
         return snap
 
     def update(self, dt: float, particles: ParticleSystem) -> State | None:
-        """Poll action queue; if empty, game stays frozen (return None).
+        """Poll action queue; game frozen when empty.
 
-        If a request is pending: execute actions, advance ``frames`` ticks,
-        return the board snapshot on the result queue, check game-over.
+        Processes all pending requests this frame (lowers latency when the
+        client floods). Top-out does NOT leave MCP — the snapshot reports
+        ``game_over`` and the client calls ``start_game`` to reset. Only an
+        explicit ``quit`` request returns to the menu.
         """
-        if self.game_over:
-            return self._do_game_over()
-
-        try:
-            actions, frames, result_queue = self._action_queue.get_nowait()
-        except queue.Empty:
-            return None
-
-        action_results = self._execute_actions(actions)
-        self._last_tool_call = {"actions": actions, "frames": frames, "results": action_results}
-
-        for _ in range(frames):
-            if self.game_over:
+        quit_requested = False
+        while True:
+            try:
+                actions, frames, result_queue = self._action_queue.get_nowait()
+            except queue.Empty:
                 break
-            super().update(dt, particles)
-
-        snapshot = self._board_snapshot(action_results)
-        self._last_snapshot = snapshot
-        result_queue.put(snapshot)
-
-        return self._do_game_over() if self.game_over else None
+            if "quit" in actions:
+                quit_requested = True
+                result_queue.put(self._board_snapshot())
+                continue
+            action_results: list[str] = []
+            try:
+                before = self.stats.total_lines
+                action_results = self._execute_actions(actions)
+                lines_cleared = max(0, self.stats.total_lines - before)
+                for _ in range(frames):
+                    if self.game_over:
+                        break
+                    super().update(dt, particles)
+                snapshot = self._board_snapshot(action_results, lines_cleared)
+            except Exception as exc:  # noqa: BLE001  # one bad request must not kill the server
+                grid: list[list[int]] = board_to_grid(self.board).astype(int).tolist() if self.board is not None else []
+                snapshot = {"error": str(exc), "game_over": self.game_over, "board": grid}
+            self._last_tool_call = {"actions": actions, "frames": frames, "results": action_results}
+            self._last_snapshot = snapshot
+            result_queue.put(snapshot)
+        if quit_requested:
+            return self._do_game_over()
+        return None
 
     def _do_game_over(self) -> State:
         """Stop server and return to menu (no GameOverState for MCP)."""
         self.audio.stop_music()
-        self.pieces.save()
         self._stop_server()
         _logger.debug(
             "MCP game over | score=%d, lines=%d, level=%d",
