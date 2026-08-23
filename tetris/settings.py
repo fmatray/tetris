@@ -122,6 +122,7 @@ HUD_POSITIONS = {
     "ai_moves": (800, 100),
     "debug_bag": (800, 50),  # bag/weights debug panel
     "mcp_hud": (570, 450),
+    "pause": (400, 350),
 }
 
 # --- Game-over animation -----------------------------------------------
