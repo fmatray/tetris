@@ -223,8 +223,11 @@ def draw_mcp_hud(screen: pygame.Surface, font: pygame.font.Font, state: MCPState
             lines.append(f"Résultats: {'(simulation)' if tc.get('simulate') else '(aucune)'}")
     if state._last_snapshot is not None:
         snap = state._last_snapshot
-        lines.append(f"Score: {snap['score']}  Lignes: {snap['lines']}  Niveau: {snap['level']}")
-        lines.append(f"Game Over: {'Oui' if snap['game_over'] else 'Non'}")
+        if "error" in snap:
+            lines.append(f"Erreur: {snap['error']}")
+        else:
+            lines.append(f"Score: {snap['score']}  Lignes: {snap['lines']}  Niveau: {snap['level']}")
+            lines.append(f"Game Over: {'Oui' if snap['game_over'] else 'Non'}")
     for i, text in enumerate(lines):
         surf = font.render(text, True, (200, 200, 200))
         screen.blit(surf, (x, y + i * 28))
