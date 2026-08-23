@@ -47,13 +47,13 @@ class TetrisMCPServer:
 
     Communication with :class:`MCPState` is one-directional via
     ``action_queue``: each tool/resource call puts a tuple
-    ``(actions, frames, result_queue)`` onto the queue, then blocks on
+    ``(actions, frames, result_queue, simulate)`` onto the queue, then blocks on
     ``result_queue.get()`` until the main thread processes the request.
     """
 
     def __init__(
         self,
-        action_queue: queue.Queue[tuple[list[str], int, queue.Queue[dict[str, Any]]]],
+        action_queue: queue.Queue[tuple[list[str], int, queue.Queue[dict[str, Any]], bool]],
         port: int = MCP_SERVER_PORT,
     ) -> None:
         self._action_queue = action_queue
@@ -89,8 +89,39 @@ class TetrisMCPServer:
                 ``holes``, ``overhangs``.
             """
             result_q: queue.Queue[dict[str, Any]] = queue.Queue()
-            self._action_queue.put((actions, frames, result_q))
+            self._action_queue.put((actions, frames, result_q, False))
             return result_q.get()  # blocks until MCPState processes
+
+        @self._mcp.tool()
+        def simulate(actions: list[str], frames: int = 0) -> dict[str, Any]:
+            """Preview the result of actions WITHOUT modifying the game.
+
+            Identical arguments to ``play``. Runs the same action/gravity logic
+            on a throwaway copy of the board, so the real game state is
+            unchanged — use it to test a move sequence before committing it
+            with ``play``.
+
+            The preview is bounded to the pieces the game already knows (the
+            current falling piece, ``next_piece``, and the preview pieces). If a
+            sequence would need a piece beyond that horizon, the result is
+            ``{"error": "horizon exceeded: ..."}`` rather than inventing future
+            pieces. ``quit`` is ignored (simulation never leaves MCP).
+
+            Args:
+                actions: Action names (same valid set as ``play``).
+                frames: Gravity/lock frames to advance (~16ms each), default 0.
+
+            Returns:
+                Board snapshot dict with the same keys as ``play``: ``board``
+                (0/1/"X"/"O"), ``holes``, ``overhangs``, ``current_piece``,
+                ``next_piece``, ``preview_pieces``, ``hold_piece``, ``can_hold``,
+                ``score``, ``lines``, ``level``, ``game_over``,
+                ``action_results``, ``lines_cleared``. On a horizon error,
+                returns ``{"error": "..."}``.
+            """
+            result_q: queue.Queue[dict[str, Any]] = queue.Queue()
+            self._action_queue.put((actions, frames, result_q, True))
+            return result_q.get()
 
         @self._mcp.tool()
         def start_game() -> dict[str, Any]:
@@ -100,21 +131,21 @@ class TetrisMCPServer:
             spawns new pieces, and returns the initial board snapshot.
             """
             result_q: queue.Queue[dict[str, Any]] = queue.Queue()
-            self._action_queue.put((["start_game"], 0, result_q))
+            self._action_queue.put((["start_game"], 0, result_q, False))
             return result_q.get()
 
         @self._mcp.tool()
         def quit() -> dict[str, Any]:
             """Stop the MCP session and return to the menu."""
             result_q: queue.Queue[dict[str, Any]] = queue.Queue()
-            self._action_queue.put((["quit"], 0, result_q))
+            self._action_queue.put((["quit"], 0, result_q, False))
             return result_q.get()
 
         @self._mcp.resource("board://state")
         def board_state() -> str:
             """Current board state without advancing the game (0 actions, 0 frames)."""
             result_q: queue.Queue[dict[str, Any]] = queue.Queue()
-            self._action_queue.put(([], 0, result_q))
+            self._action_queue.put(([], 0, result_q, False))
             return json.dumps(result_q.get())
 
         @self._mcp.resource("tetris://rules")

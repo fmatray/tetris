@@ -57,6 +57,25 @@ gravity/lock delay, return a board snapshot.
   then read the snapshot to plan the next one.
 - Returns: board snapshot.
 
+### simulate
+
+Preview the result of a move **without** touching the real game. Same
+arguments and return schema as `play`, but it runs on a throwaway copy, so the
+board, score, and piece queue are unchanged — use it to test a sequence before
+committing it with `play`.
+
+- Args: `{ "actions": string[], "frames"?: int }` (frames default 0)
+- Returns: same snapshot dict as `play` (board 0/1/"X"/"O", holes, overhangs,
+  current_piece, next_piece, preview_pieces, hold_piece, can_hold, score, lines,
+  level, game_over, action_results, lines_cleared).
+- **Non-mutating**: the real board only changes on `play`. A `simulate` call
+  leaves the current piece and queue exactly as they were.
+- **Horizon**: the simulation is bounded to the pieces the game already knows
+  (current falling piece + `next_piece` + previews). A sequence that would need
+  a piece beyond that horizon returns `{"error": "horizon exceeded: ..."}`
+  rather than inventing future pieces. `quit` is ignored (simulate never leaves
+  MCP).
+
 ### Board snapshot (both tools)
 
 ```text
@@ -165,6 +184,10 @@ vertical I into the right well (column 8): rotate once, then move right 3:
 column to `x=8`; `hard_drop` locks it at the bottom.
 
 ## Caveats
+
+- `simulate` is non-mutating — preview a move with it, then commit with `play`.
+  The real board only changes on `play`. A sequence past the known piece horizon
+  (current + next + previews) returns `{"error": "horizon exceeded: ..."}`.
 
 - The game does not run on its own — gravity only advances when you pass
 - On `game_over` the server stays ALIVE — the snapshot reports

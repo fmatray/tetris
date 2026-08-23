@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import queue
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, ClassVar
+from typing import TYPE_CHECKING, Any
 
 import pygame
 
@@ -17,8 +17,9 @@ from tetris.game.board import Board
 from tetris.game.stats import GameStats
 from tetris.game.tetromino import Tetromino
 from tetris.logger import get_logger
-from tetris.settings import BOARD_HEIGHT, BOARD_WIDTH, HUD_POSITIONS, SPEED_MODES
+from tetris.settings import HUD_POSITIONS, SPEED_MODES
 from tetris.states.game import GameConfig, GameState, _drop_interval
+from tetris.states.simulator import build_board_repr, simulate_actions
 from tetris.visuals.particles import ParticleSystem
 
 if TYPE_CHECKING:
@@ -46,17 +47,6 @@ class MCPState(GameState):
     and only advances gravity when a request contains ``frames > 0``.
     """
 
-    _ACTIONS: ClassVar[dict[str, str]] = {
-        "left": "_move_left",
-        "right": "_move_right",
-        "rotate_cw": "_rotate_cw",
-        "rotate_ccw": "_rotate_ccw",
-        "soft_drop": "_soft_drop",
-        "hard_drop": "_hard_drop",
-        "hold": "_hold",
-        "start_game": "_reset_game",
-    }
-
     def __init__(
         self,
         screen: pygame.Surface,
@@ -72,7 +62,7 @@ class MCPState(GameState):
         self.player_type = "MCP"
         self.mcp_config = mcp_config
         self._handicap = config.handicap
-        self._action_queue: queue.Queue[tuple[list[str], int, queue.Queue[dict[str, Any]]]] = queue.Queue()
+        self._action_queue: queue.Queue[tuple[list[str], int, queue.Queue[dict[str, Any]], bool]] = queue.Queue()
         self._server: TetrisMCPServer | None = None
         self._last_tool_call: dict[str, Any] | None = None
         self._last_snapshot: dict[str, Any] | None = None
@@ -91,21 +81,6 @@ class MCPState(GameState):
             self._server.stop()
             self._server = None
             _logger.debug("MCP server stopped")
-
-    def _execute_actions(self, actions: list[str]) -> list[str]:
-        """Dispatch each action name to the corresponding GameState handler."""
-        results: list[str] = []
-        for action in actions:
-            if action == "hold" and not self._can_hold:
-                results.append("blocked")
-                continue
-            handler_name = self._ACTIONS.get(action)
-            if handler_name is not None:
-                getattr(self, handler_name)()
-                results.append("ok")
-            else:
-                results.append(f"unknown:{action}")
-        return results
 
     def _reset_game(self) -> None:
         """Reset all game state for a fresh game (called via ``start_game`` tool)."""
@@ -129,29 +104,11 @@ class MCPState(GameState):
         self.stats = GameStats()
         self.current_speed = _drop_interval(0, SPEED_MODES[self.speed_mode])
 
-    def _build_board_repr(self) -> tuple[list, int, int]:
-        holes = self.board.find_holes()
-        overhangs = self.board.find_overhangs()
-        repr_grid = []
-        for y in range(BOARD_HEIGHT):
-            row = []
-            for x in range(BOARD_WIDTH):
-                if self.board.grid[y][x] is not None:
-                    row.append(1)
-                elif (x, y) in holes:
-                    row.append("X")
-                elif (x, y) in overhangs:
-                    row.append("O")
-                else:
-                    row.append(0)
-            repr_grid.append(row)
-        return repr_grid, len(holes), len(overhangs)
-
     def _board_snapshot(
         self, action_results: list[str] | None = None, lines_cleared: int | None = None
     ) -> dict[str, Any]:
         """Return current board state as a dict for the MCP client."""
-        repr_grid, holes, overhangs = self._build_board_repr()
+        repr_grid, holes, overhangs = build_board_repr(self.board)
         snap: dict[str, Any] = {
             "board": repr_grid,
             "current_piece": self.current_piece.type,
@@ -183,9 +140,15 @@ class MCPState(GameState):
         quit_requested = False
         while True:
             try:
-                actions, frames, result_queue = self._action_queue.get_nowait()
+                actions, frames, result_queue, simulate = self._action_queue.get_nowait()
             except queue.Empty:
                 break
+            if simulate:
+                snapshot = simulate_actions(self, actions, frames, dt)
+                self._last_tool_call = {"actions": actions, "frames": frames, "simulate": True}
+                self._last_snapshot = snapshot
+                result_queue.put(snapshot)
+                continue
             if "quit" in actions:
                 quit_requested = True
                 result_queue.put(self._board_snapshot())
@@ -202,7 +165,7 @@ class MCPState(GameState):
                 snapshot = self._board_snapshot(action_results, lines_cleared)
             except Exception as exc:  # noqa: BLE001  # one bad request must not kill the server
                 if self.board is not None:
-                    repr_grid, holes, overhangs = self._build_board_repr()
+                    repr_grid, holes, overhangs = build_board_repr(self.board)
                 else:
                     repr_grid, holes, overhangs = [], 0, 0
                 snapshot = {

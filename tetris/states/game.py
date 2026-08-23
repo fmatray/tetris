@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, ClassVar
 
 if TYPE_CHECKING:
     from tetris.states.menu import MenuState
@@ -203,6 +203,42 @@ class GameState(State):
         self._grounded = False
         self.drop_time = 0
         self.down_pressed = False
+
+    _ACTIONS: ClassVar[dict[str, str]] = {
+        "left": "_move_left",
+        "right": "_move_right",
+        "rotate_cw": "_rotate_cw",
+        "rotate_ccw": "_rotate_ccw",
+        "soft_drop": "_soft_drop",
+        "hard_drop": "_hard_drop",
+        "hold": "_hold",
+        "start_game": "_reset_game",
+    }
+
+    def _execute_actions(self, actions: list[str]) -> list[str]:
+        """Dispatch each action name to the corresponding GameState handler.
+
+        Generic across player types (human/AI/MCP); lifted from ``MCPState`` so
+        the simulator can replay actions on any ``GameState``. ``start_game``
+        maps to ``_reset_game`` (present only on states that support it; treated
+        as unknown elsewhere).
+        """
+        results: list[str] = []
+        for action in actions:
+            if action == "hold" and not self._can_hold:
+                results.append("blocked")
+                continue
+            handler_name = self._ACTIONS.get(action)
+            if handler_name is not None:
+                handler = getattr(self, handler_name, None)
+                if handler is not None:
+                    handler()
+                    results.append("ok")
+                else:
+                    results.append(f"unknown:{action}")
+            else:
+                results.append(f"unknown:{action}")
+        return results
 
     def _lock_and_spawn(self, hard_drop: bool = False) -> LineClearResult:
         """Lock current piece, update stats, spawn next. Returns (cleared, rows_data)."""

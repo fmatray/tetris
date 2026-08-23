@@ -17,6 +17,7 @@ from tetris.visuals.particles import ParticleSystem
 from tetris.game.shapes import get_shape_rot
 from tetris.game.tetromino import Tetromino
 from tetris.settings import BOARD_HEIGHT, BOARD_WIDTH
+from tetris.states.simulator import build_board_repr, simulate_actions
 
 
 def _make_mcp_state(start_server: bool = True) -> MCPState:
@@ -150,7 +151,7 @@ def test_mcp_state_board_snapshot_markers_and_counts():
     g[1][5] = (0, 255, 0)
     for y in range(3, 22):
         g[y][5] = (0, 255, 0)
-    repr_grid, holes, overhangs = state._build_board_repr()
+    repr_grid, holes, overhangs = build_board_repr(state.board)
     assert holes == 2
     assert overhangs == 1
     flat = [c for row in repr_grid for c in row]
@@ -171,7 +172,7 @@ def test_mcp_state_reset_game_via_queue():
     assert state.stats.score > 0
     # Queue a start_game reset
     result_q: q_mod.Queue = q_mod.Queue()
-    state._action_queue.put((["start_game"], 0, result_q))
+    state._action_queue.put((["start_game"], 0, result_q, False))
     state.update(1.0 / 60.0, ParticleSystem())
     snap = result_q.get()
     assert snap["score"] == 0
@@ -191,7 +192,7 @@ def test_mcp_state_processes_queue_request():
     state = _make_mcp_state(start_server=False)
     particles = ParticleSystem()
     result_q: q_mod.Queue = q_mod.Queue()
-    state._action_queue.put((["left"], 0, result_q))
+    state._action_queue.put((["left"], 0, result_q, False))
     state.update(1.0 / 60.0, particles)
     assert not result_q.empty()
     snap = result_q.get()
@@ -208,7 +209,7 @@ def test_mcp_state_advances_frames():
     particles = ParticleSystem()
     result_q: q_mod.Queue = q_mod.Queue()
     # Request 60 frames = 1 second at 60 FPS
-    state._action_queue.put(([], 60, result_q))
+    state._action_queue.put(([], 60, result_q, False))
     state.update(1.0 / 60.0, particles)
     snap = result_q.get()
     assert "score" in snap
@@ -277,7 +278,7 @@ def test_mcp_state_quit_returns_menu():
         menu=menu,
     )
     result_q: q_mod.Queue = q_mod.Queue()
-    state._action_queue.put((["quit"], 0, result_q))
+    state._action_queue.put((["quit"], 0, result_q, False))
     result = state.update(1.0 / 60.0, ParticleSystem())
     assert result is menu
     assert result_q.get()["game_over"] == state.game_over
@@ -290,7 +291,7 @@ def test_mcp_state_start_game_after_game_over():
     state = _make_mcp_state(start_server=False)
     state.game_over = True
     result_q: q_mod.Queue = q_mod.Queue()
-    state._action_queue.put((["start_game"], 0, result_q))
+    state._action_queue.put((["start_game"], 0, result_q, False))
     result = state.update(1.0 / 60.0, ParticleSystem())
     assert result is None
     assert all(cell is None for row in state.board.grid for cell in row)
@@ -318,7 +319,7 @@ def test_mcp_state_lines_cleared_via_queue():
     state.current_piece.x = BOARD_WIDTH - 3
     state.current_piece.y = 0
     result_q: q_mod.Queue = q_mod.Queue()
-    state._action_queue.put((["hard_drop"], 0, result_q))
+    state._action_queue.put((["hard_drop"], 0, result_q, False))
     state.update(1.0 / 60.0, ParticleSystem())
     snap = result_q.get()
     assert snap["lines_cleared"] == 1
@@ -346,7 +347,7 @@ def test_mcp_state_update_swallows_exception():
 
     state._move_left = boom  # type: ignore[method-assign]
     result_q: q_mod.Queue = q_mod.Queue()
-    state._action_queue.put((["left"], 0, result_q))
+    state._action_queue.put((["left"], 0, result_q, False))
     result = state.update(1.0 / 60.0, ParticleSystem())
     assert result is None
     snap = result_q.get()
@@ -432,3 +433,106 @@ def test_mcp_state_stop_server_clears_reference():
     state._server = None  # already None
     state._stop_server()
     assert state._server is None
+
+
+# ── Simulate (non-mutating) ──────────────────────────────────────────
+
+
+def test_simulate_actions_returns_snapshot_schema():
+    """simulate_actions returns the same snapshot schema as play (no error key)."""
+    state = _make_mcp_state(start_server=False)
+    dt = 1 / 60.0
+    snap = simulate_actions(state, ["left", "hard_drop"], 0, dt)
+    assert "error" not in snap
+    expected_keys = {
+        "board",
+        "holes",
+        "overhangs",
+        "current_piece",
+        "next_piece",
+        "preview_pieces",
+        "hold_piece",
+        "can_hold",
+        "score",
+        "lines",
+        "level",
+        "game_over",
+        "action_results",
+        "lines_cleared",
+    }
+    assert set(snap.keys()) == expected_keys
+    assert snap["action_results"] == ["ok", "ok"]
+
+
+def test_simulate_actions_does_not_mutate_state():
+    """simulate_actions leaves board, score, and piece queue untouched."""
+    state = _make_mcp_state(start_server=False)
+    dt = 1 / 60.0
+    pieces_before = state.pieces
+    score_before = state.stats.score
+    piece_before = state.current_piece
+    board_before = [row[:] for row in state.board.grid]
+    snap = simulate_actions(state, ["left", "hard_drop"], 0, dt)
+    assert "error" not in snap
+    assert state.pieces is pieces_before
+    assert state.stats.score == score_before
+    assert state.current_piece is piece_before
+    assert state.board.grid == board_before
+
+
+def test_simulate_actions_matches_real_application():
+    """Simulated board equals the board from really applying the same actions."""
+    state = _make_mcp_state(start_server=False)
+    dt = 1 / 60.0
+    actions = ["left", "hard_drop"]
+    sim = simulate_actions(state, actions, 0, dt)
+    # simulate_actions restores the state in its finally block; re-apply for real.
+    state._execute_actions(actions)
+    assert sim["board"] == build_board_repr(state.board)[0]
+
+
+def test_simulate_via_queue_flag_does_not_mutate():
+    """update() with simulate=True returns a snapshot without mutating state."""
+    import queue as _queue
+
+    state = _make_mcp_state(start_server=False)
+    dt = 1 / 60.0
+    pieces_before = state.pieces
+    piece_before = state.current_piece
+    result_q: _queue.Queue = _queue.Queue()
+    state._action_queue.put((["left", "hard_drop"], 0, result_q, True))
+    snap = state.update(dt, ParticleSystem())
+    assert snap is None  # simulate path returns None; result goes to the queue
+    out = result_q.get()
+    assert "error" not in out
+    assert out["action_results"] == ["ok", "ok"]
+    assert state.pieces is pieces_before
+    assert state.current_piece is piece_before
+
+
+def test_simulate_actions_horizon_error():
+    """A sequence past the known piece horizon returns an explicit error."""
+    state = _make_mcp_state(start_server=False)
+    dt = 1 / 60.0
+    # preview_count=1 -> horizon = current piece + next = 2 pieces (preview_count + 1).
+    # (preview_count + 2) hard_drops lock past the horizon; the 3rd needs an unknown piece.
+    snap = simulate_actions(state, ["hard_drop"] * (state.preview_count + 2), 0, dt)
+    assert "error" in snap
+    assert "horizon exceeded" in snap["error"]
+
+
+def test_simulate_ignores_quit():
+    """A simulate request containing 'quit' never leaves MCP or mutates state."""
+    import queue as _queue
+
+    state = _make_mcp_state(start_server=False)
+    dt = 1 / 60.0
+    game_over_before = state.game_over
+    result_q: _queue.Queue = _queue.Queue()
+    state._action_queue.put((["quit"], 0, result_q, True))
+    snap = state.update(dt, ParticleSystem())
+    assert snap is None  # simulate path returns None; result goes to the queue
+    out = result_q.get()
+    assert "error" not in out
+    assert out["action_results"] == ["unknown:quit"]
+    assert state.game_over is game_over_before
