@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, ClassVar
 
 from tetris.states.base import State
 from tetris.states.menu_base import MenuBase
@@ -19,7 +19,7 @@ class MCPMenuState(MenuBase):
     _title = "MCP"
     _instructions = "← →: Changer    Entrée: Valider    Échap: Retour"
 
-    _PORTS: list[int] = [8765, 8766, 8767, 8768]
+    _PORTS: ClassVar[list[int]] = [8765, 8766, 8767, 8768]
 
     def __init__(self, screen, font, audio, menu: MenuState) -> None:
         super().__init__(screen, font, audio)
