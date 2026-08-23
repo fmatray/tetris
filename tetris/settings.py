@@ -112,6 +112,7 @@ HUD_POSITIONS = {
     "speed": (20, 180),
     "hold": (20, 220),  # "HOLD:" label
     "hold_panel": (20, 250),  # hold piece drawing position
+    "debug_holes_overhang": (20, 340),  # hole/overhang debug count readout
     "next": (570, 50),  # "NEXT:" label
     "next_panel": (570, 80),  # next pieces drawing (30px below label)
     "ai_stats": (570, 350),

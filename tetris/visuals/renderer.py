@@ -129,11 +129,10 @@ class Renderer:
         self.screen.blit(surf, (rect.x + (rect.w - surf.get_width()) // 2, rect.y + (rect.h - surf.get_height()) // 2))
 
     def _draw_hole_overhang_debug(self, game: GameState) -> None:
-        hx, hy = HUD_POSITIONS["hold_panel"]
-        y = hy + BLOCK_SIZE + 8
+        x, y = HUD_POSITIONS["debug_holes_overhang"]
         if y + self.font.get_height() * 2 <= SCREEN_HEIGHT:
-            self._draw_text(f"Trous: {len(game.board.find_holes())}", (hx, y))
-            self._draw_text(f"Surplombs: {len(game.board.find_overhangs())}", (hx, y + self.font.get_height()))
+            self._draw_text(f"Trous: {len(game.board.find_holes())}", (x, y))
+            self._draw_text(f"Surplombs: {len(game.board.find_overhangs())}", (x, y + self.font.get_height()))
 
     def _draw_debug_bag(self, game: GameState) -> None:
         """Draw remaining bag pieces as colored blocks right of the next-piece panel."""
