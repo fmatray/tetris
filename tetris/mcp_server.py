@@ -26,9 +26,13 @@ def _shapes_payload() -> dict[str, Any]:
     from tetris.game.rules import SRS_KICKS_JLSTZ, SRS_KICKS_I
     from tetris.settings import BOARD_WIDTH, BOARD_HEIGHT, HIDDEN_ROWS, VISIBLE_ROWS
 
+    kicks = {
+        name: {f"{f}->{t}": offsets for (f, t), offsets in data.items()}
+        for name, data in (("JLSTZ", SRS_KICKS_JLSTZ), ("I", SRS_KICKS_I))
+    }
     return {
         "shapes": SHAPES,
-        "srs_kicks": {"JLSTZ": SRS_KICKS_JLSTZ, "I": SRS_KICKS_I},
+        "srs_kicks": kicks,
         "spawn": {"x": BOARD_WIDTH // 2 - 2, "y": 0},
         "board": {
             "width": BOARD_WIDTH,
