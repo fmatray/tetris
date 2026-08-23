@@ -38,8 +38,9 @@ class _PreviewProvider:
     BEYOND the known horizon (current + next + previews), which are
     genuinely unknown — so ``next_type`` returns ``None`` to signal
     "no known piece". The spawn/hold logic drains the preview to empty
-    instead of inventing future pieces. Reaching for a piece with an empty
-    preview raises :class:`SimulationError` (true horizon exceeded).
+    instead of inventing future pieces. When the known pieces are fully
+    exhausted, ``next_piece`` becomes ``None`` and a further action that needs
+    an active piece raises :class:`SimulationError`.
     """
 
     def __init__(self, generator_name: str) -> None:
@@ -106,8 +107,10 @@ def simulate_actions(state: GameState, actions: list[str], frames: int, dt: floa
     """Run ``actions`` on a throwaway copy of ``state``; return a snapshot.
 
     ``state`` is never mutated. Pieces past the known horizon (current falling
-    piece + ``next_piece`` + previews) raise :class:`SimulationError`, which is
-    caught and returned as ``{"error": ...}``. The real ``PieceProvider`` is
+    piece + ``next_piece`` + previews) are never invented: the preview drains to
+    empty and ``next_piece`` becomes ``None``. Acting with no active piece raises
+    :class:`SimulationError`, which is caught and returned as ``{"error": ...}``.
+    The real ``PieceProvider`` is
     never advanced or deep-copied (a replay stand-in is used instead). Frame
     advancement reuses ``GameState.update`` on the copy (audio stubbed,
     particles suppressed).
@@ -142,8 +145,8 @@ def simulate_actions(state: GameState, actions: list[str], frames: int, dt: floa
         repr_grid, holes, overhangs = build_board_repr(state.board)
         return {
             "board": repr_grid,
-            "current_piece": state.current_piece.type,
-            "next_piece": state.next_piece.type,
+            "current_piece": state.current_piece.type if state.current_piece else None,
+            "next_piece": state.next_piece.type if state.next_piece else None,
             "preview_pieces": [p.type for p in state.preview_pieces],
             "hold_piece": state.hold_piece.type if state.hold_piece else None,
             "can_hold": state._can_hold,

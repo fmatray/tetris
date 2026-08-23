@@ -111,8 +111,8 @@ class MCPState(GameState):
         repr_grid, holes, overhangs = build_board_repr(self.board)
         snap: dict[str, Any] = {
             "board": repr_grid,
-            "current_piece": self.current_piece.type,
-            "next_piece": self.next_piece.type,
+            "current_piece": self.current_piece.type if self.current_piece else None,
+            "next_piece": self.next_piece.type if self.next_piece else None,
             "preview_pieces": [p.type for p in self.preview_pieces],
             "hold_piece": self.hold_piece.type if self.hold_piece else None,
             "can_hold": self._can_hold,

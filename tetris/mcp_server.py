@@ -135,10 +135,11 @@ class TetrisMCPServer:
             with ``play``.
 
             The preview is bounded to the pieces the game already knows (the
-            current falling piece, ``next_piece``, and the preview pieces). If a
-            sequence would need a piece beyond that horizon, the result is
-            ``{"error": "horizon exceeded: ..."}`` rather than inventing future
-            pieces. ``quit`` is ignored (simulation never leaves MCP).
+            current falling piece, ``next_piece``, and the preview pieces). The
+            simulation drains those known pieces and returns ``next_piece: null``
+            once exhausted, rather than inventing future pieces. Requesting more
+            drops than known pieces returns ``{"error": "horizon exceeded: ..."}``.
+            ``quit`` is ignored (simulation never leaves MCP).
 
             Args:
                 actions: Action names (same valid set as ``play``).

@@ -180,6 +180,11 @@ class GameState(State):
         """Drop piece to bottom instantly, lock, and spawn next piece."""
         if self.paused:
             return
+        if not self.current_piece:
+            # Simulator horizon exceeded: no active piece to drop.
+            from tetris.states.simulator import SimulationError
+
+            raise SimulationError("horizon exceeded: no piece to act on")
         distance = self.board.hard_drop(self.current_piece)
         self.stats.add_hard_drop(distance)
         self._lock_and_spawn(hard_drop=True)
@@ -199,11 +204,12 @@ class GameState(State):
             else:
                 refill: str | None = self.pieces.next_type()
                 if refill is None:
-                    # Simulator horizon exceeded: no known piece beyond current + previews.
-                    from tetris.states.simulator import SimulationError
-
-                    raise SimulationError("horizon exceeded: no known piece beyond current piece + previews")
-                self.next_piece = Tetromino(refill)
+                    # Simulator horizon: known pieces exhausted; drain to empty
+                    # instead of inventing future pieces.
+                    self.next_piece = None  # type: ignore[assignment]
+                    self.preview_pieces = []
+                else:
+                    self.next_piece = Tetromino(refill)
         else:
             held_type = self.hold_piece.type
             self.hold_piece = Tetromino(self.current_piece.type)
@@ -281,17 +287,18 @@ class GameState(State):
         else:
             refill: str | None = self.pieces.next_type()
             if refill is None:
-                # Simulator horizon exceeded: no known piece beyond current + previews.
-                from tetris.states.simulator import SimulationError
-
-                raise SimulationError("horizon exceeded: no known piece beyond current piece + previews")
-            self.next_piece = Tetromino(refill)
+                # Simulator horizon: known pieces exhausted; drain to empty
+                # instead of inventing future pieces.
+                self.next_piece = None  # type: ignore[assignment]
+                self.preview_pieces = []
+            else:
+                self.next_piece = Tetromino(refill)
         self.down_pressed = False
         self._can_hold = True
         self._lock_timer = 0.0
         self._lock_resets = 0
         self._grounded = False
-        if not self.board.is_valid_move(self.current_piece):
+        if self.current_piece and not self.board.is_valid_move(self.current_piece):
             self.game_over = True
         _logger.debug("Locked %s, cleared %d", locked_type, cleared)
         return LineClearResult(cleared, rows_data)

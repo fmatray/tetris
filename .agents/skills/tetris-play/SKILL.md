@@ -71,10 +71,11 @@ committing it with `play`.
 - **Non-mutating**: the real board only changes on `play`. A `simulate` call
   leaves the current piece and queue exactly as they were.
 - **Horizon**: the simulation is bounded to the pieces the game already knows
-  (current falling piece + `next_piece` + previews). A sequence that would need
-  a piece beyond that horizon returns `{"error": "horizon exceeded: ..."}`
-  rather than inventing future pieces. `quit` is ignored (simulate never leaves
-  MCP).
+  (current falling piece + `next_piece` + previews). It drains those known
+  pieces and returns `next_piece: null` / empty `preview_pieces` once exhausted,
+  rather than inventing future pieces. Requesting more drops than known pieces
+  (no active piece left) returns `{"error": "horizon exceeded: ..."}`.
+  `quit` is ignored (simulate never leaves MCP).
 
 ### Board snapshot (both tools)
 
@@ -187,8 +188,10 @@ column to `x=8`; `hard_drop` locks it at the bottom.
 ## Caveats
 
 - `simulate` is non-mutating — preview a move with it, then commit with `play`.
-  The real board only changes on `play`. A sequence past the known piece horizon
-  (current + next + previews) returns `{"error": "horizon exceeded: ..."}`.
+  The real board only changes on `play`. The simulation drains the known pieces
+  (current + next + previews) and returns `next_piece: null` once exhausted;
+  only requesting more drops than known pieces returns
+  `{"error": "horizon exceeded: ..."}`.
 
 - The game does not run on its own — gravity only advances when you pass
 - On `game_over` the server stays ALIVE — the snapshot reports
