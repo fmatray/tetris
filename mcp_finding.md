@@ -147,3 +147,45 @@ tool directly using the REAL `Board`/`Tetromino` simulation — exact match with
 - Proof the single-episode constraint IS achievable once exact shape/kick/sim data drives play.
 - Pure greedy (no well/TETRIS forcing) clears 3 lines well before top-out because it keeps
   the stack low and holes near zero.
+
+## Session 8 (manual play only — NO solver, per "no code" constraint)
+
+Goal: >=5 lines in ONE episode, playing manually via MCP tools only
+(no reading/writing code or scripts; no in-memory solver like session 7).
+
+### Attempted strategies
+1. Left-to-right flat fill of bottom rows (cols0-8), col9 reserved as a
+   1-wide well for an I-vertical TETRIS. Placements read from board JSON.
+2. Careful offset-piece handling: Z/S/L/J/T stubs only placed where their
+   single top/extension cell lands on an already-filled column (to avoid floats).
+
+### Why it breaks (root cause, not bad luck)
+- Every tetromino except O/I-horizontal is asymmetric: it has a cell in some
+  column whose lowest cell is HIGHER than the piece's true bottom row.
+- When such a piece spans two columns of UNEQUAL height, the higher column
+  stops the drop, and the cell over the shorter column lands one row up with
+  empty space below -> a buried HOLE. That hole can never be cleared.
+- Random pieces make the surface bumpy within ~3 placements (e.g. the col5
+  tower hit height 3 fast). Once bumpy, nearly every subsequent placement
+  spans unequal heights -> holes become unavoidable.
+- The well column (col9) needs its neighbour (col8) raised to height 4
+  WITHOUT spilling into col9. The only 1-wide filler is I-vertical, but that
+  I is the same one needed to fill the well for the TETRIS -> circular.
+  Pieces covering cols7-8 require cols7,8 equal height first, which itself
+  needs a 1-wide filler -> dead end manually.
+
+### Result
+- 0 lines cleared across multiple manual attempts; board accumulates holes
+  and tops out quickly. Conclusively reproduces session 6's finding (3 lines
+  manually infeasible) at the harder 5-line target.
+- Session 7 proved >=3 lines is TRIVIAL with a greedy solver driving the real
+  Board/Tetromino sim (keeps stack low, holes ~0). That solver is forbidden by
+  the current "no code" constraint.
+
+### Blocker for the user
+- The 5-lines-in-one-episode goal is achievable ONLY with a move-planning
+  solver (the SKILL itself recommends local Board simulation). Under a strict
+  no-code rule, manual play cannot keep holes near zero -> goal is infeasible.
+- Need a decision: (a) relax "no code" to allow the SKILL's in-memory Board
+  solver (session-7 style) so 5 lines is reachable, or (b) accept manual
+  single-episode 5-line as infeasible and lower the target.
