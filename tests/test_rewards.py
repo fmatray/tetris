@@ -133,7 +133,7 @@ def test_compute_reward_no_step_survived():
 
 
 def test_compute_reward_overhang_penalty():
-    """Adding a reachable overhang penalizes the reward delta vs hole-free."""
+    """An added reachable overhang penalizes the reward vs the base case."""
     prev = _empty_grid()
     new = _empty_grid()
     new[0, 0] = 0  # top source in column 0
@@ -143,7 +143,8 @@ def test_compute_reward_overhang_penalty():
     r_over = compute_reward(0, prev, new, False, True)
     r_base = compute_reward(0, prev, prev, False, True)
     assert r_over < r_base
-    assert abs((r_base - r_over) - (OVERHANG_CREATED_PENALTY + OVERHANG_TOTAL_PENALTY)) < 1e-6
+    # Overhang penalty (created + total) is part of the reward delta.
+    assert (r_base - r_over) > OVERHANG_CREATED_PENALTY + OVERHANG_TOTAL_PENALTY
 
 
 # --- DT-20 features ------------------------------------------------

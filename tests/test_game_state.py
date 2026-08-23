@@ -589,9 +589,9 @@ def test_holes_overhangs_markers_rendered_for_human():
     def _spy(self, letter, rect, color):
         drawn.append(letter)
 
-    Renderer._draw_cell_letter = _spy
+    Renderer._draw_cell_letter = _spy  # type: ignore[method-assign]  # intentional spy
     try:
         game.renderer.render_frame(game, ParticleSystem())
     finally:
-        Renderer._draw_cell_letter = orig
+        Renderer._draw_cell_letter = orig  # type: ignore[method-assign]  # restore
     assert drawn.count("X") == 2

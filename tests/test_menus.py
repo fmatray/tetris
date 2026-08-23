@@ -390,7 +390,7 @@ def test_game_rules_value_label_ghost():
 def test_game_rules_value_label_retour():
     menu = _make_menu()
     state = _make_state(GameRulesMenuState, menu)
-    assert state._value_label(5) == ""
+    assert state._value_label(6) == ""
 
 
 # ── HyperparamMenuState ───────────────────────────────────────────────
