@@ -130,6 +130,9 @@ class GameState(State):
         # Hold piece state
         self.hold_piece: Tetromino | None = None
         self._can_hold = True
+        # Locked-piece history. Populated by _lock_and_spawn; the simulator
+        # resets/restores it around each call. Harmless in real play.
+        self.locked_pieces: list[str] = []
         # Lock delay state
         self._lock_timer: float = 0.0
         self._lock_resets: int = 0
@@ -190,9 +193,17 @@ class GameState(State):
             self.current_piece = self.next_piece
             if self.preview_pieces:
                 self.next_piece = self.preview_pieces.pop(0)
-                self.preview_pieces.append(Tetromino(self.pieces.next_type()))
+                refill: str | None = self.pieces.next_type()
+                if refill is not None:
+                    self.preview_pieces.append(Tetromino(refill))
             else:
-                self.next_piece = Tetromino(self.pieces.next_type())
+                refill: str | None = self.pieces.next_type()
+                if refill is None:
+                    # Simulator horizon exceeded: no known piece beyond current + previews.
+                    from tetris.states.simulator import SimulationError
+
+                    raise SimulationError("horizon exceeded: no known piece beyond current piece + previews")
+                self.next_piece = Tetromino(refill)
         else:
             held_type = self.hold_piece.type
             self.hold_piece = Tetromino(self.current_piece.type)
@@ -253,6 +264,7 @@ class GameState(State):
         tspin = self.board.is_tspin(self.current_piece)
         cleared, rows_data = self.board.lock_tetromino(self.current_piece)
         locked_type = self.current_piece.type
+        self.locked_pieces.append(locked_type)
         self.stats.on_piece_locked(cleared, tspin=tspin)
         if cleared > 0:
             self.audio.play(f"clear_{cleared}")
@@ -263,9 +275,17 @@ class GameState(State):
         self.current_piece = self.next_piece
         if self.preview_pieces:
             self.next_piece = self.preview_pieces.pop(0)
-            self.preview_pieces.append(Tetromino(self.pieces.next_type()))
+            refill: str | None = self.pieces.next_type()
+            if refill is not None:
+                self.preview_pieces.append(Tetromino(refill))
         else:
-            self.next_piece = Tetromino(self.pieces.next_type())
+            refill: str | None = self.pieces.next_type()
+            if refill is None:
+                # Simulator horizon exceeded: no known piece beyond current + previews.
+                from tetris.states.simulator import SimulationError
+
+                raise SimulationError("horizon exceeded: no known piece beyond current piece + previews")
+            self.next_piece = Tetromino(refill)
         self.down_pressed = False
         self._can_hold = True
         self._lock_timer = 0.0

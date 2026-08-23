@@ -35,7 +35,7 @@ def _make_mcp_state(start_server: bool = True) -> MCPState:
             music_song="korobeiniki",
             debug=False,
             ghost_piece=True,
-            preview_count=1,
+            preview_count=3,
             speed_mode="normal",
         ),
         MCPConfig(port=8765),
@@ -459,9 +459,26 @@ def test_simulate_actions_returns_snapshot_schema():
         "game_over",
         "action_results",
         "lines_cleared",
+        "locked_pieces",
     }
     assert set(snap.keys()) == expected_keys
     assert snap["action_results"] == ["ok", "ok"]
+
+
+def test_simulate_actions_records_locked_pieces_in_order():
+    """locked_pieces lists types in lock order; preview drains to empty."""
+    state = _make_mcp_state(start_server=False)
+    dt = 1 / 60.0
+    # Known horizon: I (current), Z (next), J + T (previews).
+    state.current_piece = Tetromino("I")
+    state.next_piece = Tetromino("Z")
+    state.preview_pieces = [Tetromino("J"), Tetromino("T")]
+    snap = simulate_actions(state, ["hard_drop", "hard_drop"], 0, dt)
+    assert "error" not in snap
+    assert snap["locked_pieces"] == ["I", "Z"]
+    assert snap["current_piece"] == "J"
+    assert snap["next_piece"] == "T"
+    assert snap["preview_pieces"] == []
 
 
 def test_simulate_actions_does_not_mutate_state():
@@ -478,6 +495,7 @@ def test_simulate_actions_does_not_mutate_state():
     assert state.stats.score == score_before
     assert state.current_piece is piece_before
     assert state.board.grid == board_before
+    assert state.locked_pieces == []
 
 
 def test_simulate_actions_matches_real_application():

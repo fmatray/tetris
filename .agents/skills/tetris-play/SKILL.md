@@ -93,6 +93,7 @@ holes:            int                         # count of unreachable covered emp
 overhangs:        int                        # count of reachable covered empty cells ("O")
 action_results:   list[str]                  # "ok" / "blocked" (hold unavailable) / "unknown:<action>" per action (play only)
 lines_cleared:    int | None                  # lines removed by this call's actions (play only)
+locked_pieces:    list[str]                   # pieces locked during the simulation, in lock order (simulate only)
 error:            str | None                  # present only when processing raised; also game_over/board
 ```
 

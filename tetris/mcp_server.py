@@ -6,6 +6,14 @@ block on a per-call ``result_queue`` for the board snapshot.
 
 This module is deliberately separate from the state: future MCP tools
 unrelated to Tetris gameplay can be added here without touching state code.
+
+The server is a process-wide singleton (see :func:`get_server`): it is
+created and bound exactly once, and stays up for the whole process lifetime.
+Individual :class:`MCPState` instances attach/detach their action queue
+instead of creating/destroying the server. This avoids ``Errno 48``
+("address already in use") when the game is quit and restarted within the
+same process — the previous design rebuilt and re-bound the server on every
+entry into MCP mode.
 """
 
 from __future__ import annotations
@@ -46,22 +54,41 @@ def _shapes_payload() -> dict[str, Any]:
     }
 
 
+_server_instance: TetrisMCPServer | None = None
+
+
+def get_server(port: int = MCP_SERVER_PORT) -> TetrisMCPServer:
+    """Return the process-wide MCP server, creating it on first call.
+
+    The server lives for the whole process so it never has to re-bind the
+    port. Individual :class:`MCPState` instances attach/detach their action
+    queue via :meth:`TetrisMCPServer.attach` / :meth:`detach`.
+    """
+    global _server_instance
+    if _server_instance is None:
+        _server_instance = TetrisMCPServer(port=port)
+    return _server_instance
+
+
 class TetrisMCPServer:
     """MCP server exposing ``play`` tool and board/rules resources.
 
     Communication with :class:`MCPState` is one-directional via
-    ``action_queue``: each tool/resource call puts a tuple
+    ``_action_queue``: each tool/resource call puts a tuple
     ``(actions, frames, result_queue, simulate)`` onto the queue, then blocks on
     ``result_queue.get()`` until the main thread processes the request.
+
+    The queue is ``None`` when no MCP game is currently active (e.g. the app
+    is in a menu) — tool/resource calls then return a clear error instead of
+    blocking forever.
     """
 
     def __init__(
         self,
-        action_queue: queue.Queue[tuple[list[str], int, queue.Queue[dict[str, Any]], bool]],
         port: int = MCP_SERVER_PORT,
     ) -> None:
-        self._action_queue = action_queue
         self._port = port
+        self._action_queue: queue.Queue[tuple[list[str], int, queue.Queue[dict[str, Any]], bool]] | None = None
         self._thread: threading.Thread | None = None
         self._mcp: FastMCP | None = None
         self._setup_mcp()
@@ -92,9 +119,11 @@ class TetrisMCPServer:
                 On processing error: ``error``, ``game_over``, ``board``,
                 ``holes``, ``overhangs``.
             """
+            if self._action_queue is None:
+                return {"error": "no active MCP game", "game_over": True, "board": [], "holes": 0, "overhangs": 0}
             result_q: queue.Queue[dict[str, Any]] = queue.Queue()
             self._action_queue.put((actions, frames, result_q, False))
-            return result_q.get()  # blocks until MCPState processes
+            return result_q.get()
 
         @self._mcp.tool()
         def simulate(actions: list[str], frames: int = 0) -> dict[str, Any]:
@@ -120,9 +149,13 @@ class TetrisMCPServer:
                 (0/1/"X"/"O"), ``holes``, ``overhangs``, ``current_piece``,
                 ``next_piece``, ``preview_pieces``, ``hold_piece``, ``can_hold``,
                 ``score``, ``lines``, ``level``, ``game_over``,
-                ``action_results``, ``lines_cleared``. On a horizon error,
+                ``action_results``, ``lines_cleared``, ``locked_pieces``
+                (list of piece types locked during the simulation, in lock order;
+                simulate only). On a horizon error,
                 returns ``{"error": "..."}``.
             """
+            if self._action_queue is None:
+                return {"error": "no active MCP game", "game_over": True, "board": [], "holes": 0, "overhangs": 0}
             result_q: queue.Queue[dict[str, Any]] = queue.Queue()
             self._action_queue.put((actions, frames, result_q, True))
             return result_q.get()
@@ -134,6 +167,8 @@ class TetrisMCPServer:
             Clears all locked pieces, resets score/lines/level to zero,
             spawns new pieces, and returns the initial board snapshot.
             """
+            if self._action_queue is None:
+                return {"error": "no active MCP game", "game_over": True, "board": [], "holes": 0, "overhangs": 0}
             result_q: queue.Queue[dict[str, Any]] = queue.Queue()
             self._action_queue.put((["start_game"], 0, result_q, False))
             return result_q.get()
@@ -141,6 +176,8 @@ class TetrisMCPServer:
         @self._mcp.tool()
         def quit() -> dict[str, Any]:
             """Stop the MCP session and return to the menu."""
+            if self._action_queue is None:
+                return {"error": "no active MCP game", "game_over": True, "board": [], "holes": 0, "overhangs": 0}
             result_q: queue.Queue[dict[str, Any]] = queue.Queue()
             self._action_queue.put((["quit"], 0, result_q, False))
             return result_q.get()
@@ -148,6 +185,8 @@ class TetrisMCPServer:
         @self._mcp.resource("board://state")
         def board_state() -> str:
             """Current board state without advancing the game (0 actions, 0 frames)."""
+            if self._action_queue is None:
+                return json.dumps({"error": "no active MCP game"})
             result_q: queue.Queue[dict[str, Any]] = queue.Queue()
             self._action_queue.put(([], 0, result_q, False))
             return json.dumps(result_q.get())
@@ -174,8 +213,17 @@ class TetrisMCPServer:
             """Full shape rotation data, SRS kicks, spawn, and board geometry."""
             return json.dumps(_shapes_payload())
 
+    def attach(self, action_queue: queue.Queue[tuple[list[str], int, queue.Queue[dict[str, Any]], bool]]) -> None:
+        """Bind the active game's action queue and ensure the server is up."""
+        self._action_queue = action_queue
+        self.start()
+
+    def detach(self) -> None:
+        """Unbind the active game's queue (server keeps running)."""
+        self._action_queue = None
+
     def start(self) -> None:
-        """Launch the MCP server on a daemon thread."""
+        """Launch the MCP server once on a daemon thread (idempotent)."""
         if self._thread is not None or self._mcp is None:
             return
         mcp = self._mcp
@@ -187,11 +235,10 @@ class TetrisMCPServer:
         self._thread.start()
 
     def stop(self) -> None:
-        """Soft stop — daemon thread dies with the process.
+        """Persistent server: detaches the active game but stays bound.
 
-        FastMCP has no clean shutdown API for the streamable-http transport.
-        Setting ``_mcp = None`` prevents further tool registrations; the
-        daemon thread is harmless once the process exits.
+        The daemon thread and its socket live until the process exits; there
+        is no clean uvicorn shutdown API for the streamable-http transport,
+        and keeping the server up is the desired behaviour.
         """
-        self._mcp = None
-        self._thread = None
+        self.detach()

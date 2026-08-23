@@ -33,25 +33,23 @@ class SimulationError(RuntimeError):
 class _PreviewProvider:
     """Piece source for simulation.
 
-    Replays exactly the pieces the real game *already knows* — the current
-    falling piece plus ``next_piece`` and the preview pieces. Any spawn past
-    that horizon raises :class:`SimulationError` (we must not invent future
-    pieces). The real ``PieceProvider`` is never advanced or copied.
+    The real ``PieceProvider`` is never advanced or copied. During a
+    simulation the only provider calls are preview-tail refills for pieces
+    BEYOND the known horizon (current + next + previews), which are
+    genuinely unknown — so ``next_type`` returns ``None`` to signal
+    "no known piece". The spawn/hold logic drains the preview to empty
+    instead of inventing future pieces. Reaching for a piece with an empty
+    preview raises :class:`SimulationError` (true horizon exceeded).
     """
 
-    def __init__(self, known_types: list[str], generator_name: str) -> None:
-        self._known = list(known_types)
-        self._queue = list(known_types)
+    def __init__(self, generator_name: str) -> None:
         self._generator_name = generator_name
 
-    def next_type(self) -> str:
-        if self._queue:
-            return self._queue.pop(0)
-        raise SimulationError("horizon exceeded: no known piece beyond current piece + previews")
+    def next_type(self) -> str | None:
+        return None
 
     def reset(self) -> None:
-        # A simulated start_game discards the known horizon; refuse further spawns.
-        self._queue = []
+        pass
 
     def save(self) -> None:
         pass
@@ -117,20 +115,20 @@ def simulate_actions(state: GameState, actions: list[str], frames: int, dt: floa
     saved_audio = state.audio
     state.audio = NullAudio()  # type: ignore[assignment]
     saved = {k: getattr(state, k) for k in SIM_FIELDS}
+    saved_locked = state.locked_pieces
+    state.locked_pieces = []
     particles = ParticleSystem()
     try:
         for k in SIM_FIELDS:
             if k == "pieces":
                 continue  # replaced with a replay stand-in, not deep-copied
             setattr(state, k, copy.deepcopy(getattr(state, k)))
-        # Horizon = current piece + (next_piece + preview_pieces) = preview_count + 1
-        # known pieces. Beyond that we must not invent pieces, so the replay
-        # stand-in only carries preview_count + 1 entries; exhausting it raises
-        # SimulationError (handled by the caller). Future types are unknown, so
-        # the stand-in repeats next_piece's type for the slots past the preview.
-        known = [state.next_piece.type] * (state.preview_count + 1)
+        # The real game already knows current + next + previews; anything the
+        # provider yields during the sim is a refill BEYOND that horizon and is
+        # unknown. _PreviewProvider returns None so the spawn/hold logic drains
+        # the preview to empty instead of inventing future pieces.
         gen_name = getattr(state.pieces, "_generator_name", "unknown")
-        state.pieces = _PreviewProvider(known, gen_name)  # type: ignore[assignment]
+        state.pieces = _PreviewProvider(gen_name)  # type: ignore[assignment]
         try:
             action_results = state._execute_actions(actions)
             before = state.stats.total_lines
@@ -157,8 +155,10 @@ def simulate_actions(state: GameState, actions: list[str], frames: int, dt: floa
             "overhangs": overhangs,
             "action_results": action_results,
             "lines_cleared": lines_cleared,
+            "locked_pieces": list(state.locked_pieces),
         }
     finally:
         for k in SIM_FIELDS:
             setattr(state, k, saved[k])
         state.audio = saved_audio
+        state.locked_pieces = saved_locked

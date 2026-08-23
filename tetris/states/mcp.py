@@ -70,17 +70,17 @@ class MCPState(GameState):
             self._start_server()
 
     def _start_server(self) -> None:
-        from tetris.mcp_server import TetrisMCPServer
+        from tetris.mcp_server import get_server
 
-        self._server = TetrisMCPServer(self._action_queue, self.mcp_config.port)
-        self._server.start()
-        _logger.debug("MCP server started on port %d", self.mcp_config.port)
+        self._server = get_server(self.mcp_config.port)
+        self._server.attach(self._action_queue)
+        _logger.debug("MCP server attached on port %d", self.mcp_config.port)
 
     def _stop_server(self) -> None:
         if self._server is not None:
-            self._server.stop()
-            self._server = None
-            _logger.debug("MCP server stopped")
+            self._server.detach()
+            _logger.debug("MCP server detached (kept running)")
+        self._server = None
 
     def _reset_game(self) -> None:
         """Reset all game state for a fresh game (called via ``start_game`` tool)."""
@@ -216,7 +216,11 @@ def draw_mcp_hud(screen: pygame.Surface, font: pygame.font.Font, state: MCPState
         tc = state._last_tool_call
         lines.append(f"Actions: {', '.join(tc['actions']) or '(aucune)'}")
         lines.append(f"Frames: {tc['frames']}")
-        lines.append(f"Résultats: {', '.join(tc['results']) or '(aucune)'}")
+        results = tc.get("results")
+        if results:
+            lines.append(f"Résultats: {', '.join(results)}")
+        else:
+            lines.append(f"Résultats: {'(simulation)' if tc.get('simulate') else '(aucune)'}")
     if state._last_snapshot is not None:
         snap = state._last_snapshot
         lines.append(f"Score: {snap['score']}  Lignes: {snap['lines']}  Niveau: {snap['level']}")
