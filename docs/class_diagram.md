@@ -109,6 +109,24 @@ classDiagram
             # _on_select() State | None
             - _build_ai_state() State
             - _build_mcp_state() State
+            +holes_overhangs_help: str
+        }
+
+        class NullAudio {
+            +__getattr__(_name: str) Any
+        }
+
+        class SimulationError {
+        }
+
+        class _PreviewProvider {
+            - _known: list~str~
+            - _queue: list~str~
+            - _generator_name: str
+            +__init__(known_types: list~str~, generator_name: str) None
+            +next_type() str
+            +reset() None
+            +save() None
         }
 
         class HumanMenuState {
@@ -305,6 +323,8 @@ classDiagram
             +update(dt: float, particles: ParticleSystem) State | None
             - _emit_line_particles(particles: ParticleSystem, rows_data) None
             +draw(screen: pygame.Surface, particles: ParticleSystem | None) None
+            +holes_overhangs_help: str
+            - _execute_actions(actions: list~str~) list~str~
         }
         %% Module-level functions: _drop_interval(level: int, drop_step: float) -> float
         %% Module-level functions: _music_speed_for_level(level: int) -> float
@@ -503,6 +523,8 @@ classDiagram
             +hard_drop(tetromino: Tetromino) int
             +apply_handicap(level: int) None
             +clear_lines() tuple~int, list~
+            +find_holes() set~tuple~int, int~~
+            +find_overhangs() set~tuple~int, int~~
         }
 
 
@@ -776,6 +798,9 @@ classDiagram
             - _render_glitch_board(game: GameState, shake_x: int, shake_y: int, glitch: float) pygame.Surface
             - _render_game_over_text(elapsed: int) None
             +play_game_over_animation(game: GameState, audio) None
+            - _draw_hole_overhang_markers(game: GameState) None
+            - _draw_cell_letter(letter: str, rect: pygame.Rect, color) None
+            - _draw_hole_overhang_debug(game: GameState) None
         }
 
         class Particle {
