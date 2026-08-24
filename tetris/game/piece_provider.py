@@ -307,7 +307,8 @@ class PieceProvider:
         if piece is None:  # replay exhausted → switch to fallback
             self._generator = self._fallback
             piece = self._generator.next(pool, self._first_piece)
-            assert piece is not None  # fallback generators never exhaust
+            if piece is None:
+                raise RuntimeError("piece_provider: fallback generator exhausted")
         self._first_piece = False
         self._recorded.append(piece)
         _logger.debug("Spawned %s | bag=%s", piece, self._generator.bag_remaining)

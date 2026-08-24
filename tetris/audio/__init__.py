@@ -260,8 +260,9 @@ class AudioManager:
             return
         # Crossfade: new buffer fades in over 500ms while old fades out
         vol = VOLUME_LEVELS[self.music_volume]
+        if self._music_sound is None:
+            return
         self._xfade_channel.set_volume(vol)
-        assert self._music_sound is not None  # set by _build_music_sound above
         self._xfade_channel.play(self._music_sound, loops=-1)
         self._music_channel.fadeout(500)
         # Swap channels: xfade becomes the main music channel

@@ -226,7 +226,6 @@ def enumerate_drops(state: GameState, dt: float) -> dict:
     schema matches `simulate` exactly; only `actions` is added.
     """
     piece = state.current_piece
-    assert piece is not None
     entries: list[tuple[list[str], dict]] = []
     for actions, _ in enumerate_hard_drop_actions(state.board, piece):
         snap = simulate_actions(state, actions, 0, dt)
