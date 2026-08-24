@@ -228,6 +228,8 @@ def draw_mcp_hud(screen: pygame.Surface, font: pygame.font.Font, state: MCPState
         snap = state._last_snapshot
         if "error" in snap:
             lines.append(f"Erreur: {snap['error']}")
+        elif "boards" in snap:
+            lines.append(f"Pièce: {snap['piece_type']}  Placements: {len(snap['boards'])}")
         else:
             lines.append(f"Score: {snap['score']}  Lignes: {snap['lines']}  Niveau: {snap['level']}")
             lines.append(f"Game Over: {'Oui' if snap['game_over'] else 'Non'}")
