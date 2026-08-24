@@ -19,7 +19,7 @@ from tetris.game.tetromino import Tetromino
 from tetris.logger import get_logger
 from tetris.settings import HUD_POSITIONS, SPEED_MODES
 from tetris.states.game import GameConfig, GameState, _drop_interval
-from tetris.states.simulator import build_board_repr, simulate_actions
+from tetris.states.simulator import build_board_repr, simulate_actions, enumerate_drops, ENUMERATE_COMMAND
 from tetris.visuals.particles import ParticleSystem
 
 if TYPE_CHECKING:
@@ -144,7 +144,10 @@ class MCPState(GameState):
             except queue.Empty:
                 break
             if simulate:
-                snapshot = simulate_actions(self, actions, frames, dt)
+                if actions == ENUMERATE_COMMAND:
+                    snapshot = enumerate_drops(self, dt)
+                else:
+                    snapshot = simulate_actions(self, actions, frames, dt)
                 self._last_tool_call = {"actions": actions, "frames": frames, "simulate": True}
                 self._last_snapshot = snapshot
                 result_queue.put(snapshot)

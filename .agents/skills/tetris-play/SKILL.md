@@ -7,204 +7,122 @@ metadata:
 
 # Tetris MCP Player
 
-Play the game via the harness MCP tools `xd://mcp__tetris_start_game` and
-`xd://mcp__tetris_play`. The MCP server is assumed already running and
-connected (see Connection). The game is fully under your control: it
-advances only when you send `play` with `frames > 0`; otherwise it stays
-frozen between calls.
+Drive the game through the harness MCP tools `xd://mcp__tetris_start_game` and
+`xd://mcp__tetris_play`. The server is assumed already running. The game
+advances only when you send `play`; it stays frozen between calls.
 
-## Response format (harness)
+## Limits
 
-The harness MCP tools (`xd://mcp__tetris_play`, `xd://mcp__tetris_start_game`)
-return a wrapper, not the raw snapshot dict:
-
-```json
-{ "text": "<str>", "details": { "rawContent": [ { "type": "text", "text": "<json>" } ] } }
-```
-
-Parse `details.rawContent[0].text` as the snapshot dict. External HTTP clients
-(direct FastMCP streamable-http) receive the dict directly.
-
-## When to activate
-
-- User asks to "play Tetris", "drive the board via MCP", "use the tetris MCP
-  tools", or run the MCP player.
+- **No reading** game source, scripts, or any repo code (including shape/kick
+  data files).
+- **No writing or executing** any code/scripts — no solvers, bots, or local
+  simulation with game classes.
+  using **only** the MCP tools (`start_game`, `play`, `simulate`, `enumerate_drops`) and the
+  snapshot. Each move is a deliberate decision, never an automated loop: think
+  of candidates, preview with `simulate`, commit with `play`.
 
 ## Tools
 
-### start_game
-
-Reset the board, score/lines/level to 0, spawn fresh pieces.
-
-- Args: `{}` (none)
-- Returns: board snapshot (see below).
-
-### play
-
-Execute a list of actions, optionally advance `frames` (~16 ms each) of
-gravity/lock delay, return a board snapshot.
-
-- Args: `{ "actions": string[], "frames"?: int }` (frames default 0)
-- Actions: `left`, `right`, `rotate_cw`, `rotate_ccw`, `soft_drop`,
-      `hard_drop`, `hold`, `start_game` (reset), `quit` (leave MCP).
-      `start_game`/`quit` may also be sent inside a `play` action list.
-- All actions in one call run sequentially, then `frames` ticks of gravity
-  happen, then the snapshot is returned. `hard_drop` drops the piece to the
-  floor and locks it immediately — so `play(["hard_drop"], 0)` places the
-  current piece and spawns the next one.
-- Actions after `hard_drop` in the same call apply to the NEXT spawned piece
-  (the current one already locked). Send one piece's moves per `play` call,
-  then read the snapshot to plan the next one.
-- Returns: board snapshot.
-
-### simulate
-
-Preview the result of a move **without** touching the real game. Same
-arguments and return schema as `play`, but it runs on a throwaway copy, so the
-board, score, and piece queue are unchanged — use it to test a sequence before
-committing it with `play`.
-
-- Args: `{ "actions": string[], "frames"?: int }` (frames default 0)
-- Returns: same snapshot dict as `play` (board 0/1/"X"/"O", holes, overhangs,
-  current_piece, next_piece, preview_pieces, hold_piece, can_hold, score, lines,
-  level, game_over, action_results, lines_cleared).
-- **Non-mutating**: the real board only changes on `play`. A `simulate` call
-  leaves the current piece and queue exactly as they were.
-- **Horizon**: the simulation is bounded to the pieces the game already knows
-  (current falling piece + `next_piece` + previews). It drains those known
-  pieces and returns `next_piece: null` / empty `preview_pieces` once exhausted,
-  rather than inventing future pieces. Requesting more drops than known pieces
-  (no active piece left) returns `{"error": "horizon exceeded: ..."}`.
-  `quit` is ignored (simulate never leaves MCP).
-
-### Board snapshot (both tools)
-
-```text
-board:            list[22] of list[10] of (int|"X"|"O")   # 1 = filled, 0 = empty, "X" = hole (unreachable covered), "O" = overhang (reachable covered)
-current_piece:    str   # "I","O","T","S","Z","J","L"
-next_piece:       str
-preview_pieces:   list[str]                  # extra lookahead (count = preview_count-1)
-hold_piece:       str | None
-can_hold:         bool   # hold available for this piece
-score:            int
-lines:            int
-level:            int
-game_over:        bool
-holes:            int                         # count of unreachable covered empty cells ("X")
-overhangs:        int                        # count of reachable covered empty cells ("O")
-action_results:   list[str]                  # "ok" / "blocked" (hold unavailable) / "unknown:<action>" per action (play only)
-lines_cleared:    int | None                  # lines removed by this call's actions (play only)
-locked_pieces:    list[str]                   # pieces locked during the simulation, in lock order (simulate only)
-error:            str | None                  # present only when processing raised; also game_over/board
-```
+- **start_game** `{}` — reset board/score/lines; spawn fresh pieces.
+- **simulate** `{ "actions": [...] }` — run the action list on a throwaway copy
+  and return a snapshot, **without mutating** the real board or piece queue. Use
+  it to preview a placement before committing. The horizon is bounded to known
+  pieces (current + next + previews); requesting more drops than known returns
+  `{"error": "horizon exceeded: ..."}`.
+- **enumerate_drops** `{}` — compute every final board from rotating/shifting/hard-dropping
+  the current piece, **without mutating** the real game. Returns
+  `{"piece_type": ..., "boards": [ { ...simulate keys..., "actions": [...] } ]}`, each board
+  de-duplicated and ranked by (1) most `lines_cleared`, (2) fewest `overhangs`,
+  (3) fewest `holes`, (4) flattest/lowest stack. Use it as the **Plan** step: read the
+  ranked list, pick `boards[0]` (or any entry), and commit its `actions` with `play`.
+  Only the current falling piece is enumerated — `next_piece`/`preview_pieces` are never
+  used to choose placements (soft_drop/hold fallbacks are out of scope for this tool).
+- **play** `{ "actions": [...], "frames"?: int }` — run the action list, then
+  advance `frames` (~16 ms) of gravity, return a snapshot. `frames` defaults to
+  0. Actions: `left`, `right`, `rotate_cw`, `rotate_ccw`, `soft_drop`,
+  `hard_drop`, `hold`, `start_game`, `quit`. `hard_drop` drops to the floor
+  and locks immediately; later actions in the same call apply to the
+  next piece. Send one piece's moves per call, then read the snapshot.
 
 ## Resources
 
-### tetris://shapes
+- `tetris://shapes` — MCP resource with the full piece geometry (all rotation
+  states) and SRS wall-kick tables. Read it once at session start for exact
+  shape/kick data if needed. It is game data, not repo code, so reading it does
+  not violate the Limits above. If you prefer, skip it and learn shapes from the
+  snapshot + `simulate` instead.
 
-Full shape/kick geometry as JSON (read the resource; harness: `mcp://tetris://shapes`):
+## Snapshot
 
-- `shapes`: `SHAPES` — `dict[piece_type, list[rotation_cells]]`, each rotation a
-  list of `(col,row)` cell offsets in the 4×4 piece box.
-- `srs_kicks`: `{"JLSTZ": ..., "I": ...}` — SRS wall-kick offset tables.
-- `spawn`: `{"x": 3, "y": 0}` (BOARD_WIDTH//2 - 2).
-- `board`: `{"width":10, "height":22, "hidden_rows":2, "visible_rows":20}`.
-- `coordinate_convention`: cells are `(col,row)` in the piece box; absolute =
-  `(piece.x+col, piece.y+row)`; board `y=0` top, `y` increases downward.
+Both tools return a snapshot dict (the harness wraps it as JSON; parse the text
+field). Key fields:
 
-Read it once at session start; no need to open `tetris/game/shapes.py`.
+    board:          22 rows x 10 cols  (0 empty, 1 filled, "X" hole, "O" overhang)
+    current_piece:  "I"|"O"|"T"|"S"|"Z"|"J"|"L"
+    next_piece:     str
+    preview_pieces: list[str]
+    hold_piece:     str | None
+    can_hold:       bool
+    score, lines, level: int
+    game_over:      bool
+    holes:          int   # "X" cells (empty, covered, no top path)
+    overhangs:      int   # "O" cells (filled-but-unsupported, non-solid)
+    action_results: list[str]   # "ok"|"blocked"|"unknown:<action>" (play only)
+    lines_cleared:  int | None   # lines removed by this call (play only)
 
-## Board representation
+## Board & pieces
 
-- `board[y][x]`: `y=0` is the **top** (2 hidden buffer rows at y=0,1),
-  `y=21` is the bottom. `x=0` is the left wall. `1` = occupied, `0` = empty,
-  `"X"` = hole (empty with a filled cell above and no path from the top),
-  `"O"` = overhang (empty with a filled cell above but still reachable from
-  the top through a side gap). `holes`/`overhangs` count them.
-- Height of column `x` = `22 - (index of first filled row from the top)`.
-- Line clears and scoring (standard Tetris Guideline) happen automatically
-  on lock.
-- A `handicap` (settings) may pre-fill bottom rows with gray blocks at game
-  start — treat them as normal filled cells.
+- Rows `y=0..21` (0 top, 21 bottom; 2 hidden buffer rows at top). Cols
+  `x=0..9`. `1` = filled, `0` = empty, `"X"` = hole (empty with filled above,
+  unreachable), `"O"` = overhang (filled-but-unsupported). **A row clears only
+  if all 10 cells are solid (`1`); any `X` or `O` blocks that clear.**
+- A piece spawns at rotation `0`, `x = 3`, `y = 0`. `left`/`right` shift x;
+  `rotate_cw`/`rotate_ccw` change rotation (SRS kicks may nudge x by 0/±1 —
+  rotate while high, then shift). `hold` swaps once per piece (`can_hold` →
+  False until next lock).
+- Line clears and scoring are automatic on lock. A `handicap` may pre-fill
+  bottom rows — treat as normal filled cells.
 
-## Piece model (for planning moves)
+## Play loop
 
-- A new piece **spawns** at rotation `0`, `x = BOARD_WIDTH//2 - 2 = 3`,
-  `y = 0` (top). Its cells are `SHAPES[type][rotation]` offsets added to
-  `(x, y)`.
-- The snapshot does **not** include the falling piece's coordinates — you
-  must track them yourself:
-  - `left` → x -= 1, `right` → x += 1.
-  - `rotate_cw` / `rotate_ccw` → advance rotation; SRS wall kicks *may*
-    shift x (usually by 0 or ±1). Rotate while the piece is high (near
-    spawn) where there is room, then move horizontally — kicks rarely fire
-    there.
-  - `hold` swaps with `hold_piece` (once per piece; `can_hold` becomes
-    `False` until the next lock).
-- Exact cell offsets, SRS kick tables, spawn, and board geometry are exposed
-  by the `tetris://shapes` resource (read it once at session start).
-- For exact placement you can simulate locally with
-  `tetris.game.board.Board` + `tetris.game.tetromino.Tetromino`:
-  `Board.try_rotate(piece, dir)` **mutates** the piece (x/y/rotation/shape)
-  and returns a `bool`; `Board.hard_drop(piece)` mutates `piece.y` to the
-  lowest valid row; `Board.is_valid_move(piece, dx)` checks fit at the current
-  y. `frames=0` + `hard_drop` is fully deterministic — plan offline, then send
-  `[rotate_cw]*n + [left|right]*m + [hard_drop]`.
+1. **Start** — call `start_game` once.
+2. **Read** — get the snapshot. If `game_over`, stop (call `start_game` for a
+   new game; never restart before game over).
+3. **Plan** — call `enumerate_drops()` once to get every final board from
+   rotating/shifting/hard-dropping the current piece, already ranked by
+   (1) most `lines_cleared`, (2) fewest `overhangs`, (3) fewest `holes`,
+   (4) flattest/lowest stack. Each entry carries its `actions` list — pick the
+   best and commit it directly with `play`. Most placements drop straight with
+   `hard_drop`; use `soft_drop` to lower to a specific row, then shift, only
+   when you must tuck under an overhang or fill a mid-height gap. Also consider
+   a `hold` swap when the piece fits nowhere cleanly and a preview piece fits
+   better. Use `preview_pieces` to leave a notch for the next piece; building
+   one edge well for vertical `I`s sustains long games. Completing a line beats
+   saving height.
+4. **Preview** — for each candidate call `simulate([...])` and read the board,
+   `holes`, `overhangs`, `lines_cleared`. `simulate` never changes the real game,
+   so preview as many as you can. Never auto-reject a line-clearing placement
+   just because it adds a hole/overhang — score and compare instead (soft
+   penalties, no hard filters).
+5. **Choose** — rank by: (1) most `lines_cleared`, (2) fewest `overhangs`,
+   (3) fewest `holes`, (4) flattest/lowest stack. Overhangs outrank holes: an
+   `O` cell is permanently non-solid, so any overhang dooms that row's clear.
+6. **Commit** — call `play([...], 0)` with the chosen actions; read the new
+   snapshot and repeat from step 2.
 
-## Play loop (greedy heuristic)
+### Example
 
-1. Call `start_game` once to begin.
-2. Read the snapshot. Note `game_over`; stop if `True`.
-3. Decide the placement for `current_piece`:
-   - Using `SHAPES`, enumerate every `(rotation, x)` where the piece fits
-     (no overlap with `board`, within `0..9`).
-   - For each candidate, drop it onto the stack (lowest valid y), place,
-     clear full lines, and score the resulting board: prefer more lines
-     cleared, fewer holes, lower and less bumpy aggregate height.
-   - Pick the best `(rotation, x)`.
-4. Build one `play` action list: first the needed `rotate_cw`/`rotate_ccw`
-   (from spawn rotation `0` to target), then `left`/`right` to reach target
-   `x` from spawn `x=3` (account for any kick shift if you rotated), then
-   `hard_drop`.
-   - `frames = 0` (no gravity during placement).
-5. Send the `play` call, read the new snapshot, repeat from step 2.
+`current_piece = "O"` spawns at `x=3`; target columns 4-5:
+`play(["right", "hard_drop"], 0)`. The O locks at the bottom of cols 4-5; the
+next snapshot shows the new piece and updated board.
 
-### Worked example
+## Notes
 
-After `start_game`, suppose `current_piece = "O"` (rotations irrelevant;
-2x2). Spawn `x=3`. Target column: `x=4`. Actions:
-`["right", "hard_drop"]`, `frames=0`. The O locks at the bottom of columns
-4-5. The next snapshot shows the new `current_piece` and updated
-`board`/`score`.
-
-### Worked example — vertical I (well fill)
-
-`current_piece = "I"` spawns horizontal (rotation 0) at `x=3`. To drop a
-vertical I into the right well (column 8): rotate once, then move right 3:
-`["rotate_cw", "right", "right", "right", "hard_drop"]`, `frames=0`. After
-`rotate_cw` the I occupies a single column; the three `right`s shift that
-column to `x=8`; `hard_drop` locks it at the bottom.
-
-## Caveats
-
-- `simulate` is non-mutating — preview a move with it, then commit with `play`.
-  The real board only changes on `play`. The simulation drains the known pieces
-  (current + next + previews) and returns `next_piece: null` once exhausted;
-  only requesting more drops than known pieces returns
-  `{"error": "horizon exceeded: ..."}`.
-
-- The game does not run on its own — gravity only advances when you pass
-- On `game_over` the server stays ALIVE — the snapshot reports
-  `game_over: true` and play is frozen. Call `start_game` to reset within the
-  same MCP session (no menu transition). To leave MCP entirely, send the
-  `quit` action/tool — it stops the server and returns to the menu.
-- Pieces are random (not 7-bag) and NOT seeded — episodes are not
-  reproducible. Re-plan from each snapshot; do not assume a fixed sequence.
-- Issuing `play` with no movement and `hard_drop` drops straight from the
-  current position (spawn column by default).
-- `action_results` tells you if any action name was rejected
-  (`unknown:<name>`).
-- Respect `can_hold`: `hold` is unavailable after you have already held this
-  piece (until the next lock).
-- On `game_over`, the server stops and returns to the menu; call
-  `start_game` for a new game.
+- `play` is deterministic with `frames=0` (no gravity): `hard_drop` to commit to
+  the floor, or `soft_drop` + shift to tuck at a chosen height, then `hard_drop`.
+- `action_results` reports rejected actions (`unknown:<action>`); the valid
+  rotation is `rotate_cw`, not `rotate`.
+- Pieces are random and not seeded — re-plan from each snapshot; never assume a
+  sequence.
+- On `game_over` the server stays alive (frozen); `start_game` resets in place,
+  `quit` leaves MCP.

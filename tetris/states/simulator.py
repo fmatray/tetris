@@ -17,6 +17,9 @@ from tetris.game.board import Board
 from tetris.settings import BOARD_HEIGHT, BOARD_WIDTH
 from tetris.states.game import GameState
 from tetris.visuals.particles import ParticleSystem
+from tetris.ai.candidates import enumerate_hard_drop_actions
+
+ENUMERATE_COMMAND = ["__enumerate_drops__"]
 
 
 class NullAudio:
@@ -165,3 +168,69 @@ def simulate_actions(state: GameState, actions: list[str], frames: int, dt: floa
             setattr(state, k, saved[k])
         state.audio = saved_audio
         state.locked_pieces = saved_locked
+
+
+def _board_aggregate_height(repr_grid: list) -> int:
+    """Sum of column heights (filled cell == 1). Lower = flatter/lower stack."""
+    total = 0
+    for x in range(BOARD_WIDTH):
+        for y in range(BOARD_HEIGHT):
+            if repr_grid[y][x] == 1:
+                total += BOARD_HEIGHT - y
+                break
+    return total
+
+
+def _board_bumpiness(repr_grid: list) -> int:
+    heights = []
+    for x in range(BOARD_WIDTH):
+        h = 0
+        for y in range(BOARD_HEIGHT):
+            if repr_grid[y][x] == 1:
+                h = BOARD_HEIGHT - y
+                break
+        heights.append(h)
+    return sum(abs(heights[i] - heights[i + 1]) for i in range(BOARD_WIDTH - 1))
+
+
+def _dedup_and_rank(entries: list[tuple[list[str], dict]]) -> list[dict]:
+    seen: set = set()
+    unique: list[tuple[list[str], dict]] = []
+    for actions, snap in entries:
+        key = tuple(tuple(row) for row in snap["board"])
+        if key in seen:
+            continue
+        seen.add(key)
+        unique.append((actions, snap))
+
+    def sort_key(item: tuple[list[str], dict]):
+        _actions, snap = item
+        lines = snap.get("lines_cleared") or 0
+        return (
+            -lines,  # (1) most lines cleared
+            snap.get("overhangs", 0),  # (2) fewest overhangs
+            snap.get("holes", 0),  # (3) fewest holes
+            _board_aggregate_height(snap["board"]),  # (4) lowest/flattest stack
+            _board_bumpiness(snap["board"]),  # (4) tiebreak: smoothest
+        )
+
+    unique.sort(key=sort_key)
+    return [{"actions": actions, **snap} for actions, snap in unique]
+
+
+def enumerate_drops(state: GameState, dt: float) -> dict:
+    """Enumerate all hard-drop final boards for the current piece.
+
+    Returns {"piece_type": str|None, "boards": [ {**simulate_snapshot, "actions": [...]}, ... ]}
+    ranked by _dedup_and_rank. Each board is a simulate_actions snapshot, so the
+    schema matches `simulate` exactly; only `actions` is added.
+    """
+    piece = state.current_piece
+    assert piece is not None
+    entries: list[tuple[list[str], dict]] = []
+    for actions, _ in enumerate_hard_drop_actions(state.board, piece):
+        snap = simulate_actions(state, actions, 0, dt)
+        if "error" in snap:
+            continue
+        entries.append((actions, snap))
+    return {"piece_type": piece.type, "boards": _dedup_and_rank(entries)}

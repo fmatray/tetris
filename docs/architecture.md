@@ -67,7 +67,7 @@ tetris/
 │   │   ├── mcp.py               # MCPState (jeu MCP, hérite GameState ; MCPConfig)
 │   │   └── mcp_menu.py          # MCPMenuState (port)
 │   └── storage/                 # Persistance JSON
-├── mcp_server.py            # TetrisMCPServer (serveur MCP HTTP, outils play + simulate + start_game + resources)
+├── mcp_server.py            # TetrisMCPServer (serveur MCP HTTP, outils play + simulate + start_game + enumerate_drops + resources)
 ├── tests/                       # Tests unitaires
 │   ├── __init__.py
 │   ├── conftest.py              # Fixtures partagées

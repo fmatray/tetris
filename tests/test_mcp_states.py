@@ -554,3 +554,104 @@ def test_simulate_ignores_quit():
     assert "error" not in out
     assert out["action_results"] == ["unknown:quit"]
     assert state.game_over is game_over_before
+
+
+# ── enumerate_drops tool ─────────────────────────────────────────────
+
+
+def test_enumerate_core_returns_action_lists():
+    """gen_placements -> replayable action lists ending in hard_drop."""
+    from tetris.game.board import Board
+    from tetris.ai.candidates import enumerate_hard_drop_actions
+
+    board = Board()
+    piece = Tetromino("T")
+    drops = enumerate_hard_drop_actions(board, piece)
+    assert len(drops) > 0
+    valid = {"rotate_cw", "left", "right", "hard_drop"}
+    for actions, _ in drops:
+        assert actions[-1] == "hard_drop"
+        assert all(a in valid for a in actions)
+
+
+def test_enumerate_drops_via_state():
+    """enumerate_drops returns simulate-format boards, each with actions."""
+    from tetris.states.simulator import enumerate_drops
+
+    state = _make_mcp_state(start_server=False)
+    dt = 1.0 / 60.0
+    piece = state.current_piece
+    assert piece is not None
+    result = enumerate_drops(state, dt)
+    assert result["piece_type"] == piece.type
+    assert len(result["boards"]) > 0
+    for board in result["boards"]:
+        assert isinstance(board["actions"], list)
+        assert board["actions"][-1] == "hard_drop"
+        for key in ("board", "holes", "overhangs", "current_piece", "lines_cleared"):
+            assert key in board
+
+
+def test_enumerate_roundtrip_fidelity():
+    """Each enumerated board's actions replay to that exact board."""
+    from tetris.states.simulator import enumerate_drops, simulate_actions
+
+    state = _make_mcp_state(start_server=False)
+    dt = 1.0 / 60.0
+    result = enumerate_drops(state, dt)
+    seen_lines = []
+    for board in result["boards"]:
+        replay = simulate_actions(state, board["actions"], 0, dt)
+        assert replay["board"] == board["board"]
+        seen_lines.append(board.get("lines_cleared") or 0)
+    # ranking is monotonic on lines_cleared (primary key)
+    assert seen_lines == sorted(seen_lines, reverse=True)
+
+
+def test_enumerate_dedup_and_rank():
+    """Identical final boards collapse; line clears rank first."""
+    from tetris.states.simulator import _dedup_and_rank
+
+    board_a = [[0] * BOARD_WIDTH for _ in range(BOARD_HEIGHT)]
+    board_a[BOARD_HEIGHT - 1][3] = 1
+    snap_dup1 = {"board": board_a, "lines_cleared": 0, "overhangs": 2, "holes": 1}
+    snap_dup2 = {"board": board_a, "lines_cleared": 0, "overhangs": 2, "holes": 1}
+    snap_clear = {
+        "board": [[0] * BOARD_WIDTH for _ in range(BOARD_HEIGHT)],
+        "lines_cleared": 1,
+        "overhangs": 0,
+        "holes": 0,
+    }
+    entries = [
+        (["left", "hard_drop"], snap_dup1),
+        (["right", "hard_drop"], snap_dup2),
+        (["hard_drop"], snap_clear),
+    ]
+    ranked = _dedup_and_rank(entries)
+    assert len(ranked) == 2  # two identical boards deduped to one
+    assert ranked[0]["lines_cleared"] == 1  # line clear ranks first
+    assert "actions" in ranked[0]
+
+
+def test_enumerate_tool_via_queue():
+    """The enumerate_drops MCP tool routes through update() to ranked boards."""
+    import queue as q_mod
+
+    from tetris.states.simulator import ENUMERATE_COMMAND
+
+    state = _make_mcp_state(start_server=False)
+    particles = ParticleSystem()
+    dt = 1.0 / 60.0
+    result_q: q_mod.Queue = q_mod.Queue()
+    state._action_queue.put((ENUMERATE_COMMAND, 0, result_q, True))
+    state.update(dt, particles)
+    snap = result_q.get()
+    assert "boards" in snap
+    assert "piece_type" in snap
+    assert len(snap["boards"]) > 0
+    # existing play still works afterwards (no regression)
+    result_q2: q_mod.Queue = q_mod.Queue()
+    state._action_queue.put((["left"], 0, result_q2, False))
+    state.update(dt, particles)
+    snap2 = result_q2.get()
+    assert snap2["action_results"] == ["ok"]

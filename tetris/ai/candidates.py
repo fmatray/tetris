@@ -6,6 +6,7 @@ No pygame, no FSM, no instance state.
 
 from __future__ import annotations
 
+import copy
 from collections.abc import Iterator
 
 import numpy as np
@@ -20,7 +21,11 @@ from tetris.game.rules import hard_drop_y, try_rotation
 from tetris.game.shapes import get_shape_rot, num_shape_rot
 from tetris.settings import BOARD_HEIGHT, BOARD_WIDTH
 
-from typing import NamedTuple
+from typing import NamedTuple, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from tetris.game.board import Board
+    from tetris.game.tetromino import Tetromino
 
 
 class Placement(NamedTuple):
@@ -279,3 +284,55 @@ def get_candidate_states(
 
     actions = list(range(len(all_placements)))
     return candidates, actions, dellacherie_values, all_placements
+
+
+def enumerate_hard_drop_actions(board: Board, piece: Tetromino) -> list[tuple[list[str], Placement]]:
+    """All replayable action lists that hard-drop *piece* on *board*.
+
+    Reuses gen_placements for the (rot, px) target set, then drives the engine
+    (Board.try_rotate / is_valid_move / Tetromino.move) to build each action
+    list from the piece's CURRENT rotation/position, so the list replays exactly
+    through the real action handlers. Unreachable targets are skipped.
+    """
+    grid = np.array([[1 if cell else 0 for cell in row] for row in board.grid], dtype=np.int8)
+    out: list[tuple[list[str], Placement]] = []
+    for pl in gen_placements(grid, piece.type, soft_drop=False):
+        actions = _derive_actions(board, piece, pl.rot, pl.px)
+        if actions is None:
+            continue
+        out.append((actions, pl))
+    return out
+
+
+def _derive_actions(board: Board, piece: Tetromino, rot: int, px: int) -> list[str] | None:
+    """Build [..., 'hard_drop'] to reach (rot, px). None if unreachable."""
+    clone = copy.copy(piece)
+    actions: list[str] = []
+    num = num_shape_rot(piece.type)
+    guard = 0
+    while (clone.rotation % num) != rot:
+        if not board.try_rotate(clone, +1):
+            return None
+        actions.append("rotate_cw")
+        guard += 1
+        if guard > num + 1:
+            return None
+    guard = 0
+    while clone.x < px:
+        if not board.is_valid_move(clone, dx=1):
+            return None
+        clone.move(1, 0)
+        actions.append("right")
+        guard += 1
+        if guard > 10:
+            return None
+    while clone.x > px:
+        if not board.is_valid_move(clone, dx=-1):
+            return None
+        clone.move(-1, 0)
+        actions.append("left")
+        guard += 1
+        if guard > 10:
+            return None
+    actions.append("hard_drop")
+    return actions

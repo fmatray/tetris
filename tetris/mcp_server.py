@@ -26,6 +26,7 @@ from typing import Any
 from mcp.server.fastmcp import FastMCP
 
 from tetris.settings import MCP_SERVER_PORT
+from tetris.states.simulator import ENUMERATE_COMMAND
 
 
 def _shapes_payload() -> dict[str, Any]:
@@ -159,6 +160,20 @@ class TetrisMCPServer:
                 return {"error": "no active MCP game", "game_over": True, "board": [], "holes": 0, "overhangs": 0}
             result_q: queue.Queue[dict[str, Any]] = queue.Queue()
             self._action_queue.put((actions, frames, result_q, True))
+            return result_q.get()
+
+        @self._mcp.tool()
+        def enumerate_drops() -> dict[str, Any]:
+            """Enumerate every final board from rotating/shifting/hard-dropping the
+            current piece. Returns {"piece_type": str|None, "boards": [...]} where each
+            board is a simulate-format snapshot plus its "actions" list, de-duplicated
+            and ranked by (lines_cleared desc, overhangs asc, holes asc, stack height
+            asc). Never mutates the real game.
+            """
+            if self._action_queue is None:
+                return {"error": "no active MCP game", "game_over": True, "boards": [], "piece_type": None}
+            result_q: queue.Queue[dict[str, Any]] = queue.Queue()
+            self._action_queue.put((ENUMERATE_COMMAND, 0, result_q, True))
             return result_q.get()
 
         @self._mcp.tool()
