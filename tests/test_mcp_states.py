@@ -562,14 +562,14 @@ def test_simulate_ignores_quit():
 def test_enumerate_core_returns_action_lists():
     """gen_placements -> replayable action lists ending in hard_drop."""
     from tetris.game.board import Board
-    from tetris.ai.candidates import enumerate_hard_drop_actions
+    from tetris.states.simulator import enumerate_hard_drop_actions
 
     board = Board()
     piece = Tetromino("T")
     drops = enumerate_hard_drop_actions(board, piece)
     assert len(drops) > 0
     valid = {"rotate_cw", "left", "right", "hard_drop"}
-    for actions, _ in drops:
+    for actions in drops:
         assert actions[-1] == "hard_drop"
         assert all(a in valid for a in actions)
 

@@ -14,10 +14,12 @@ import copy
 from typing import Any
 
 from tetris.game.board import Board
+from tetris.game.rules import hard_drop_y, shape_fits
+from tetris.game.shapes import get_shape_rot, num_shape_rot
+from tetris.game.tetromino import Tetromino
 from tetris.settings import BOARD_HEIGHT, BOARD_WIDTH
 from tetris.states.game import GameState
 from tetris.visuals.particles import ParticleSystem
-from tetris.ai.candidates import enumerate_hard_drop_actions
 
 ENUMERATE_COMMAND = ["__enumerate_drops__"]
 
@@ -218,6 +220,70 @@ def _dedup_and_rank(entries: list[tuple[list[str], dict]]) -> list[dict]:
     return [{"actions": actions, **snap} for actions, snap in unique]
 
 
+def _derive_actions(board: Board, piece: Tetromino, rot: int, px: int) -> list[str] | None:
+    """Build [..., 'hard_drop'] to reach (rot, px). None if unreachable."""
+    clone = copy.copy(piece)
+    actions: list[str] = []
+    num = num_shape_rot(piece.type)
+    guard = 0
+    while (clone.rotation % num) != rot:
+        if not board.try_rotate(clone, +1):
+            return None
+        actions.append("rotate_cw")
+        guard += 1
+        if guard > num + 1:
+            return None
+    guard = 0
+    while clone.x < px:
+        if not board.is_valid_move(clone, dx=1):
+            return None
+        clone.move(1, 0)
+        actions.append("right")
+        guard += 1
+        if guard > 10:
+            return None
+    while clone.x > px:
+        if not board.is_valid_move(clone, dx=-1):
+            return None
+        clone.move(-1, 0)
+        actions.append("left")
+        guard += 1
+        if guard > 10:
+            return None
+    actions.append("hard_drop")
+    return actions
+
+
+def enumerate_hard_drop_actions(board: Board, piece: Tetromino) -> list[list[str]]:
+    """All replayable action lists that hard-drop *piece* on *board*.
+
+    Enumerates (rotation, column) targets via game-rule helpers, then drives
+    the engine (Board.try_rotate / is_valid_move / Tetromino.move) to build
+    each action list from the piece's CURRENT rotation/position, so the list
+    replays exactly through the real action handlers. Unreachable targets
+    are skipped.
+    """
+    out: list[list[str]] = []
+    num_rots = num_shape_rot(piece.type)
+    for rot in range(num_rots):
+        shape = get_shape_rot(piece.type, rot)
+        min_bx = min(bx for bx, _ in shape)
+        max_bx = max(bx for bx, _ in shape)
+        for col in range(BOARD_WIDTH):
+            px = col - min_bx
+            if px < 0 or px + max_bx >= BOARD_WIDTH:
+                continue
+            if not shape_fits(board.grid, shape, px, 0):
+                continue
+            py = hard_drop_y(board.grid, shape, px)
+            if py < 0:
+                continue
+            actions = _derive_actions(board, piece, rot, px)
+            if actions is not None:
+                out.append(actions)
+    return out
+
+
 def enumerate_drops(state: GameState, dt: float) -> dict:
     """Enumerate all hard-drop final boards for the current piece.
 
@@ -227,7 +293,7 @@ def enumerate_drops(state: GameState, dt: float) -> dict:
     """
     piece = state.current_piece
     entries: list[tuple[list[str], dict]] = []
-    for actions, _ in enumerate_hard_drop_actions(state.board, piece):
+    for actions in enumerate_hard_drop_actions(state.board, piece):
         snap = simulate_actions(state, actions, 0, dt)
         if "error" in snap:
             continue
