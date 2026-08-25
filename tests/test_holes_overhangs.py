@@ -1,12 +1,8 @@
 """Tests for shared hole/overhang detection (rules + Board)."""
 
-import os
-
-os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
-os.environ.setdefault("SDL_AUDIODRIVER", "dummy")
-
 import numpy as np
 
+from tests.helpers import fill_capped_columns
 from tetris.game.board import Board
 from tetris.game import rules
 from tetris.game.rules import (
@@ -76,13 +72,7 @@ def test_numpy_matches_list():
 def test_board_find_holes_overhangs():
     board = Board()
     g = board.grid
-    for y in range(22):
-        g[y][0] = (255, 0, 0)
-        g[y][1] = (255, 0, 0)
-        g[y][2] = (255, 0, 0)
-    # unreachable holes at bottom of capped columns 0/1
-    g[21][0] = None
-    g[21][1] = None
+    fill_capped_columns(board)
     # reachable overhang under a ledge in column 5
     g[0][5] = None
     g[1][5] = (0, 255, 0)

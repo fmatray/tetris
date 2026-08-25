@@ -287,77 +287,10 @@ tetris/game/
 #### `tetris/game/rules.py` — Grid-Agnostic Rule Engine
 
 ```python
-"""Pure game-rule functions operating on abstract grids.
-
-All functions accept a grid (list-of-lists or numpy 2D array) and
-cell-occupancy predicate. This eliminates the duplication between
-Board (list grid) and rewards.py (numpy grid simulation).
-"""
-
-from tetris.settings import (
-    BOARD_WIDTH, BOARD_HEIGHT, SHAPES,
-    SRS_KICKS_I, SRS_KICKS_JLSTZ,
-)
-
-# --- Occupancy abstraction ---------------------------------------------
-
-def is_occupied(grid, x: int, y: int) -> bool:
-    """Check if cell (x, y) is filled. Works for list[list] and np.ndarray."""
-    if x < 0 or x >= BOARD_WIDTH or y < 0 or y >= BOARD_HEIGHT:
-        return False  # out of bounds above is "empty" (spawn area)
-    if y >= BOARD_HEIGHT:
-        return True   # below board is "occupied" (floor)
-    cell = grid[y][x]
-    # list grid: cell is None or (r,g,b); numpy: cell is 0.0 or 1.0
-    return cell is not None if isinstance(cell, (tuple, type(None))) else cell > 0
-
-
-def shape_fits(grid, shape, x: int, y: int) -> bool:
-    """Check if shape fits at (x, y) without collision."""
-    for bx, by in shape:
-        cx, cy = x + bx, y + by
-        if cx < 0 or cx >= BOARD_WIDTH or cy >= BOARD_HEIGHT:
-            return False
-        if cy >= 0 and is_occupied(grid, cx, cy):
-            return False
-    return True
-
-
-def try_rotation(grid, piece_type, from_rot, to_rot, x, y):
-    """SRS wall kicks. Returns (nx, ny) or None."""
-    if piece_type == "O":
-        return (x, y) if shape_fits(grid, SHAPES[piece_type][to_rot], x, y) else None
-    kicks = SRS_KICKS_I if piece_type == "I" else SRS_KICKS_JLSTZ
-    key = (from_rot % len(SHAPES[piece_type]), to_rot % len(SHAPES[piece_type]))
-    for dx, dy in kicks.get(key, [(0, 0)]):
-        nx, ny = x + dx, y - dy
-        if shape_fits(grid, SHAPES[piece_type][to_rot], nx, ny):
-            return (nx, ny)
-    return None
-
-
-def hard_drop_y(grid, shape, x: int) -> int:
-    """Find lowest y where shape fits at column x."""
-    py = 0
-    while True:
-        if not shape_fits(grid, shape, x, py):
-            return py - 1 if py > 0 else 0
-        py += 1
-
-
-def soft_drop_placements(grid, piece_type):
-    """BFS enumeration of all reachable placements (SRS-aware)."""
-    # ... same BFS logic, using shape_fits() and try_rotation() ...
-
-
-def place_piece(grid, shape, x, y, value=None):
-    """Write shape cells into grid. Returns new grid (copy)."""
-    # ... works for both list and numpy ...
-
-
-def clear_lines(grid):
-    """Remove full rows, insert empty rows at top. Returns (new_grid, cleared_count, cleared_data)."""
-    # ... unified logic ...
+# See tetris/game/rules.py for the full implementation.
+# Key functions: is_occupied, shape_fits, try_rotation, hard_drop_y,
+# place_cells, clear_lines, find_full_rows, find_holes, find_overhangs.
+# All accept abstract grids (list-of-lists or numpy 2D array).
 ```
 
 #### Migration of Existing Code

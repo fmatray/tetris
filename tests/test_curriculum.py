@@ -3,16 +3,11 @@
 Headless: conftest.py sets SDL_VIDEODRIVER=dummy + SDL_AUDIODRIVER=dummy.
 """
 
-import os
-
-os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
-os.environ.setdefault("SDL_AUDIODRIVER", "dummy")
-from tetris.states.game import GameConfig
-from tetris.states.ai import AIConfig
-
 import pygame
 import pytest
 
+from tests.helpers import make_game_config
+from tetris.states.ai import AIConfig
 from tetris.game.piece_provider import PieceProvider
 from tetris.settings import CURRICULUM_ORDER
 from tetris.states.ai import AIState
@@ -35,16 +30,7 @@ def _make_ai(audio, curriculum=True, freq=2, epsilon_policy="reset"):
         _screen,
         _font,
         audio,
-        GameConfig(
-            handicap=0,
-            sound_volume=0,
-            music_volume=0,
-            music_song="korobeiniki",
-            debug=False,
-            ghost_piece=True,
-            preview_count=3,
-            speed_mode="normal",
-        ),
+        make_game_config(preview_count=3),
         AIConfig(
             epsilon_decay=0.999,
             epsilon_end=0.1,
@@ -87,16 +73,7 @@ class TestCurriculumInit:
             _screen,
             _font,
             audio,
-            GameConfig(
-                handicap=0,
-                sound_volume=0,
-                music_volume=0,
-                music_song="korobeiniki",
-                debug=False,
-                ghost_piece=True,
-                preview_count=3,
-                speed_mode="normal",
-            ),
+            make_game_config(preview_count=3),
             AIConfig(
                 epsilon_decay=0.999,
                 epsilon_end=0.1,
@@ -233,16 +210,7 @@ class TestCurriculum7Bag:
             _screen,
             _font,
             audio,
-            GameConfig(
-                handicap=0,
-                sound_volume=0,
-                music_volume=0,
-                music_song="korobeiniki",
-                debug=False,
-                ghost_piece=True,
-                preview_count=3,
-                speed_mode="normal",
-            ),
+            make_game_config(preview_count=3),
             AIConfig(
                 epsilon_decay=0.999,
                 epsilon_end=0.1,

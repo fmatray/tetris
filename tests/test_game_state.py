@@ -1,17 +1,8 @@
 """Tests for HumanState game-over transitions (normal drop, soft drop, hard drop)."""
 
-import os
-
-os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
-os.environ.setdefault("SDL_AUDIODRIVER", "dummy")
-
 import pygame
 
-pygame.init()
-pygame.mixer.init()
-
-
-from tetris.audio import AudioManager
+from tests.helpers import make_audio, make_font, make_game_config, make_screen
 from tetris.game.board import Board, ClearedRow
 from tetris.settings import (
     BOARD_HEIGHT,
@@ -20,7 +11,6 @@ from tetris.settings import (
     DAS_REPEAT_MS,
     LOCK_DELAY_MS,
 )
-from tetris.states.game import GameConfig
 from tetris.states.human import HumanState
 from tetris.visuals.particles import ParticleSystem
 
@@ -28,23 +18,11 @@ GRAY = (128, 128, 128)
 
 
 def _make_game():
-    screen = pygame.Surface((640, 480))
-    font = pygame.font.Font(None, 24)
-    audio = AudioManager(sound_volume=0, music_volume=0)
     return HumanState(
-        screen,
-        font,
-        audio,
-        GameConfig(
-            handicap=0,
-            sound_volume=0,
-            music_volume=0,
-            music_song="korobeiniki",
-            debug=False,
-            ghost_piece=True,
-            preview_count=3,
-            speed_mode="normal",
-        ),
+        make_screen(),
+        make_font(),
+        make_audio(),
+        make_game_config(preview_count=3),
     )
 
 
@@ -133,24 +111,15 @@ def test_handle_event_esc_returns_menu():
 def test_handle_event_esc_returns_existing_menu():
     from tetris.states.menu import MenuState
 
-    screen = pygame.Surface((640, 480))
-    font = pygame.font.Font(None, 24)
-    audio = AudioManager(sound_volume=0, music_volume=0)
+    screen = make_screen()
+    font = make_font()
+    audio = make_audio()
     menu = MenuState(screen, font, audio)
     game = HumanState(
         screen,
         font,
         audio,
-        GameConfig(
-            handicap=0,
-            sound_volume=0,
-            music_volume=0,
-            music_song="korobeiniki",
-            debug=False,
-            ghost_piece=True,
-            preview_count=3,
-            speed_mode="normal",
-        ),
+        make_game_config(preview_count=3),
         menu=menu,
     )
     result = game.handle_event(_key_down(pygame.K_ESCAPE))
@@ -511,24 +480,15 @@ def test_emit_line_particles():
 def test_return_to_menu_with_existing():
     from tetris.states.menu import MenuState
 
-    screen = pygame.Surface((640, 480))
-    font = pygame.font.Font(None, 24)
-    audio = AudioManager(sound_volume=0, music_volume=0)
+    screen = make_screen()
+    font = make_font()
+    audio = make_audio()
     menu = MenuState(screen, font, audio)
     game = HumanState(
         screen,
         font,
         audio,
-        GameConfig(
-            handicap=0,
-            sound_volume=0,
-            music_volume=0,
-            music_song="korobeiniki",
-            debug=False,
-            ghost_piece=True,
-            preview_count=3,
-            speed_mode="normal",
-        ),
+        make_game_config(preview_count=3),
         menu=menu,
     )
     assert game._return_to_menu() is menu
@@ -556,25 +516,14 @@ def test_holes_overhangs_markers_rendered_for_human():
     from tetris.visuals.renderer import Renderer
 
     screen = pygame.Surface((1500, 800))
-    font = pygame.font.Font(None, 24)
-    audio = AudioManager(sound_volume=0, music_volume=0)
+    font = make_font()
+    audio = make_audio()
     game = HumanState(
         screen,
         font,
         audio,
-        GameConfig(
-            handicap=0,
-            sound_volume=0,
-            music_volume=0,
-            music_song="korobeiniki",
-            debug=False,
-            ghost_piece=True,
-            preview_count=1,
-            speed_mode="normal",
-            holes_overhangs_help="both",
-        ),
+        make_game_config(preview_count=1, holes_overhangs_help="both"),
     )
-    assert game.holes_overhangs_help == "both"
     # craft a single unreachable hole (capped columns 0/1, bottom gap)
     g = game.board.grid
     for y in range(22):

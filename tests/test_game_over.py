@@ -2,16 +2,8 @@
 
 import os
 
-os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
-os.environ.setdefault("SDL_AUDIODRIVER", "dummy")
-
 import pygame
-
-pygame.init()
-pygame.mixer.init()
-
-from tetris.audio import AudioManager
-from tetris.states.game import GameConfig
+from tests.helpers import make_audio, make_font, make_game_config, make_screen
 from tetris.states.human import HumanState
 from tetris.states.game_over import GameOverState
 from tetris.settings import MAX_NAME_LENGTH
@@ -20,23 +12,14 @@ from tetris.visuals.particles import ParticleSystem
 
 def _make_game_over(menu=None):
     """Build a GameOverState with dummy screen/font/audio and a real GameState."""
-    screen = pygame.Surface((640, 480))
-    font = pygame.font.Font(None, 20)
-    audio = AudioManager(sound_volume=0, music_volume=0)
+    screen = make_screen()
+    font = make_font()
+    audio = make_audio()
     game = HumanState(
         screen,
         font,
         audio,
-        GameConfig(
-            handicap=0,
-            sound_volume=0,
-            music_volume=0,
-            music_song="korobeiniki",
-            debug=False,
-            ghost_piece=True,
-            preview_count=3,
-            speed_mode="normal",
-        ),
+        make_game_config(preview_count=3),
     )
     return GameOverState(screen, font, audio, game, menu=menu)
 
@@ -162,9 +145,9 @@ def test_handle_event_leaderboard_returns_menu(tmp_path, monkeypatch):
 
     monkeypatch.setattr("tetris.storage.LEADERBOARD_PATH", str(tmp_path / "lb.json"))
     monkeypatch.setattr("tetris.storage.HUMAN_STATS_PATH", str(tmp_path / "hs.json"))
-    screen = pygame.Surface((640, 480))
-    font = pygame.font.Font(None, 20)
-    audio = AudioManager(sound_volume=0, music_volume=0)
+    screen = make_screen()
+    font = make_font()
+    audio = make_audio()
     menu = MenuState(screen, font, audio)
     state = _make_game_over(menu=menu)
     state.step = "LEADERBOARD"
@@ -275,25 +258,16 @@ def test_mcp_player_does_not_save_human_stats(monkeypatch):
     if os.path.exists(HUMAN_STATS_PATH):
         os.remove(HUMAN_STATS_PATH)
 
-    screen = pygame.Surface((640, 480))
-    font = pygame.font.Font(None, 20)
-    audio = AudioManager(sound_volume=0, music_volume=0)
+    screen = make_screen()
+    font = make_font()
+    audio = make_audio()
     from tetris.states.mcp import MCPConfig, MCPState
 
     game = MCPState(
         screen,
         font,
         audio,
-        GameConfig(
-            handicap=0,
-            sound_volume=0,
-            music_volume=0,
-            music_song="korobeiniki",
-            debug=False,
-            ghost_piece=True,
-            preview_count=1,
-            speed_mode="normal",
-        ),
+        make_game_config(preview_count=1),
         MCPConfig(port=8765),
         start_server=False,
     )

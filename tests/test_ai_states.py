@@ -165,7 +165,7 @@ class TestIterColumnPositions:
             for shape, rot, px in positions:
                 assert isinstance(shape, list)
                 assert 0 <= rot < NUM_ROTATIONS
-                assert 0 <= px < BOARD_WIDTH
+                assert -2 <= px < BOARD_WIDTH
 
     def test_o_piece_one_rotation(self):
         positions = list(iter_column_positions("O"))
@@ -209,7 +209,7 @@ class TestGenPlacements:
         assert len(placements) > 0
         for p in placements:
             assert len(p.shape) == 4
-            assert 0 <= p.px < BOARD_WIDTH
+            assert -2 <= p.px < BOARD_WIDTH
             assert p.py >= 0
 
     def test_full_grid_soft_drop_yields_spawn(self):

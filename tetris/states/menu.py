@@ -189,6 +189,20 @@ class MenuState(MenuBase):
         pygame.quit()
         sys.exit()
 
+    def _game_config(self) -> GameConfig:
+        """Build a GameConfig from current menu settings."""
+        return GameConfig(
+            handicap=self.handicap,
+            sound_volume=self.sound_volume,
+            music_volume=self.music_volume,
+            music_song=self.music_song,
+            debug=self.debug,
+            ghost_piece=self.ghost_piece,
+            preview_count=self.preview_count,
+            speed_mode=self.speed_mode,
+            holes_overhangs_help=self.holes_overhangs_help,
+        )
+
     def _on_select(self) -> State | None:
         match self.selection:
             case 0:  # Start
@@ -208,17 +222,7 @@ class MenuState(MenuBase):
                     self.screen,
                     self.font,
                     self.audio,
-                    GameConfig(
-                        handicap=self.handicap,
-                        sound_volume=self.sound_volume,
-                        music_volume=self.music_volume,
-                        music_song=self.music_song,
-                        debug=self.debug,
-                        ghost_piece=self.ghost_piece,
-                        preview_count=self.preview_count,
-                        speed_mode=self.speed_mode,
-                        holes_overhangs_help=self.holes_overhangs_help,
-                    ),
+                    self._game_config(),
                     provider,
                     self,
                 )
@@ -260,17 +264,7 @@ class MenuState(MenuBase):
             self.screen,
             self.font,
             self.audio,
-            GameConfig(
-                handicap=self.handicap,
-                sound_volume=self.sound_volume,
-                music_volume=self.music_volume,
-                music_song=self.music_song,
-                debug=self.debug,
-                ghost_piece=self.ghost_piece,
-                preview_count=self.preview_count,
-                speed_mode=self.speed_mode,
-                holes_overhangs_help=self.holes_overhangs_help,
-            ),
+            self._game_config(),
             AIConfig(
                 epsilon_decay=self.ai_epsilon_decay,
                 epsilon_end=self.ai_epsilon_end,
@@ -302,17 +296,7 @@ class MenuState(MenuBase):
             self.screen,
             self.font,
             self.audio,
-            GameConfig(
-                handicap=self.handicap,
-                sound_volume=self.sound_volume,
-                music_volume=self.music_volume,
-                music_song=self.music_song,
-                debug=self.debug,
-                ghost_piece=self.ghost_piece,
-                preview_count=self.preview_count,
-                speed_mode=self.speed_mode,
-                holes_overhangs_help=self.holes_overhangs_help,
-            ),
+            self._game_config(),
             MCPConfig(port=self.mcp_port),
             mcp_provider,
             self,

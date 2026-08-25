@@ -1,17 +1,8 @@
 """Tests for MCPState: construction, action dispatch, frozen game, board snapshot, game over."""
 
-import os
-
-os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
-os.environ.setdefault("SDL_AUDIODRIVER", "dummy")
-
 import pygame
 
-pygame.init()
-pygame.mixer.init()
-
-from tetris.audio import AudioManager
-from tetris.states.game import GameConfig
+from tests.helpers import fill_capped_columns, make_audio, make_font, make_game_config, make_screen
 from tetris.states.mcp import MCPConfig, MCPState, draw_mcp_hud
 from tetris.visuals.particles import ParticleSystem
 from tetris.game.shapes import get_shape_rot
@@ -22,23 +13,11 @@ from tetris.states.simulator import build_board_repr, simulate_actions
 
 
 def _make_mcp_state(start_server: bool = True) -> MCPState:
-    screen = pygame.Surface((640, 480))
-    font = pygame.font.Font(None, 24)
-    audio = AudioManager(sound_volume=0, music_volume=0)
     return MCPState(
-        screen,
-        font,
-        audio,
-        GameConfig(
-            handicap=0,
-            sound_volume=0,
-            music_volume=0,
-            music_song="korobeiniki",
-            debug=False,
-            ghost_piece=True,
-            preview_count=3,
-            speed_mode="normal",
-        ),
+        make_screen(),
+        make_font(),
+        make_audio(),
+        make_game_config(preview_count=3),
         MCPConfig(port=8765),
         start_server=start_server,
     )
@@ -145,13 +124,7 @@ def test_mcp_state_board_snapshot_markers_and_counts():
     """Board repr marks holes as 'X', overhangs as 'O', and reports counts."""
     state = _make_mcp_state(start_server=False)
     g = state.board.grid
-    for y in range(22):
-        g[y][0] = (255, 0, 0)
-        g[y][1] = (255, 0, 0)
-        g[y][2] = (255, 0, 0)
-    # unreachable holes at bottom of capped columns 0/1
-    g[21][0] = None
-    g[21][1] = None
+    fill_capped_columns(state.board)
     # reachable overhang under a ledge in column 5
     g[0][5] = None
     g[1][5] = (0, 255, 0)
@@ -228,24 +201,15 @@ def test_mcp_state_game_over_stays_in_state():
     """Top-out no longer leaves MCP; update() stays and server survives."""
     from tetris.states.menu import MenuState
 
-    screen = pygame.Surface((640, 480))
-    font = pygame.font.Font(None, 24)
-    audio = AudioManager(sound_volume=0, music_volume=0)
+    screen = make_screen()
+    font = make_font()
+    audio = make_audio()
     menu = MenuState(screen, font, audio)
     state = MCPState(
         screen,
         font,
         audio,
-        GameConfig(
-            handicap=0,
-            sound_volume=0,
-            music_volume=0,
-            music_song="korobeiniki",
-            debug=False,
-            ghost_piece=True,
-            preview_count=1,
-            speed_mode="normal",
-        ),
+        make_game_config(preview_count=1),
         MCPConfig(port=8765),
         start_server=False,
         menu=menu,
@@ -261,24 +225,15 @@ def test_mcp_state_quit_returns_menu():
     import queue as q_mod
     from tetris.states.menu import MenuState
 
-    screen = pygame.Surface((640, 480))
-    font = pygame.font.Font(None, 24)
-    audio = AudioManager(sound_volume=0, music_volume=0)
+    screen = make_screen()
+    font = make_font()
+    audio = make_audio()
     menu = MenuState(screen, font, audio)
     state = MCPState(
         screen,
         font,
         audio,
-        GameConfig(
-            handicap=0,
-            sound_volume=0,
-            music_volume=0,
-            music_song="korobeiniki",
-            debug=False,
-            ghost_piece=True,
-            preview_count=1,
-            speed_mode="normal",
-        ),
+        make_game_config(preview_count=1),
         MCPConfig(port=8765),
         start_server=False,
         menu=menu,

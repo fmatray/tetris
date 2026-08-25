@@ -123,11 +123,7 @@ class TetrisMCPServer:
                 On processing error: ``error``, ``game_over``, ``board``,
                 ``holes``, ``overhangs``.
             """
-            if self._action_queue is None:
-                return {"error": "no active MCP game", "game_over": True, "board": [], "holes": 0, "overhangs": 0}
-            result_q: queue.Queue[dict[str, Any]] = queue.Queue()
-            self._action_queue.put(MCPRequest(actions, frames, result_q, False))
-            return result_q.get()
+            return self._run_command(actions, frames, simulate=False)
 
         @self._mcp.tool()
         def simulate(actions: list[str], frames: int = 0) -> dict[str, Any]:
@@ -160,11 +156,7 @@ class TetrisMCPServer:
                 simulation, in lock order; simulate only). On a horizon error,
                 returns ``{"error": "..."}``.
             """
-            if self._action_queue is None:
-                return {"error": "no active MCP game", "game_over": True, "board": [], "holes": 0, "overhangs": 0}
-            result_q: queue.Queue[dict[str, Any]] = queue.Queue()
-            self._action_queue.put(MCPRequest(actions, frames, result_q, True))
-            return result_q.get()
+            return self._run_command(actions, frames, simulate=True)
 
         @self._mcp.tool()
         def enumerate_drops(depth: int = 1, hold: bool = True) -> dict[str, Any]:
@@ -188,11 +180,14 @@ class TetrisMCPServer:
                     hold is empty), prefixed with ``["hold"]``. Dedup collapses
                     hold==non-hold identical boards (favors non-hold).
             """
-            if self._action_queue is None:
-                return {"error": "no active MCP game", "game_over": True, "boards": [], "piece_type": None}
-            result_q: queue.Queue[dict[str, Any]] = queue.Queue()
-            self._action_queue.put(MCPRequest(ENUMERATE_COMMAND, 0, result_q, True, depth=depth, hold=hold))
-            return result_q.get()
+            return self._run_command(
+                ENUMERATE_COMMAND,
+                0,
+                simulate=True,
+                depth=depth,
+                hold=hold,
+                error_fallback={"error": "no active MCP game", "game_over": True, "boards": [], "piece_type": None},
+            )
 
         @self._mcp.tool()
         def start_game() -> dict[str, Any]:
@@ -201,29 +196,17 @@ class TetrisMCPServer:
             Clears all locked pieces, resets score/lines/level to zero,
             spawns new pieces, and returns the initial board snapshot.
             """
-            if self._action_queue is None:
-                return {"error": "no active MCP game", "game_over": True, "board": [], "holes": 0, "overhangs": 0}
-            result_q: queue.Queue[dict[str, Any]] = queue.Queue()
-            self._action_queue.put(MCPRequest(["start_game"], 0, result_q, False))
-            return result_q.get()
+            return self._run_command(["start_game"], 0, simulate=False)
 
         @self._mcp.tool()
         def quit() -> dict[str, Any]:
             """Stop the MCP session and return to the menu."""
-            if self._action_queue is None:
-                return {"error": "no active MCP game", "game_over": True, "board": [], "holes": 0, "overhangs": 0}
-            result_q: queue.Queue[dict[str, Any]] = queue.Queue()
-            self._action_queue.put(MCPRequest(["quit"], 0, result_q, False))
-            return result_q.get()
+            return self._run_command(["quit"], 0, simulate=False)
 
         @self._mcp.resource("board://state")
         def board_state() -> str:
             """Current board state without advancing the game (0 actions, 0 frames)."""
-            if self._action_queue is None:
-                return json.dumps({"error": "no active MCP game"})
-            result_q: queue.Queue[dict[str, Any]] = queue.Queue()
-            self._action_queue.put(MCPRequest([], 0, result_q, False))
-            return json.dumps(result_q.get())
+            return json.dumps(self._run_command([], 0, simulate=False, error_fallback={"error": "no active MCP game"}))
 
         @self._mcp.resource("tetris://rules")
         def rules() -> str:
@@ -246,6 +229,28 @@ class TetrisMCPServer:
         def shapes_resource() -> str:
             """Full shape rotation data, SRS kicks, spawn, and board geometry."""
             return json.dumps(_shapes_payload())
+
+    def _run_command(
+        self,
+        actions: list[str],
+        frames: int = 0,
+        simulate: bool = False,
+        depth: int = 1,
+        hold: bool = True,
+        error_fallback: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """Send a command to the active game and wait for the result."""
+        if self._action_queue is None:
+            return error_fallback or {
+                "error": "no active MCP game",
+                "game_over": True,
+                "board": [],
+                "holes": 0,
+                "overhangs": 0,
+            }
+        result_q: queue.Queue[dict[str, Any]] = queue.Queue()
+        self._action_queue.put(MCPRequest(actions, frames, result_q, simulate, depth=depth, hold=hold))
+        return result_q.get()
 
     def attach(self, action_queue: queue.Queue[MCPRequest]) -> None:
         """Bind the active game's action queue and ensure the server is up."""

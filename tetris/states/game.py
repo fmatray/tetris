@@ -195,21 +195,7 @@ class GameState(State):
             return
         if self.hold_piece is None:
             self.hold_piece = Tetromino(self.current_piece.type)
-            self.current_piece = self.next_piece
-            if self.preview_pieces:
-                self.next_piece = self.preview_pieces.pop(0)
-                refill: str | None = self.pieces.next_type()
-                if refill is not None:
-                    self.preview_pieces.append(Tetromino(refill))
-            else:
-                refill: str | None = self.pieces.next_type()
-                if refill is None:
-                    # Simulator horizon: known pieces exhausted; drain to empty
-                    # instead of inventing future pieces.
-                    self.next_piece = None  # type: ignore[assignment]
-                    self.preview_pieces = []
-                else:
-                    self.next_piece = Tetromino(refill)
+            self._advance_piece_pipeline()
         else:
             held_type = self.hold_piece.type
             self.hold_piece = Tetromino(self.current_piece.type)
@@ -220,6 +206,26 @@ class GameState(State):
         self._grounded = False
         self.drop_time = 0
         self.down_pressed = False
+
+    def _advance_piece_pipeline(self) -> None:
+        """Move next_piece to current, refill from preview/pieces.
+
+        Shared by ``_hold`` (hold empty → swap in next) and ``_lock_and_spawn``.
+        When pieces are exhausted (simulator horizon), drains to ``None``.
+        """
+        self.current_piece = self.next_piece
+        if self.preview_pieces:
+            self.next_piece = self.preview_pieces.pop(0)
+            refill: str | None = self.pieces.next_type()
+            if refill is not None:
+                self.preview_pieces.append(Tetromino(refill))
+        else:
+            refill: str | None = self.pieces.next_type()
+            if refill is None:
+                self.next_piece = None  # type: ignore[assignment]
+                self.preview_pieces = []
+            else:
+                self.next_piece = Tetromino(refill)
 
     _ACTIONS: ClassVar[dict[str, str]] = {
         "left": "_move_left",
@@ -278,21 +284,7 @@ class GameState(State):
             self.audio.play("hard_drop")
         else:
             self.audio.play("spawn")
-        self.current_piece = self.next_piece
-        if self.preview_pieces:
-            self.next_piece = self.preview_pieces.pop(0)
-            refill: str | None = self.pieces.next_type()
-            if refill is not None:
-                self.preview_pieces.append(Tetromino(refill))
-        else:
-            refill: str | None = self.pieces.next_type()
-            if refill is None:
-                # Simulator horizon: known pieces exhausted; drain to empty
-                # instead of inventing future pieces.
-                self.next_piece = None  # type: ignore[assignment]
-                self.preview_pieces = []
-            else:
-                self.next_piece = Tetromino(refill)
+        self._advance_piece_pipeline()
         self.down_pressed = False
         self._can_hold = True
         self._lock_timer = 0.0

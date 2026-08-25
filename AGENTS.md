@@ -142,7 +142,7 @@ python -m tetris.verify_training
 - **No pyproject.toml** — project uses `requirements.txt` only
 - **ruff** for linting (`ruff check .`); pre-existing I001/DTZ005/PLR0402 diagnostics are known and not our concern
 - **Headless testing** requires `SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy`
-- **Vision model unavailable for image files** — use pixel-level analysis via `screen.get_at()` instead
+- **jscpd** for code duplication detection (`npx jscpd .` or jscpd MCP tools); target <1% duplication, configured via `.jscpd.json`
 
 ## UI Layout Rules
 
@@ -176,6 +176,21 @@ python -m tetris.verify_training
 # Success criteria: best_score > 10000, avg_score > 1000,
 # avg_duration > 30s, max_loss < 1000
 ```
+
+### Code Duplication (jscpd)
+
+```bash
+# Check duplication via CLI
+npx jscpd .
+
+# Or use the jscpd MCP tools (preferred):
+#   get_statistics       — project-wide duplication stats
+#   check_current_directory — rescan after edits
+#   get_file_clones       — clones involving a specific file
+#   check_duplication     — check a snippet against the project
+```
+
+Target: **<1% duplication rate**. Config in `.jscpd.json` (threshold, ignore patterns, min-tokens/lines). Mermaid diagrams in `docs/class_diagram.md` are excluded from scans. Before commits, run `get_statistics` via jscpd MCP; if >1%, use `check_current_directory` then `get_file_clones` to find top offenders and refactor.
 
 **Always run `zuban check .` and `ruff check .` before commits — fix all errors.**
 
