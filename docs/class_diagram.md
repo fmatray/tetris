@@ -109,6 +109,7 @@ classDiagram
             # _on_select() State | None
             - _build_ai_state() State
             - _build_mcp_state() State
+            - _game_config() GameConfig
             +holes_overhangs_help: str
         }
 
@@ -314,6 +315,7 @@ classDiagram
             - _soft_drop() None
             - _hard_drop() None
             - _hold() None
+            - _advance_piece_pipeline() None
             - _on_piece_moved() None
             - _lock_and_spawn(hard_drop: bool) tuple~int, list~
             - _do_game_over() State
@@ -503,6 +505,7 @@ classDiagram
             - _mcp: FastMCP | None
             +__init__(action_queue, port) None
             - _setup_mcp() None
+            - _run_command(actions: list~str~, frames: int, simulate: bool, depth: int, hold: bool, error_fallback: dict) dict
             +start() None
             +stop() None
             +attach(action_queue) None

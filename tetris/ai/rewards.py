@@ -475,20 +475,17 @@ def place_and_clear_batch(
     """
     N = len(shapes)
     batch = np.repeat(grid[np.newaxis], N, axis=0)
-    # Vectorized scatter: flatten all (candidate, cell) pairs into parallel arrays
-    all_rows = []
-    all_cols = []
-    all_batch_idx = []
-    for i in range(N):
-        x, y = x_positions[i], y_positions[i]
-        for bx, by in shapes[i]:
-            cx, cy = x + bx, y + by
-            if 0 <= cx < BOARD_WIDTH and 0 <= cy < BOARD_HEIGHT:
-                all_rows.append(cy)
-                all_cols.append(cx)
-                all_batch_idx.append(i)
-    if all_rows:
-        batch[np.array(all_batch_idx), np.array(all_rows), np.array(all_cols)] = 1.0
+    # Vectorized scatter: build (N, 4) arrays — each shape has exactly 4 cells
+    all_bx = np.array([[bx for bx, _ in s] for s in shapes], dtype=np.int32)  # (N, 4)
+    all_by = np.array([[by for _, by in s] for s in shapes], dtype=np.int32)  # (N, 4)
+    xs = np.array(x_positions, dtype=np.int32)[:, None]  # (N, 1)
+    ys = np.array(y_positions, dtype=np.int32)[:, None]  # (N, 1)
+    all_cx = xs + all_bx  # (N, 4)
+    all_cy = ys + all_by  # (N, 4)
+    valid = (all_cx >= 0) & (all_cx < BOARD_WIDTH) & (all_cy >= 0) & (all_cy < BOARD_HEIGHT)
+    if valid.any():
+        batch_idx = np.repeat(np.arange(N, dtype=np.int32), 4)
+        batch[batch_idx[valid.ravel()], all_cy.ravel()[valid.ravel()], all_cx.ravel()[valid.ravel()]] = 1.0
     mask = batch > 0
     full = mask.all(axis=2)  # (N, H)
     lines = full.sum(axis=1).astype(np.int32)  # (N,)
@@ -498,13 +495,8 @@ def place_and_clear_batch(
             grids_out[i] = batch[i]
         else:
             keep = ~full[i]
-            cleared = np.vstack(
-                [
-                    np.zeros((int(lines[i]), BOARD_WIDTH), dtype=batch.dtype),
-                    batch[i][keep],
-                ]
-            )
-            grids_out[i] = cleared
+            grids_out[i, : int(lines[i])] = 0.0
+            grids_out[i, int(lines[i]) :] = batch[i][keep]
     return grids_out, lines
 
 

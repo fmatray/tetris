@@ -17,7 +17,7 @@ from tetris.ai.rewards import (
 )
 from tetris.game import rules
 from tetris.game.rules import hard_drop_y, try_rotation
-from tetris.game.shapes import get_shape_rot, num_shape_rot
+from tetris.game.shapes import SHAPES_TYPES, get_shape_rot, num_shape_rot
 from tetris.settings import BOARD_HEIGHT, BOARD_WIDTH
 
 from typing import NamedTuple
@@ -44,7 +44,7 @@ class Placement(NamedTuple):
 NUM_ROTATIONS = 4
 
 
-def iter_column_positions(
+def _iter_column_positions_uncached(
     piece_type: str,
 ) -> Iterator[tuple[list[tuple[int, int]], int, int]]:
     """Yield (shape, rot, px) for every (rotation, column) that fits the board width."""
@@ -62,6 +62,19 @@ def iter_column_positions(
             yield shape, rot, px
 
 
+# ponytail: unbounded dict — only 7 piece types × fixed columns, so this is safe
+_COLUMN_POSITIONS: dict[str, list[tuple[list[tuple[int, int]], int, int]]] = {
+    pt: list(_iter_column_positions_uncached(pt)) for pt in SHAPES_TYPES
+}
+
+
+def iter_column_positions(
+    piece_type: str,
+) -> Iterator[tuple[list[tuple[int, int]], int, int]]:
+    """Yield (shape, rot, px) for every (rotation, column) that fits the board width."""
+    yield from _COLUMN_POSITIONS[piece_type]
+
+
 def hard_drop_y_batch(
     grid: np.ndarray,
     shapes: list[list[tuple[int, int]]],
@@ -75,18 +88,9 @@ def hard_drop_y_batch(
     mask = np.asarray(grid) > 0
     col_tops = np.argmax(mask, axis=0).astype(np.int32)
     col_tops[~mask.any(axis=0)] = BOARD_HEIGHT
-    # Flatten all (shape, cell) pairs into parallel arrays for vectorized min.
-    all_bx: list[int] = []
-    all_by: list[int] = []
-    all_shape_idx: list[int] = []
-    for i, shape in enumerate(shapes):
-        for bx, by in shape:
-            all_bx.append(bx)
-            all_by.append(by)
-            all_shape_idx.append(i)
-    all_bx_arr = np.array(all_bx, dtype=np.int32)
-    all_by_arr = np.array(all_by, dtype=np.int32)
-    shape_idx_arr = np.array(all_shape_idx, dtype=np.int32)
+    all_bx_arr = np.array([bx for shape in shapes for bx, _ in shape], dtype=np.int32)
+    all_by_arr = np.array([by for shape in shapes for _, by in shape], dtype=np.int32)
+    shape_idx_arr = np.repeat(np.arange(len(shapes), dtype=np.int32), [len(s) for s in shapes])
     all_cx = np.array(x_positions, dtype=np.int32)[shape_idx_arr] + all_bx_arr
 
     valid = (all_cx >= 0) & (all_cx < BOARD_WIDTH)
