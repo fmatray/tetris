@@ -57,7 +57,7 @@ def iter_column_positions(
         max_bx = max(bx for bx, _ in shape)
         for col in range(BOARD_WIDTH):
             px = col - min_bx
-            if px < 0 or px + max_bx >= BOARD_WIDTH:
+            if px + max_bx >= BOARD_WIDTH:
                 continue
             yield shape, rot, px
 

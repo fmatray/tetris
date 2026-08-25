@@ -261,7 +261,7 @@ def _hard_drop_outcomes(grid: list, piece_type: str) -> list[tuple[list, int]]:
         max_bx = max(bx for bx, _ in shape)
         for col in range(BOARD_WIDTH):
             px = col - min_bx
-            if px < 0 or px + max_bx >= BOARD_WIDTH:
+            if px + max_bx >= BOARD_WIDTH:
                 continue
             if not shape_fits(grid, shape, px, 0):
                 continue
@@ -360,7 +360,7 @@ def enumerate_hard_drop_actions(board: Board, piece: Tetromino) -> list[list[str
         max_bx = max(bx for bx, _ in shape)
         for col in range(BOARD_WIDTH):
             px = col - min_bx
-            if px < 0 or px + max_bx >= BOARD_WIDTH:
+            if px + max_bx >= BOARD_WIDTH:
                 continue
             if not shape_fits(board.grid, shape, px, 0):
                 continue
