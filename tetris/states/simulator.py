@@ -14,7 +14,14 @@ import copy
 from typing import Any
 
 from tetris.game.board import Board
-from tetris.game.rules import hard_drop_y, shape_fits
+from tetris.game.rules import (
+    find_full_rows,
+    find_holes,
+    find_overhangs,
+    hard_drop_y,
+    place_cells,
+    shape_fits,
+)
 from tetris.game.shapes import get_shape_rot, num_shape_rot
 from tetris.game.tetromino import Tetromino
 from tetris.settings import BOARD_HEIGHT, BOARD_WIDTH
@@ -161,6 +168,7 @@ def simulate_actions(state: GameState, actions: list[str], frames: int, dt: floa
             "game_over": state.game_over,
             "holes": holes,
             "overhangs": overhangs,
+            **_board_feature_dict(repr_grid, lines_cleared, holes, overhangs),
             "action_results": action_results,
             "lines_cleared": lines_cleared,
             "locked_pieces": list(state.locked_pieces),
@@ -195,6 +203,91 @@ def _board_bumpiness(repr_grid: list) -> int:
     return sum(abs(heights[i] - heights[i + 1]) for i in range(BOARD_WIDTH - 1))
 
 
+def _board_max_height(repr_grid: list) -> int:
+    """Tallest column height (filled cell == 1)."""
+    h = 0
+    for x in range(BOARD_WIDTH):
+        for y in range(BOARD_HEIGHT):
+            if repr_grid[y][x] == 1:
+                h = max(h, BOARD_HEIGHT - y)
+                break
+    return h
+
+
+def _board_hole_depth(repr_grid: list) -> int:
+    """Max hole count in any single column (X markers)."""
+    depth = 0
+    for x in range(BOARD_WIDTH):
+        col_holes = sum(1 for y in range(BOARD_HEIGHT) if repr_grid[y][x] == "X")
+        depth = max(depth, col_holes)
+    return depth
+
+
+def _merit(lines_cleared: int, holes: int, overhangs: int, agg_height: int, bumpiness: int) -> float:
+    """Weighted board-quality score. lines×1000 dominates in normal play."""
+    return lines_cleared * 1000 - holes * 120 - overhangs * 10 - agg_height * 0.8 - bumpiness * 1.5
+
+
+def _board_feature_dict(repr_grid: list, lines_cleared: int | None, holes: int, overhangs: int) -> dict[str, Any]:
+    """The 5 exposed board-feature metrics, computed wherever snapshots are assembled."""
+    agg = _board_aggregate_height(repr_grid)
+    bump = _board_bumpiness(repr_grid)
+    return {
+        "aggregate_height": agg,
+        "bumpiness": bump,
+        "max_height": _board_max_height(repr_grid),
+        "hole_depth": _board_hole_depth(repr_grid),
+        "merit": _merit(lines_cleared or 0, holes, overhangs, agg, bump),
+    }
+
+
+def _grid_merit(grid: list, lines_cleared: int) -> float:
+    """Merit on a plain 0/1 grid (for lookahead on simulated boards)."""
+    return _merit(
+        lines_cleared,
+        len(find_holes(grid)),
+        len(find_overhangs(grid)),
+        _board_aggregate_height(grid),
+        _board_bumpiness(grid),
+    )
+
+
+def _hard_drop_outcomes(grid: list, piece_type: str) -> list[tuple[list, int]]:
+    """All (resulting 0/1 grid, lines_cleared) from hard-dropping *piece_type* on *grid*."""
+    outcomes = []
+    for rot in range(num_shape_rot(piece_type)):
+        shape = get_shape_rot(piece_type, rot)
+        min_bx = min(bx for bx, _ in shape)
+        max_bx = max(bx for bx, _ in shape)
+        for col in range(BOARD_WIDTH):
+            px = col - min_bx
+            if px < 0 or px + max_bx >= BOARD_WIDTH:
+                continue
+            if not shape_fits(grid, shape, px, 0):
+                continue
+            py = hard_drop_y(grid, shape, px)
+            if py < 0:
+                continue
+            sim = [row[:] for row in grid]
+            place_cells(sim, shape, px, py, 1)
+            full = find_full_rows(sim)
+            for y in sorted(full, reverse=True):
+                del sim[y]
+                sim.insert(0, [0] * BOARD_WIDTH)
+            outcomes.append((sim, len(full)))
+    return outcomes
+
+
+def _lookahead_merit(grid: list, piece_types: list[str], depth: int) -> float:
+    """Best achievable merit after *depth* more hard-drop placements on *grid*."""
+    if depth <= 0 or not piece_types:
+        return _grid_merit(grid, 0)
+    outcomes = _hard_drop_outcomes(grid, piece_types[0])
+    if not outcomes:
+        return _grid_merit(grid, 0)
+    return max(_lookahead_merit(sim, piece_types[1:], depth - 1) for sim, _lines in outcomes)
+
+
 def _dedup_and_rank(entries: list[tuple[list[str], dict]]) -> list[dict]:
     seen: set = set()
     unique: list[tuple[list[str], dict]] = []
@@ -204,19 +297,15 @@ def _dedup_and_rank(entries: list[tuple[list[str], dict]]) -> list[dict]:
             continue
         seen.add(key)
         unique.append((actions, snap))
-
-    def sort_key(item: tuple[list[str], dict]):
-        _actions, snap = item
-        lines = snap.get("lines_cleared") or 0
-        return (
-            -lines,  # (1) most lines cleared
-            snap.get("holes", 0),  # (2) fewest holes (unreachable, harder to recover)
-            snap.get("overhangs", 0),  # (3) fewest overhangs (reachable, fillable now)
-            _board_aggregate_height(snap["board"]),  # (4) lowest/flattest stack
-            _board_bumpiness(snap["board"]),  # (4) tiebreak: smoothest
-        )
-
-    unique.sort(key=sort_key)
+    # Ensure every snap has merit (defensive: direct callers may not precompute it)
+    for _actions, snap in unique:
+        if "merit" not in snap:
+            agg = _board_aggregate_height(snap["board"])
+            bump = _board_bumpiness(snap["board"])
+            snap["merit"] = _merit(
+                snap.get("lines_cleared") or 0, snap.get("holes", 0), snap.get("overhangs", 0), agg, bump
+            )
+    unique.sort(key=lambda item: -item[1]["merit"])
     return [{"actions": actions, **snap} for actions, snap in unique]
 
 
@@ -284,19 +373,53 @@ def enumerate_hard_drop_actions(board: Board, piece: Tetromino) -> list[list[str
     return out
 
 
-def enumerate_drops(state: GameState, dt: float) -> dict:
+def enumerate_drops(state: GameState, dt: float, depth: int = 1, hold: bool = True) -> dict:
     """Enumerate all hard-drop final boards for the current piece.
 
     Returns {"piece_type": str|None, "boards": [ {**simulate_snapshot, "actions": [...]}, ... ]}
-    ranked by (lines_cleared desc, holes asc, overhangs asc, stack height asc, bumpiness asc).
-    Each board is a simulate_actions snapshot, so the schema matches `simulate` exactly;
-    only `actions` is added.
+    ranked by ``merit`` descending (weighted sum: lines×1000 − holes×120 − overhangs×10
+    − aggregate_height×0.8 − bumpiness×1.5). Each board is a simulate_actions snapshot,
+    so the schema matches ``simulate`` exactly; only ``actions`` is added.
+
+    Args:
+        depth: Look-ahead depth. 1 = no lookahead (default). 2 = current + next_piece.
+            3 = current + next + 1 preview. Deeper placements evaluate the best
+            subsequent hard-drop(s) and override ``merit`` with the resulting board's
+            merit; the board/snapshot still shows the depth-1 result.
+        hold: If True and the hold is available, also enumerate placements for the
+            held piece (or next piece if hold is empty), prefixed with ``["hold"]``.
+            Dedup collapses hold==non-hold identical boards (favors non-hold).
     """
     piece = state.current_piece
+    # Future pieces for lookahead: from the ORIGINAL state (before simulate drains them)
+    future_pieces = [
+        t
+        for t in [
+            state.next_piece.type if state.next_piece else None,
+            *(p.type for p in state.preview_pieces),
+        ]
+        if t is not None
+    ]
     entries: list[tuple[list[str], dict]] = []
     for actions in enumerate_hard_drop_actions(state.board, piece):
         snap = simulate_actions(state, actions, 0, dt)
         if "error" in snap:
             continue
         entries.append((actions, snap))
+    # Hold-aware candidates: swap to held piece (or next if hold empty), then enumerate
+    if hold and state._can_hold:
+        hold_type = state.hold_piece.type if state.hold_piece else (state.next_piece.type if state.next_piece else None)
+        if hold_type:
+            held_piece = Tetromino(hold_type)
+            for actions in enumerate_hard_drop_actions(state.board, held_piece):
+                hold_actions = ["hold"] + actions
+                snap = simulate_actions(state, hold_actions, 0, dt)
+                if "error" in snap:
+                    continue
+                entries.append((hold_actions, snap))
+    # Lookahead: for depth > 1, override merit with best-achievable future board merit
+    if depth > 1:
+        for _actions, snap in entries:
+            grid = [[1 if cell == 1 else 0 for cell in row] for row in snap["board"]]
+            snap["merit"] = _lookahead_merit(grid, future_pieces, depth - 1)
     return {"piece_type": piece.type, "boards": _dedup_and_rank(entries)}

@@ -29,14 +29,21 @@ advances only when you send `play`; it stays frozen between calls.
   it to preview a placement before committing. The horizon is bounded to known
   pieces (current + next + previews); requesting more drops than known returns
   `{"error": "horizon exceeded: ..."}`.
-- **enumerate_drops** `{}` — compute every final board from rotating/shifting/hard-dropping
-  the current piece, **without mutating** the real game. Returns
-  `{"piece_type": ..., "boards": [ { ...simulate keys..., "actions": [...] } ]}`, each board
-  de-duplicated and ranked by (1) most `lines_cleared`, (2) fewest `holes`,
-  (3) fewest `overhangs`, (4) flattest/lowest stack. Use it as the **Plan** step: read the
-  ranked list, pick `boards[0]` (or any entry), and commit its `actions` with `play`.
-  Only the current falling piece is enumerated — `next_piece`/`preview_pieces` are never
-  used to choose placements (soft_drop/hold fallbacks are out of scope for this tool).
+- **enumerate_drops** `{ "depth"?: int, "hold"?: bool }` — compute every final
+  board from rotating/shifting/hard-dropping the current piece, **without
+  mutating** the real game. Returns
+  `{"piece_type": ..., "boards": [ { ...simulate keys..., "actions": [...] } ]}`,
+  each board de-duplicated and ranked by `merit` descending (weighted sum:
+  `lines×1000 − holes×120 − overhangs×10 − aggregate_height×0.8 − bumpiness×1.5`).
+  Use it as the **Plan** step: read the ranked list, pick `boards[0]` (or any
+  entry), and commit its `actions` with `play`.
+  - `depth` (default 1): look-ahead depth. 1 = no lookahead. 2 = current +
+    next_piece. 3 = current + next + 1 preview. Deeper placements evaluate the
+    best subsequent hard-drop(s) and override `merit` with the resulting board's
+    merit; the board/snapshot still shows the depth-1 result.
+  - `hold` (default true): also enumerate placements for the held piece (or
+    next piece if hold is empty), prefixed with `["hold"]`. Dedup collapses
+    hold==non-hold identical boards (favors non-hold).
 - **play** `{ "actions": [...], "frames"?: int }` — run the action list, then
   advance `frames` (~16 ms) of gravity, return a snapshot. `frames` defaults to
   0. Actions: `left`, `right`, `rotate_cw`, `rotate_ccw`, `soft_drop`,
@@ -67,6 +74,11 @@ field). Key fields:
     game_over:      bool
     holes:          int   # "X" cells (empty, covered, no top path)
     overhangs:      int   # "O" cells (reachable covered empty — fillable now)
+    aggregate_height: int   # sum of column heights
+    bumpiness:      int   # sum of abs height differences between adjacent cols
+    max_height:     int   # tallest column
+    hole_depth:     int   # max holes in any single column
+    merit:          float # weighted quality score (higher = better board)
     action_results: list[str]   # "ok"|"blocked"|"unknown:<action>" (play only)
     lines_cleared:  int | None   # lines removed by this call (play, simulate, enumerate)
 
@@ -106,11 +118,14 @@ field). Key fields:
    so preview as many as you can. Never auto-reject a line-clearing placement
    just because it adds a hole/overhang — score and compare instead (soft
    penalties, no hard filters).
-5. **Choose** — rank by: (1) most `lines_cleared`, (2) fewest `holes`,
-   (3) fewest `overhangs`, (4) flattest/lowest stack. Holes outrank overhangs:
-   an `X` cell is currently unreachable (needs cells above cleared first); an
-   `O` cell is reachable now and fillable. Holes are harder to recover, so they
-   rank worse.
+5. **Choose** — `enumerate_drops` already ranks boards by `merit` (a weighted
+   sum: `lines×1000 − holes×120 − overhangs×10 − aggregate_height×0.8
+   − bumpiness×1.5`). Pick `boards[0]` or any higher-merit board. Use `depth=2`
+   or `depth=3` for look-ahead (evaluates best subsequent placement(s)); use
+   `hold=true` (default) to also consider swapping to the held piece. Holes
+   outrank overhangs in the penalty weights: an `X` cell is currently
+   unreachable (needs cells above cleared first); an `O` cell is reachable now
+   and fillable.
 6. **Commit** — call `play([...], 0)` with the chosen actions; read the new
    snapshot and repeat from step 2.
 

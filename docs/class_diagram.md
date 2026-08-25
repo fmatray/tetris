@@ -464,7 +464,7 @@ classDiagram
         class MCPState {
             +player_type: str
             +mcp_config: MCPConfig
-            - _action_queue: Queue~tuple~list~str~, int, Queue~~
+            - _action_queue: Queue~MCPRequest~
             - _server: TetrisMCPServer | None
             - _last_tool_call: dict | None
             - _last_snapshot: dict | None
@@ -479,6 +479,15 @@ classDiagram
             - _do_game_over() State | None
             - _reset_game() None
             +draw(screen: pygame.Surface, particles: ParticleSystem | None) None
+        }
+
+        class MCPRequest {
+            +actions: list~str~
+            +frames: int
+            +result_queue: Queue
+            +simulate: bool
+            +depth: int
+            +hold: bool
         }
         %% Module-level function: draw_mcp_hud(screen, font, state: MCPState) -> None
     }

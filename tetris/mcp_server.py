@@ -26,6 +26,7 @@ from typing import Any
 from mcp.server.fastmcp import FastMCP
 
 from tetris.settings import MCP_SERVER_PORT
+from tetris.states.mcp import MCPRequest
 from tetris.states.simulator import ENUMERATE_COMMAND
 
 
@@ -75,9 +76,9 @@ class TetrisMCPServer:
     """MCP server exposing ``play`` tool and board/rules resources.
 
     Communication with :class:`MCPState` is one-directional via
-    ``_action_queue``: each tool/resource call puts a tuple
-    ``(actions, frames, result_queue, simulate)`` onto the queue, then blocks on
-    ``result_queue.get()`` until the main thread processes the request.
+    ``_action_queue``: each tool/resource call puts an :class:`MCPRequest`
+    onto the queue, then blocks on ``result_queue.get()`` until the main
+    thread processes the request.
 
     The queue is ``None`` when no MCP game is currently active (e.g. the app
     is in a menu) — tool/resource calls then return a clear error instead of
@@ -89,7 +90,7 @@ class TetrisMCPServer:
         port: int = MCP_SERVER_PORT,
     ) -> None:
         self._port = port
-        self._action_queue: queue.Queue[tuple[list[str], int, queue.Queue[dict[str, Any]], bool]] | None = None
+        self._action_queue: queue.Queue[MCPRequest] | None = None
         self._thread: threading.Thread | None = None
         self._mcp: FastMCP | None = None
         self._setup_mcp()
@@ -116,14 +117,16 @@ class TetrisMCPServer:
                 ``overhangs`` (int), ``current_piece``, ``next_piece``,
                 ``preview_pieces``, ``hold_piece``, ``can_hold``,
                 ``score``, ``lines``, ``level``, ``game_over``,
-                ``action_results``, ``lines_cleared``.
+                ``aggregate_height``, ``bumpiness``, ``max_height``,
+                ``hole_depth``, ``merit``, ``action_results``,
+                ``lines_cleared``.
                 On processing error: ``error``, ``game_over``, ``board``,
                 ``holes``, ``overhangs``.
             """
             if self._action_queue is None:
                 return {"error": "no active MCP game", "game_over": True, "board": [], "holes": 0, "overhangs": 0}
             result_q: queue.Queue[dict[str, Any]] = queue.Queue()
-            self._action_queue.put((actions, frames, result_q, False))
+            self._action_queue.put(MCPRequest(actions, frames, result_q, False))
             return result_q.get()
 
         @self._mcp.tool()
@@ -151,29 +154,44 @@ class TetrisMCPServer:
                 (0/1/"X"/"O"), ``holes``, ``overhangs``, ``current_piece``,
                 ``next_piece``, ``preview_pieces``, ``hold_piece``, ``can_hold``,
                 ``score``, ``lines``, ``level``, ``game_over``,
-                ``action_results``, ``lines_cleared``, ``locked_pieces``
-                (list of piece types locked during the simulation, in lock order;
-                simulate only). On a horizon error,
+                ``aggregate_height``, ``bumpiness``, ``max_height``,
+                ``hole_depth``, ``merit``, ``action_results``, ``lines_cleared``,
+                ``locked_pieces`` (list of piece types locked during the
+                simulation, in lock order; simulate only). On a horizon error,
                 returns ``{"error": "..."}``.
             """
             if self._action_queue is None:
                 return {"error": "no active MCP game", "game_over": True, "board": [], "holes": 0, "overhangs": 0}
             result_q: queue.Queue[dict[str, Any]] = queue.Queue()
-            self._action_queue.put((actions, frames, result_q, True))
+            self._action_queue.put(MCPRequest(actions, frames, result_q, True))
             return result_q.get()
 
         @self._mcp.tool()
-        def enumerate_drops() -> dict[str, Any]:
+        def enumerate_drops(depth: int = 1, hold: bool = True) -> dict[str, Any]:
             """Enumerate every final board from rotating/shifting/hard-dropping the
-            current piece. Returns {"piece_type": str|None, "boards": [...]} where each
-            board is a simulate-format snapshot plus its "actions" list, de-duplicated
-            and ranked by (lines_cleared desc, holes asc, overhangs asc, stack height
-            asc). Never mutates the real game.
+            current piece.
+
+            Returns ``{"piece_type": str|None, "boards": [...]}`` where each
+            board is a simulate-format snapshot plus its ``"actions"`` list,
+            de-duplicated and ranked by ``merit`` descending (weighted sum:
+            lines×1000 − holes×120 − overhangs×10 − aggregate_height×0.8
+            − bumpiness×1.5). Never mutates the real game.
+
+            Args:
+                depth: Look-ahead depth (default 1 = no lookahead). 2 = current
+                    + next_piece. 3 = current + next + 1 preview. Deeper
+                    placements evaluate the best subsequent hard-drop(s) and
+                    override ``merit`` with the resulting board's merit; the
+                    board/snapshot still shows the depth-1 result.
+                hold: If True (default) and the hold is available, also
+                    enumerate placements for the held piece (or next piece if
+                    hold is empty), prefixed with ``["hold"]``. Dedup collapses
+                    hold==non-hold identical boards (favors non-hold).
             """
             if self._action_queue is None:
                 return {"error": "no active MCP game", "game_over": True, "boards": [], "piece_type": None}
             result_q: queue.Queue[dict[str, Any]] = queue.Queue()
-            self._action_queue.put((ENUMERATE_COMMAND, 0, result_q, True))
+            self._action_queue.put(MCPRequest(ENUMERATE_COMMAND, 0, result_q, True, depth=depth, hold=hold))
             return result_q.get()
 
         @self._mcp.tool()
@@ -186,7 +204,7 @@ class TetrisMCPServer:
             if self._action_queue is None:
                 return {"error": "no active MCP game", "game_over": True, "board": [], "holes": 0, "overhangs": 0}
             result_q: queue.Queue[dict[str, Any]] = queue.Queue()
-            self._action_queue.put((["start_game"], 0, result_q, False))
+            self._action_queue.put(MCPRequest(["start_game"], 0, result_q, False))
             return result_q.get()
 
         @self._mcp.tool()
@@ -195,7 +213,7 @@ class TetrisMCPServer:
             if self._action_queue is None:
                 return {"error": "no active MCP game", "game_over": True, "board": [], "holes": 0, "overhangs": 0}
             result_q: queue.Queue[dict[str, Any]] = queue.Queue()
-            self._action_queue.put((["quit"], 0, result_q, False))
+            self._action_queue.put(MCPRequest(["quit"], 0, result_q, False))
             return result_q.get()
 
         @self._mcp.resource("board://state")
@@ -204,7 +222,7 @@ class TetrisMCPServer:
             if self._action_queue is None:
                 return json.dumps({"error": "no active MCP game"})
             result_q: queue.Queue[dict[str, Any]] = queue.Queue()
-            self._action_queue.put(([], 0, result_q, False))
+            self._action_queue.put(MCPRequest([], 0, result_q, False))
             return json.dumps(result_q.get())
 
         @self._mcp.resource("tetris://rules")
@@ -229,7 +247,7 @@ class TetrisMCPServer:
             """Full shape rotation data, SRS kicks, spawn, and board geometry."""
             return json.dumps(_shapes_payload())
 
-    def attach(self, action_queue: queue.Queue[tuple[list[str], int, queue.Queue[dict[str, Any]], bool]]) -> None:
+    def attach(self, action_queue: queue.Queue[MCPRequest]) -> None:
         """Bind the active game's action queue and ensure the server is up."""
         self._action_queue = action_queue
         self.start()

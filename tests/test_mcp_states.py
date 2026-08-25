@@ -17,6 +17,7 @@ from tetris.visuals.particles import ParticleSystem
 from tetris.game.shapes import get_shape_rot
 from tetris.game.tetromino import Tetromino
 from tetris.settings import BOARD_HEIGHT, BOARD_WIDTH
+from tetris.states.mcp import MCPRequest
 from tetris.states.simulator import build_board_repr, simulate_actions
 
 
@@ -116,6 +117,11 @@ def test_mcp_state_board_snapshot_keys():
         "action_results",
         "holes",
         "overhangs",
+        "aggregate_height",
+        "bumpiness",
+        "max_height",
+        "hole_depth",
+        "merit",
     }
     assert set(snap.keys()) == expected_keys
 
@@ -172,7 +178,7 @@ def test_mcp_state_reset_game_via_queue():
     assert state.stats.score > 0
     # Queue a start_game reset
     result_q: q_mod.Queue = q_mod.Queue()
-    state._action_queue.put((["start_game"], 0, result_q, False))
+    state._action_queue.put(MCPRequest(["start_game"], 0, result_q, False))
     state.update(1.0 / 60.0, ParticleSystem())
     snap = result_q.get()
     assert snap["score"] == 0
@@ -192,7 +198,7 @@ def test_mcp_state_processes_queue_request():
     state = _make_mcp_state(start_server=False)
     particles = ParticleSystem()
     result_q: q_mod.Queue = q_mod.Queue()
-    state._action_queue.put((["left"], 0, result_q, False))
+    state._action_queue.put(MCPRequest(["left"], 0, result_q, False))
     state.update(1.0 / 60.0, particles)
     assert not result_q.empty()
     snap = result_q.get()
@@ -209,7 +215,7 @@ def test_mcp_state_advances_frames():
     particles = ParticleSystem()
     result_q: q_mod.Queue = q_mod.Queue()
     # Request 60 frames = 1 second at 60 FPS
-    state._action_queue.put(([], 60, result_q, False))
+    state._action_queue.put(MCPRequest([], 60, result_q, False))
     state.update(1.0 / 60.0, particles)
     snap = result_q.get()
     assert "score" in snap
@@ -278,7 +284,7 @@ def test_mcp_state_quit_returns_menu():
         menu=menu,
     )
     result_q: q_mod.Queue = q_mod.Queue()
-    state._action_queue.put((["quit"], 0, result_q, False))
+    state._action_queue.put(MCPRequest(["quit"], 0, result_q, False))
     result = state.update(1.0 / 60.0, ParticleSystem())
     assert result is menu
     assert result_q.get()["game_over"] == state.game_over
@@ -291,7 +297,7 @@ def test_mcp_state_start_game_after_game_over():
     state = _make_mcp_state(start_server=False)
     state.game_over = True
     result_q: q_mod.Queue = q_mod.Queue()
-    state._action_queue.put((["start_game"], 0, result_q, False))
+    state._action_queue.put(MCPRequest(["start_game"], 0, result_q, False))
     result = state.update(1.0 / 60.0, ParticleSystem())
     assert result is None
     assert all(cell is None for row in state.board.grid for cell in row)
@@ -319,7 +325,7 @@ def test_mcp_state_lines_cleared_via_queue():
     state.current_piece.x = BOARD_WIDTH - 3
     state.current_piece.y = 0
     result_q: q_mod.Queue = q_mod.Queue()
-    state._action_queue.put((["hard_drop"], 0, result_q, False))
+    state._action_queue.put(MCPRequest(["hard_drop"], 0, result_q, False))
     state.update(1.0 / 60.0, ParticleSystem())
     snap = result_q.get()
     assert snap["lines_cleared"] == 1
@@ -347,7 +353,7 @@ def test_mcp_state_update_swallows_exception():
 
     state._move_left = boom  # type: ignore[method-assign]
     result_q: q_mod.Queue = q_mod.Queue()
-    state._action_queue.put((["left"], 0, result_q, False))
+    state._action_queue.put(MCPRequest(["left"], 0, result_q, False))
     result = state.update(1.0 / 60.0, ParticleSystem())
     assert result is None
     snap = result_q.get()
@@ -457,6 +463,11 @@ def test_simulate_actions_returns_snapshot_schema():
         "lines",
         "level",
         "game_over",
+        "aggregate_height",
+        "bumpiness",
+        "max_height",
+        "hole_depth",
+        "merit",
         "action_results",
         "lines_cleared",
         "locked_pieces",
@@ -518,7 +529,7 @@ def test_simulate_via_queue_flag_does_not_mutate():
     pieces_before = state.pieces
     piece_before = state.current_piece
     result_q: _queue.Queue = _queue.Queue()
-    state._action_queue.put((["left", "hard_drop"], 0, result_q, True))
+    state._action_queue.put(MCPRequest(["left", "hard_drop"], 0, result_q, True))
     snap = state.update(dt, ParticleSystem())
     assert snap is None  # simulate path returns None; result goes to the queue
     out = result_q.get()
@@ -547,7 +558,7 @@ def test_simulate_ignores_quit():
     dt = 1 / 60.0
     game_over_before = state.game_over
     result_q: _queue.Queue = _queue.Queue()
-    state._action_queue.put((["quit"], 0, result_q, True))
+    state._action_queue.put(MCPRequest(["quit"], 0, result_q, True))
     snap = state.update(dt, ParticleSystem())
     assert snap is None  # simulate path returns None; result goes to the queue
     out = result_q.get()
@@ -599,13 +610,13 @@ def test_enumerate_roundtrip_fidelity():
     state = _make_mcp_state(start_server=False)
     dt = 1.0 / 60.0
     result = enumerate_drops(state, dt)
-    seen_lines = []
+    merits = []
     for board in result["boards"]:
         replay = simulate_actions(state, board["actions"], 0, dt)
         assert replay["board"] == board["board"]
-        seen_lines.append(board.get("lines_cleared") or 0)
-    # ranking is monotonic on lines_cleared (primary key)
-    assert seen_lines == sorted(seen_lines, reverse=True)
+        merits.append(board["merit"])
+    # ranking is by merit descending (weighted sum, not lexicographic)
+    assert merits == sorted(merits, reverse=True)
 
 
 def test_enumerate_dedup_and_rank():
@@ -643,7 +654,7 @@ def test_enumerate_tool_via_queue():
     particles = ParticleSystem()
     dt = 1.0 / 60.0
     result_q: q_mod.Queue = q_mod.Queue()
-    state._action_queue.put((ENUMERATE_COMMAND, 0, result_q, True))
+    state._action_queue.put(MCPRequest(ENUMERATE_COMMAND, 0, result_q, True))
     state.update(dt, particles)
     snap = result_q.get()
     assert "boards" in snap
@@ -651,7 +662,7 @@ def test_enumerate_tool_via_queue():
     assert len(snap["boards"]) > 0
     # existing play still works afterwards (no regression)
     result_q2: q_mod.Queue = q_mod.Queue()
-    state._action_queue.put((["left"], 0, result_q2, False))
+    state._action_queue.put(MCPRequest(["left"], 0, result_q2, False))
     state.update(dt, particles)
     snap2 = result_q2.get()
     assert snap2["action_results"] == ["ok"]

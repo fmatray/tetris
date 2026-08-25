@@ -17,12 +17,14 @@ a human pressing keys. No candidate enumeration, no DQN, no macro-actions.
 TetrisApp (main loop, 60 FPS, single thread)
   └─ FSM
        └─ MCPState(GameState)           ← inherits abstract GameState, alongside HumanState and AIState
-            ├─ _action_queue: queue.Queue[str]
+            ├─ _action_queue: queue.Queue[MCPRequest]
             ├─ update(): drain queue → execute actions on main thread
             ├─ MCP server (side thread)
-            │    ├─ @tool play(actions, frames)  → enqueue + advance
-            │    ├─ @resource board://state      → JSON snapshot
-            │    └─ @resource tetris://rules     → mechanics + coordinate system
+            │    ├─ @tool play(actions, frames)          → enqueue + advance
+            │    ├─ @tool simulate(actions, frames)       → preview without mutating
+            │    ├─ @tool enumerate_drops(depth, hold)    → ranked placements
+            │    ├─ @resource board://state              → JSON snapshot
+            │    └─ @resource tetris://rules             → mechanics + coordinate system
             └─ _on_episode_end() → GameOverState (human flow, not AI auto-restart)
 ```
 
@@ -164,6 +166,13 @@ on screen:
 | `stats`          | `self.stats` (score, lines, level)     | From `GameStats`                   |
 | `game_over`      | `self.game_over`                        |                                    |
 | `paused`         | `self.paused`                           |                                    |
+| `holes`          | `find_holes(grid)`                     | "X" cells (unreachable covered)     |
+| `overhangs`      | `find_overhangs(grid)`                 | "O" cells (reachable covered)       |
+| `aggregate_height` | sum of column heights                | Board-feature metric                |
+| `bumpiness`      | sum of adjacent height diffs           | Board-feature metric                |
+| `max_height`     | tallest column                         | Board-feature metric                |
+| `hole_depth`     | max holes in any single column         | Board-feature metric                |
+| `merit`          | weighted quality score                 | `lines×1000 − holes×120 − ...`      |
 
 `preview_count` (0, 1, or 3 in `settings.json`) controls how many pieces are
 visible — the resource reflects whatever the player configured.
@@ -204,18 +213,16 @@ by `docs/threading_study.md`). pygame is not thread-safe — all Surface/event/d
 calls must be on the main thread. The MCP server runs on a side thread (asyncio
 for HTTP transport). Tools must never touch pygame state directly.
 
-### Solution: in-process queue
-
 ```
 MCP server thread                 Main thread (pygame loop)
 ─────────────────                 ─────────────────────────
 play(actions, frames)              MCPState.update(dt, particles):
-  → push actions to queue            while queue not empty:
-  → push frames to queue                action = queue.get()
-  → block until result ready            self.input_map[action]()  # safe, main thread
-                                     for _ in range(frames):
-                                        super().update(16ms, particles)
-                                     → return board snapshot via result queue
+  → push MCPRequest to queue          while queue not empty:
+  → block until result ready            req = queue.get()
+                                       self.input_map[req.actions]()  # safe, main thread
+                                     for _ in range(req.frames):
+                                         super().update(dt, particles)  # gravity + lock delay
+                                     → return board snapshot via result_queue
 ```
 
 - Tools enqueue actions + frame counts.
@@ -278,15 +285,22 @@ mcp = MCPServer("Tetris")
 def play(actions: list[str], frames: int = 0) -> dict:
     """..."""
     # Push to queue, block on result
-    
+
+@mcp.tool()
+def simulate(actions: list[str], frames: int = 0) -> dict:
+    """Preview actions on a throwaway copy (no mutation)."""
+
+@mcp.tool()
+def enumerate_drops(depth: int = 1, hold: bool = True) -> dict:
+    """All hard-drop placements for current piece, ranked by merit."""
+
 @mcp.resource("board://state")
 def board_state() -> str:
     """Current board + piece queue snapshot as JSON."""
-    
+
 @mcp.resource("tetris://rules")
 def rules() -> str:
     """Coordinate system, piece shapes, mechanics, scoring."""
-```
 
 ### `requirements.txt`
 

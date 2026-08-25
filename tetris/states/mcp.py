@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import queue
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
+from typing import NamedTuple, TYPE_CHECKING, Any
 
 import pygame
 
@@ -19,7 +19,13 @@ from tetris.game.tetromino import Tetromino
 from tetris.logger import get_logger
 from tetris.settings import HUD_POSITIONS, SPEED_MODES
 from tetris.states.game import GameConfig, GameState, _drop_interval
-from tetris.states.simulator import build_board_repr, simulate_actions, enumerate_drops, ENUMERATE_COMMAND
+from tetris.states.simulator import (
+    _board_feature_dict,
+    build_board_repr,
+    enumerate_drops,
+    simulate_actions,
+    ENUMERATE_COMMAND,
+)
 from tetris.visuals.particles import ParticleSystem
 
 if TYPE_CHECKING:
@@ -30,6 +36,21 @@ if TYPE_CHECKING:
     from tetris.states.menu import MenuState
 
 _logger = get_logger("mcp")
+
+
+class MCPRequest(NamedTuple):
+    """Typed queue payload for MCP tool calls to MCPState.update.
+
+    Fields ``depth``/``hold`` only apply to ``enumerate_drops``; all other
+    tools use the defaults (depth=1, hold=True).
+    """
+
+    actions: list[str]
+    frames: int
+    result_queue: queue.Queue
+    simulate: bool
+    depth: int = 1
+    hold: bool = True
 
 
 @dataclass(frozen=True)
@@ -62,7 +83,7 @@ class MCPState(GameState):
         self.player_type = "MCP"
         self.mcp_config = mcp_config
         self._handicap = config.handicap
-        self._action_queue: queue.Queue[tuple[list[str], int, queue.Queue[dict[str, Any]], bool]] = queue.Queue()
+        self._action_queue: queue.Queue[MCPRequest] = queue.Queue()
         self._server: TetrisMCPServer | None = None
         self._last_tool_call: dict[str, Any] | None = None
         self._last_snapshot: dict[str, Any] | None = None
@@ -122,6 +143,7 @@ class MCPState(GameState):
             "game_over": self.game_over,
             "holes": holes,
             "overhangs": overhangs,
+            **_board_feature_dict(repr_grid, lines_cleared, holes, overhangs),
         }
         if action_results is not None:
             snap["action_results"] = action_results
@@ -140,12 +162,13 @@ class MCPState(GameState):
         quit_requested = False
         while True:
             try:
-                actions, frames, result_queue, simulate = self._action_queue.get_nowait()
+                req = self._action_queue.get_nowait()
             except queue.Empty:
                 break
+            actions, frames, result_queue, simulate = (req.actions, req.frames, req.result_queue, req.simulate)
             if simulate:
                 if actions == ENUMERATE_COMMAND:
-                    snapshot = enumerate_drops(self, dt)
+                    snapshot = enumerate_drops(self, dt, depth=req.depth, hold=req.hold)
                 else:
                     snapshot = simulate_actions(self, actions, frames, dt)
                 self._last_tool_call = {"actions": actions, "frames": frames, "simulate": True}
