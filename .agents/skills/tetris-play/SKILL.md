@@ -32,8 +32,8 @@ advances only when you send `play`; it stays frozen between calls.
 - **enumerate_drops** `{}` — compute every final board from rotating/shifting/hard-dropping
   the current piece, **without mutating** the real game. Returns
   `{"piece_type": ..., "boards": [ { ...simulate keys..., "actions": [...] } ]}`, each board
-  de-duplicated and ranked by (1) most `lines_cleared`, (2) fewest `overhangs`,
-  (3) fewest `holes`, (4) flattest/lowest stack. Use it as the **Plan** step: read the
+  de-duplicated and ranked by (1) most `lines_cleared`, (2) fewest `holes`,
+  (3) fewest `overhangs`, (4) flattest/lowest stack. Use it as the **Plan** step: read the
   ranked list, pick `boards[0]` (or any entry), and commit its `actions` with `play`.
   Only the current falling piece is enumerated — `next_piece`/`preview_pieces` are never
   used to choose placements (soft_drop/hold fallbacks are out of scope for this tool).
@@ -63,19 +63,21 @@ field). Key fields:
     preview_pieces: list[str]
     hold_piece:     str | None
     can_hold:       bool
-    score, lines, level: int
+    score, lines, level: int       # lines = cumulative total cleared (only increments on actual clears)
     game_over:      bool
     holes:          int   # "X" cells (empty, covered, no top path)
-    overhangs:      int   # "O" cells (filled-but-unsupported, non-solid)
+    overhangs:      int   # "O" cells (reachable covered empty — fillable now)
     action_results: list[str]   # "ok"|"blocked"|"unknown:<action>" (play only)
-    lines_cleared:  int | None   # lines removed by this call (play only)
+    lines_cleared:  int | None   # lines removed by this call (play, simulate, enumerate)
 
 ## Board & pieces
 
 - Rows `y=0..21` (0 top, 21 bottom; 2 hidden buffer rows at top). Cols
-  `x=0..9`. `1` = filled, `0` = empty, `"X"` = hole (empty with filled above,
-  unreachable), `"O"` = overhang (filled-but-unsupported). **A row clears only
-  if all 10 cells are solid (`1`); any `X` or `O` blocks that clear.**
+  `x=0..9`. `1` = filled, `0` = empty, `"X"` = hole (empty, covered, currently
+  unreachable — gap under filled cells with no path from top), `"O"` = overhang
+  (empty, covered, reachable now — can be filled by soft-dropping into it). **A
+  row clears only when all 10 cells are `1` (filled); `X` and `O` are empty-gap
+  annotations, not obstacles.**
 - A piece spawns at rotation `0`, `x = 3`, `y = 0`. `left`/`right` shift x;
   `rotate_cw`/`rotate_ccw` change rotation (SRS kicks may nudge x by 0/±1 —
   rotate while high, then shift). `hold` swaps once per piece (`can_hold` →
@@ -90,7 +92,7 @@ field). Key fields:
    new game; never restart before game over).
 3. **Plan** — call `enumerate_drops()` once to get every final board from
    rotating/shifting/hard-dropping the current piece, already ranked by
-   (1) most `lines_cleared`, (2) fewest `overhangs`, (3) fewest `holes`,
+   (1) most `lines_cleared`, (2) fewest `holes`, (3) fewest `overhangs`,
    (4) flattest/lowest stack. Each entry carries its `actions` list — pick the
    best and commit it directly with `play`. Most placements drop straight with
    `hard_drop`; use `soft_drop` to lower to a specific row, then shift, only
@@ -104,9 +106,11 @@ field). Key fields:
    so preview as many as you can. Never auto-reject a line-clearing placement
    just because it adds a hole/overhang — score and compare instead (soft
    penalties, no hard filters).
-5. **Choose** — rank by: (1) most `lines_cleared`, (2) fewest `overhangs`,
-   (3) fewest `holes`, (4) flattest/lowest stack. Overhangs outrank holes: an
-   `O` cell is permanently non-solid, so any overhang dooms that row's clear.
+5. **Choose** — rank by: (1) most `lines_cleared`, (2) fewest `holes`,
+   (3) fewest `overhangs`, (4) flattest/lowest stack. Holes outrank overhangs:
+   an `X` cell is currently unreachable (needs cells above cleared first); an
+   `O` cell is reachable now and fillable. Holes are harder to recover, so they
+   rank worse.
 6. **Commit** — call `play([...], 0)` with the chosen actions; read the new
    snapshot and repeat from step 2.
 

@@ -655,3 +655,59 @@ def test_enumerate_tool_via_queue():
     state.update(dt, particles)
     snap2 = result_q2.get()
     assert snap2["action_results"] == ["ok"]
+
+
+# ── Regression: lines_cleared in simulate_actions (Issue 1) ──────────
+
+
+def test_simulate_actions_lines_cleared():
+    """simulate_actions reports lines_cleared correctly (was always 0 before fix).
+
+    Mirrors test_mcp_state_lines_cleared_via_queue but exercises the simulate path:
+    set up a near-complete row, hard_drop a vertical I-piece, assert lines_cleared == 1.
+    """
+    state = _make_mcp_state(start_server=False)
+    dt = 1.0 / 60.0
+    for c in range(BOARD_WIDTH - 1):
+        state.board.grid[BOARD_HEIGHT - 1][c] = (1, 1, 1)
+    state.current_piece = Tetromino("I")
+    state.current_piece.rotation = 1
+    state.current_piece.shape = get_shape_rot("I", 1)
+    state.current_piece.x = BOARD_WIDTH - 3
+    state.current_piece.y = 0
+    snap = simulate_actions(state, ["hard_drop"], 0, dt)
+    assert snap["lines_cleared"] == 1
+    assert snap["lines"] == 1
+    assert snap["game_over"] is False
+    # original state is unmutated (simulate is side-effect-free)
+    assert state.stats.total_lines == 0
+
+
+# ── Regression: _dedup_and_rank holes before overhangs (Issue 5) ─────
+
+
+def test_enumerate_rank_holes_before_overhangs():
+    """_dedup_and_rank prioritizes fewer holes over fewer overhangs (was reversed).
+
+    Board A: 0 overhangs, 5 holes. Board B: 1 overhang, 0 holes.
+    B should rank higher (fewer holes wins) after the fix.
+    """
+    from tetris.states.simulator import _dedup_and_rank
+
+    board_a = [[0] * BOARD_WIDTH for _ in range(BOARD_HEIGHT)]
+    board_a[BOARD_HEIGHT - 1][3] = 1
+    board_b = [[0] * BOARD_WIDTH for _ in range(BOARD_HEIGHT)]
+    board_b[BOARD_HEIGHT - 1][3] = 1
+    board_b[BOARD_HEIGHT - 2][4] = 1
+    snap_a = {"board": board_a, "lines_cleared": 0, "overhangs": 0, "holes": 5}
+    snap_b = {"board": board_b, "lines_cleared": 0, "overhangs": 1, "holes": 0}
+    entries = [
+        (["left", "hard_drop"], snap_a),
+        (["right", "hard_drop"], snap_b),
+    ]
+    ranked = _dedup_and_rank(entries)
+    # B (0 holes) ranks above A (5 holes) despite A having fewer overhangs
+    assert ranked[0]["holes"] == 0
+    assert ranked[0]["overhangs"] == 1
+    assert ranked[1]["holes"] == 5
+    assert ranked[1]["overhangs"] == 0

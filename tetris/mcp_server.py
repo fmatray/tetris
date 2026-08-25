@@ -167,7 +167,7 @@ class TetrisMCPServer:
             """Enumerate every final board from rotating/shifting/hard-dropping the
             current piece. Returns {"piece_type": str|None, "boards": [...]} where each
             board is a simulate-format snapshot plus its "actions" list, de-duplicated
-            and ranked by (lines_cleared desc, overhangs asc, holes asc, stack height
+            and ranked by (lines_cleared desc, holes asc, overhangs asc, stack height
             asc). Never mutates the real game.
             """
             if self._action_queue is None:

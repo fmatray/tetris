@@ -138,8 +138,8 @@ def simulate_actions(state: GameState, actions: list[str], frames: int, dt: floa
         gen_name = getattr(state.pieces, "_generator_name", "unknown")
         state.pieces = _PreviewProvider(gen_name)  # type: ignore[assignment]
         try:
-            action_results = state._execute_actions(actions)
             before = state.stats.total_lines
+            action_results = state._execute_actions(actions)
             for _ in range(frames):
                 if state.game_over:
                     break
@@ -210,8 +210,8 @@ def _dedup_and_rank(entries: list[tuple[list[str], dict]]) -> list[dict]:
         lines = snap.get("lines_cleared") or 0
         return (
             -lines,  # (1) most lines cleared
-            snap.get("overhangs", 0),  # (2) fewest overhangs
-            snap.get("holes", 0),  # (3) fewest holes
+            snap.get("holes", 0),  # (2) fewest holes (unreachable, harder to recover)
+            snap.get("overhangs", 0),  # (3) fewest overhangs (reachable, fillable now)
             _board_aggregate_height(snap["board"]),  # (4) lowest/flattest stack
             _board_bumpiness(snap["board"]),  # (4) tiebreak: smoothest
         )
@@ -288,8 +288,9 @@ def enumerate_drops(state: GameState, dt: float) -> dict:
     """Enumerate all hard-drop final boards for the current piece.
 
     Returns {"piece_type": str|None, "boards": [ {**simulate_snapshot, "actions": [...]}, ... ]}
-    ranked by _dedup_and_rank. Each board is a simulate_actions snapshot, so the
-    schema matches `simulate` exactly; only `actions` is added.
+    ranked by (lines_cleared desc, holes asc, overhangs asc, stack height asc, bumpiness asc).
+    Each board is a simulate_actions snapshot, so the schema matches `simulate` exactly;
+    only `actions` is added.
     """
     piece = state.current_piece
     entries: list[tuple[list[str], dict]] = []

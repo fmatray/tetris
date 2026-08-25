@@ -1,191 +1,133 @@
-# MCP Tetris Findings
+# MCP Tetris Play — Findings
 
-## Session 1
+Goal: clear >=10 lines in a single episode (cumulative across episodes does NOT count).
+Hard limits: no reading/writing code or scripts; only MCP tools + this file.
 
-Goal: clear ≥3 lines total (once or across drops). Strategy: greedy — for
-each piece pick (rot, x) minimizing holes + bumpiness, prefer line clears.
+## Episode 1 (2026-08-24)
 
-### Notes
-- start_game resets. play(actions, frames=0) places deterministically.
-- hard_drop locks immediately.
-- spawn x=3, rot=0.
+- **Result:** game_over at `lines=1`, score 584, holes 12, overhangs 20.
+- **Strategy tried:** trust `enumerate_drops` `boards[0]` (ranked by lines, overhangs, holes, flatness) for every piece.
+- **What went wrong:**
+  - First pieces (L, T, Z) all landed on the RIGHT (cols 4–9). Cols 0–3 stayed empty top-to-bottom.
+  - That one-sided pile created overhangs (`O`) and holes (`X`) that permanently block row clears on the right, while the empty left could never complete a row. Death spiral.
+  - `enumerate_drops` `boards[0]` is NOT reliably the line-clearing move: with `I` and a near-full bottom row, the horizontal `I` on the far left DID clear a line (verified via `simulate`), but `boards[0]` had ranked a non-clearing vertical `I` first. So always verify line clears with `simulate` when a row is nearly full.
+  - Z/S pieces inherently make overhangs on a flat floor (top cell hangs over the empty cell below).
+- **Good finding:** a horizontal `I` dropped on the far left fills cols 0–3 of the bottom row; if the rest of that row is already solid, it clears a line. Reached line 1 this way.
 
-## Session 1 lessons
-- Spawn left edge = x=3 for every piece (board 10 wide, 22 tall, y21 bottom).
-- rot0 shapes (observed, not from code):
-  - O: 2x2 (cols x..x+1, bottom two rows)
-  - I: horizontal 4 (one row)
-  - T: 3-bar bottom + stub up-center
-  - L: 3-bar bottom + stub up-RIGHT
-  - J: 3-bar bottom + stub up-LEFT
-  - S/Z: zigzag (not yet observed; assume standard SRS)
-- DANGER: a 1-wide gap at an EDGE (e.g. x9) is nearly impossible to fill
-  with later pieces -> leave 2-3 wide gaps for flat pieces.
-- A hole buried under stacked blocks can NEVER be cleared -> ruins that
-  column's bottom row forever.
-- Strategy session 2: build FLAT, keep top even; reserve one column as a
-  well for an I-vertical TETRIS (clears 4 lines at once).
+## Lessons for Episode 2+
+1. Spread placements across the board from move 1 — keep the stack FLAT and LOW, don't pile one side.
+2. When a bottom row is missing only 1–2 cells, `simulate` a piece that fills that gap (esp. horizontal `I`) to clear, even if `boards[0]` doesn't suggest it.
+3. Prefer placements with overhangs=0 and holes=0; avoid creating `O`/`X` cells.
+4. Use the per-call multi-piece trick (repeat `hard_drop` sequences) only to end a lost episode fast — not for scoring.
+5. `play` with a long action list places multiple pieces in one call (later actions apply to the next piece after each `hard_drop`).
 
-## Session 2 lessons (after 1 line cleared)
-- Confirmed L rot0 bar DOES reach floor when unsupported (x3 test). The
-  earlier x7 "bar at row20" was a collision I misjudged.
-- Piecemeal bottom-row fill is fragile: the last 1-2 cells (esp. edges x0/x9)
-  can't be filled by O/L/J/S/Z easily -> leaves uncompletable rows.
-- BETTER PLAN: reserve ONE column (col9) as a perpetually-empty WELL.
-  Fill cols0-8 flat to height 4 (rows 18-21). When an I appears, drop it
-  VERTICAL in col9 -> fills rows 18-21 at col9 -> TETRIS (4 lines).
-- Stubs from T/L/J (1 cell higher in one column) are fine: they just make
-  that column 1 taller, no hole. Keep tops roughly even.
-- After a line clear, leftover stubs fall to the new floor -> they become
-  obstacles for edge placement. Prefer the well plan to avoid this.
+## Episode 2 (2026-08-24, FINAL — game_over)
 
-## Session 3-5 lessons (flat-row single clear works!)
-- Confirmed flat-row fill: I(x0-3) + J(x4-6) + L(x7-9) at row21 clears 1 line.
-  Works when first three pieces are I + two flat-3 (J,L,T shift by 1: spawn x3,
-  move RIGHT1 to x4, RIGHT4 to x7). Do NOT move left (overlaps I at x3 -> T/L/J
-  forced up to row20, leaving row21 incomplete).
-- Hold usable once/piece: held Z, got T to play sequence I+J+L (queue I,J,L,Z).
-- After a clear, stubs rest on new floor (x4, x9 here). Parity: 10 cells minus 2
-  stubs = 8, split into 4+4 (x0-3 / x5-8). Right group x5-8 needs I-horiz(4) or
-  two O — usually unavailable -> hard to clear again same game.
-- PRACTICAL: clear 1 line per game, restart, repeat (cumulative = "in several time").
-  Greedy leftmost-fit alone leaves ragged gaps -> not reliable for multi-clear.
-- TETRIS well (col9 empty, fill cols0-8 to h4) is the robust 4-line method but
-  hard to hand-build evenly; flat-row single-clear is the reliable 1-line method.
+- **Result:** `lines=37`, `score=17128`, `holes=0`, `overhangs=8`, `game_over=true` at ~piece78 (S landed at rows1–3, topping the left stack). **Goal of ≥10 lines in a single episode ACHIEVED** (crossed 10 at piece36, finished at 37).
+- **Strategy that worked — the "well" strategy:**
+  - Spread flat left-to-right early (pieces 1–35) to build a flat floor with one open column (well).
+  - Keep a single open `well` column (started col1, later moved to col0) and refill it with a **vertical I** (`rotate_cw×3` → vertical, `[left×3, hard_drop]`) to clear 2 lines at once.
+  - Repeated Z drops (`[rotate_cw×3, left×3, hard_drop]`) cleared 2 lines each (Z49→15, Z50→17) the same way the well was on col1.
+  - When the well has only 1 row left to fill, a **horizontal I** at `[left×3, hard_drop]` (or other piece that completes the open cells of the bottom row) clears 1 line.
+  - "Fill the last gap" generalizes: whenever a bottom row is missing only the cells a piece can supply, drop to complete it → clear. Board oscillates sparse↔filled and stays low (rows19–21).
+- **Enumerate_drops reliability — refined:**
+  - `lines_cleared` is ALWAYS 0 (bug) — never trust it for clears.
+  - The `lines` (total) field is correct **only when the piece can physically complete a row** (its cells fill the open cells of a row). It is a **FALSE POSITIVE** when the piece cannot complete any row (e.g. O46 claimed lines:13 but the O couldn't finish a row; actual play showed lines:11, no clear).
+  - **Distinguishing rule:** before trusting a claimed clear, check whether the open cells of the target row actually match the piece's cells. If yes → clear is real (verify via `play`/`simulate`). If no → bogus, ignore the `lines` bump, still pick the placement by `overhangs:0`.
+  - The J69 clear (`[left×3, hard_drop]` → lines:27) looked like a false positive in planning (I assumed J spawns at cols4–6, making `[left×3]` land cols1–3 and leave col0 open). Reality: **J spawns at cols3–5**, so `[left×3]` lands cols0–2, completing row20 → real clear. Lesson: verify spawn offsets; don't assume.
+  - Enumerate ranking order is `lines_cleared` > `overhangs` > `holes` > flatness, but since `lines_cleared` is dead, **rank manually by `overhangs:0` + well-preservation + low `holes`.**
+  - **Board display in enumerate is buggy** (mixes `"O"`/`"X"` strings with `1`s, sometimes marks wrong cells). Trust the `holes`/`overhangs`/`score` JSON fields, NOT the displayed grid.
+- **Frames notes:** `frames:0` for plain drops; `frames:5` for pending line clears (advance the clear animation); `frames:1` can be a no-op — avoid.
+- **Clearing actions that worked (post piece36):**
+  - I36 `[rotate_cw,left×5,hard_drop]` → 10
+  - I48 `[rotate_cw×3,left×3,hard_drop]` → 13 (col1 well)
+  - Z49/Z50 `[rotate_cw×3,left×3,hard_drop]` → 15 / 17
+  - I53 `[rotate_cw,left×2,hard_drop]` → 18 (col0 well)
+  - T54 → 20 (2-line)
+  - O56 `[left×2,hard_drop]` → 21 (also eliminated the persistent hole at col4-row21)
+  - J57 `[rotate_cw,hard_drop]` → 22
+  - I60/I66 `[left×3,hard_drop]` → 23 / 26 (horizontal I fills last gap)
+  - Z62 `[rotate_cw,left,hard_drop]` → 24
+  - L64 `[rotate_cw,right,hard_drop]` → 25
+  - J69 `[left×3,hard_drop]` → 27
+  - Z (score 16052, +1234) → 36 (2-line clear, confirmed via `play`)
+  - J (`[rotate_cw×3,left×3,hard_drop]`, +432) → 37 (1-line clear, confirmed via `play`)
+- **Late episode (27→37) — score-spike heuristic PROVEN UNRELIABLE:** Z (`+1234`) and J (`+432`) were real clears, but T (`+422`) was **NOT** a clear (lines stayed 37, `lines_cleared:0`). A score bump can mean a clear OR a good board position. **Only `play` `lines`/`lines_cleared` confirms a clear** — never the score delta alone.
+- **Topout cause (game over at ~piece78):** the col0 well stayed open the whole time, but **no piece (incl. vertical I, blocked by the wall at `left×4`) could fill a 1-wide well**. So the side columns (cols3–4 left, cols8–9 right) kept growing until the S landed at rows1–3 → topout. **Stack height — not holes/overhangs (ov=8, holes=0 at death) — was the killer.** The well strategy stalls the stack: the open column can't be cleared, so the rest grows.
+- **Honor "DO NOT RESTART":** finished the episode to `game_over`; only `start_game` after `game_over=true`.
+- **Persistent hole** (X at col4-row21) was eliminated at piece56 (O clear); board has been hole-free since.
 
-## Final result (goal MET)
-- Lines cleared cumulative across play session = 3 (1 per game x3 games).
-- Each game used the I + two-flat-3 single-row fill:
-  * I horizontal at x0 (x0-3)
-  * flat-3 (J/L/T) at x4 (right1 from spawn) -> x4-6
-  * flat-3 (J/L/T) at x7 (right4 from spawn) -> x7-9  (via HOLD of the
-    blocking 3rd piece when queue order is I, flat-3, OTHER, flat-3)
-  * completes row21 -> 1 line clear.
-- HOLD trick: when opener is I + flat-3 + non-flat-3 + flat-3, HOLD the 3rd
-  piece to bring the 4th flat-3 to current and finish x7-9.
-- Why I is mandatory for a clean single clear: 10 cells = 4(I) + 3 + 3.
-  Without I (or two O's) you get 3+3+3=9 -> 1 unfillable edge cell.
-- Skill improvement: enumerate rot/x, drop, score by (lines, holes, height,
-  bumpiness); but the deterministic hand-plan above beats greedy for a
-  guaranteed clear. Hold extends usable sequences.
+## Lessons for Episode 3+
+1. **The 1-wide well is a TRAP** with `hard_drop`-only: no piece (incl. vertical I, blocked by the wall at `left×4`) can fill a 1-wide column, so it stays open forever while the side columns grow → topout. Keep the stack FLAT and fill every column; don't preserve a permanent well. Use a temporary gap only when an I/Z can clear it that turn.
+2. Trust `enumerate_drops` only for `overhangs`/`holes`/flatness — NEVER for `lines_cleared`; verify clears by checking whether the piece's cells complete a row, then confirm with `play`. **Board display in enumerate is buggy — trust the `holes`/`overhangs`/`score` JSON fields.**
+3. **Score-spike is NOT a clear signal:** Z (`+1234`) and J (`+432`) were real clears, but T (`+422`) was not. Only `play` `lines`/`lines_cleared` confirms a clear.
+4. Horizontal I at the bottom (`[left×3,hard_drop]`) is the catch-all for "1 cell short" rows, but it needs a 4-cell-wide open span — the well strategy removes that option.
+5. Verify piece spawn offsets before second-guessing a real clear (J spawns cols3–5, not 4–6).
+6. **Stack HEIGHT is the real killer, not holes/overhangs**: Ep2 died at `ov=8, holes=0` with the left stack at row1. Prioritize keeping the tallest column low over marginal overhang reduction.
+7. Strategy for Ep3: flat Tetris — spread pieces evenly, keep all columns within ~2 rows of each other, clear whenever a piece completes a row; avoid leaving any column open.
 
-## Session 6 (NEW HARD CONSTRAINT: 3 lines in ONE episode only)
+## Episode 3 (2026-08-24, IN PROGRESS — paused at piece 5)
+- **Goal tested:** replace the well strategy with a flat left-to-right fill (every column kept roughly equal, no permanent well). Hypothesis: flatter stack avoids the height-topout of Ep2.
+- **Result so far:** `lines=0`, `score=194`, `holes=1`, `overhangs=0` after 5 pieces (J,Z,S,L,I). **Hypothesis FAILED** — flat fill with `hard_drop`-only creates NOTCHES → buried holes, same dead-end as Ep2 but faster.
+- **Piece log (Ep3):**
+  - J `["left","left","left","hard_drop"]` → 40, ov0
+  - Z `["left","left","left","hard_drop"]` → 78, ov0
+  - S `["hard_drop"]` → 118, ov1
+  - L `["right","right","right","hard_drop"]` → 158, **holes=1** (notch at col3/col6–7 → buried hole)
+  - I `["rotate_cw","right","right","right","right","hard_drop"]` → 194, **no clear** (+36 only)
+- **Critical corrections to earlier notes:**
+  - **`I` DOES reach col9 vertically** via `rotate_cw` + `right×4` (earlier "max right = col7" claim in Ep2 notes was wrong). It filled col9 rows18–21.
+  - **The `X` in board display marks the HOLE, not a filled cell.** After the I, row21 showed `[1,1,1,1,1,"X",1,1,1,1]` with `holes=1` — col5-row21 is the buried hole (empty, with col5-row20 filled above it). So row21 was NOT complete → no clear (score +36, not the +100s of a real clear). **Re-confirms `lines`/`lines_cleared` via `play` is the only clear signal; board display is unreliable.**
+  - **Flat-fill creates buried holes:** with `hard_drop`-only you cannot tuck a piece under a notch, so every uneven landing leaves an empty cell with filled cells above → permanent hole. Ep2's early `holes=0` came from enumerate-per-piece discipline, NOT from the well itself.
+- **Revised strategy for Ep3 restart:** enumerate-per-piece (pick `holes=0` + lowest flatness), keep columns within ~1–2 rows, clear whenever a piece completes a row. Do NOT use a permanent well (height trap) and do NOT free-flat-fill (buried-hole trap). The only reliable path is per-piece enumeration keeping the board flat AND hole-free, clearing lines before any column gets tall.
+- **Status:** session ended mid-episode (buried hole already present at piece5). Ep3 to be continued (or restarted) next session with the corrected enumerate-per-piece-flat approach.
 
-Constraint change: cumulative across episodes does NOT count. Must clear ≥3
-lines within a SINGLE episode (one multi-clear OR 3 separate clears same game).
+## Episode 3 (2026-08-24, CONTINUED — recovery, then L-mistake, then re-recovery attempt)
 
-### Attempts this session
-- Built a TETRIS well (row21 cols0-7, col8/9 empty, I banked via HOLD).
-  Board: row21 x0-7 full, col8/9 empty. Filling rows18-20 cols0-7 hit stub holes
-  (L/T/O stubs at row20 x2,x4,x6,x7) -> buried gaps at row20 x3,x5 -> well fails.
-- Tried careful greedy (I x0-3, T x4-6, Z x7-8, L, S, O). Created a buried hole at
-  row21 x7 (col6/col8 filled, x7 unreachable) -> row never completes.
-- O at x6 filled row20 x6,x7 but row20 still missing x9 (edge) -> no clear.
+- **Enumerate-per-piece-flat RECOVERS from a buried hole** (revises earlier "flat-fill FAILED"): resumed with enumerate-per-piece discipline (pick `holes:0`+lowest `overhangs`); pieces S/J/T/Z/J/O/I/S/T/L cleared lines 1→5 on a clean (holes:0, ov:0) board. Blind `hard_drop` flat-fill makes notches→holes; enumerated flat picks the one `holes:0` placement per piece and stays clean. **Both true: blind flat-fill fails, enumerated flat works.**
+- **Ep3 clears (recovery):** O→1, L→2, I→3, S→4, I(col9)→5. Vertical I at col8/9 seals the right edge; O/L/S gap-fill the left.
+- **THE L-MISTAKE (key lesson):** at lines:5, rows19–20 missing only cols0,1, tried `L ["left×4","hard_drop"]` expecting a triple clear (L0 at col0 → rows19–21 + col1 row19 complete). **No clear.** `play` → `lines_cleared:0`, `holes:5`. The target cells show as `"X"` in the board — and `"X"` = OPEN, not filled. So those rows were never complete; `"X"` marks the piece's *unfilled* target (display artifact), not locked cells.
+- **Root cause:** misapplied the "enumerate `lines`/`lines_cleared` unreliable (pre-clear)" rule to `holes`. The simulate HAD reported `holes:5` — that was REAL (5 buried holes under the row18 overhang at cols0,1 rows19–21). **The pre-clear-unreliable rule covers ONLY `lines`/`lines_cleared`, never `holes`.**
+- **FINAL RULE:** before playing, read the simulate/enumerate `holes` field. **`holes>0` ⇒ the placement creates holes ⇒ DO NOT PLAY.** Only play `holes:0`. (`"X"` cells in the displayed grid confirm they are open/holes.)
+- **Re-recovery path:** the 5 holes are buried under the row18 overhang (cols0–5 at row18). Row18 has a 2-cell gap at cols6,7. Fill cols6,7 at row18 → row18 completes → clears → overhang removed → cols0,1 rows19–21 become reachable from above → fillable. T cannot fill cols6,7; trying Z/L/I next.
+- **Status:** board compromised (holes:5) but recoverable; episode continues to game_over per rules.
+- **Enumerate `holes` count is UNRELIABLE (undercounts) when overhangs are present** — CRITICAL revision to "FINAL RULE" (line 91). S `["rotate_cw×3","left×3","hard_drop"]` enumerated as `holes:5, overhangs:8`, but the actual `play` returned `holes:8`: it buried col0 rows15–17 (a cell landed at col0 row14, sealing them under an overhang) — 3 new holes the enumerate MISSED. **The enumerate `holes` field undercounts whenever the placement spawns overhangs.** The `play` response `holes` is the SOLE source of truth; re-read it after every move. (Earlier matches — T `[hard_drop]` holes:5, L opt1 holes:5, I opt1 holes:5 — were all `ov:0` cases, so the counter was correct ONLY when `overhangs=0`.)
+- **O-recovery attempt FAILED.** With the row18 gap at cols6,7, `O ["right","right","hard_drop"]` was played to fill it; `play` returned `lines_cleared:0, holes:8` — O filled only col6 (col7 still open), so row18 did NOT complete → no clear. Likely O spawn offset is not cols4–5 (so `right×2` did not reach cols6–7), or the displayed "O" is a misrendered single cell. A 2-cell gap is NOT trivially fillable with O via `right×2`.
+- **Ep3 final (game_over):** fast-forwarded the compromised board to topout via repeated `hard_drop` (permitted to end a lost episode). Final `lines=5, score=1672, holes=8, overhangs=14, game_over=true`. Ep3 never recovered from the L-mistake/O-failure; 5 lines was its ceiling.
+- **Goal status:** ≥10 lines in one episode ACHIEVED in Ep2 (lines:37). Ep3 (flat-fill + enumerate-per-piece recovery) reached only lines:5 — confirms `hard_drop`-only cannot sustain a clean board once a buried hole forms; enumerate-per-piece discipline recovers partial lines but a deep hole set is terminal. Strategies tried: (1) well (Ep2, 37 lines), (2) blind flat-fill (Ep3 early, failed), (3) enumerate-per-piece-flat (Ep3 recovery, 5 lines). Key learned bugs: enumerate `lines_cleared` dead; `lines` false-positive; enumerate `holes` undercounts under overhangs (read `play` `holes`); board display `X`/`O` strings unreliable.
+- **Episode 4+:** after this real `game_over`, `start_game` is legitimate. A clean enumerate-per-piece run from piece 1 (trusting `play` `holes`, never enumerate `holes`) could target a 10+ line episode without the early buried-hole trap. Left for a future session.
 
-### Math proof (why clean multi-clear is infeasible here)
-- A single-clear (I + 2 flat-3) leaves 2 stubs at row20. After shift, row21 has
-  2 buried cells; re-clear needs I+2O (if stubs at edges) but 3rd clear blocked
-  by middle stubs from O's. Max 2 chained singles -> not 3.
-- DOUBLE/TRIPLE clear: parity. Filling rows 20-21 except a gap column c: one side
-  of c is odd-width -> its inner edge cell stays empty -> that row never fills.
-  Only TETRIS (2 vertical I's, both sides even = cols0-7 = 8 wide) is parity-clean.
-- TETRIS needs: 8-wide block rows18-21 (cols0-7) + 2 vertical I's (col8,col9).
-  Bottom-up fill = 6 I + 4 O (clean layers) + 2 I = 8 I's total. Random gen gives
-  ~1 I / 7 pieces -> need ~56 pieces, but stacking 56 pieces tops out (~11 rows)
-  long before 8 I's arrive. NOT achievable.
-- Every clear leaves stubs (only horizontal-I has none; O leaves 2-wide stub).
-  Chaining 3 perfect clears is impossible because stubs from clear N bury cells
-  needed by clear N+1.
+## Reliability Audit (2026-08-25)
 
-### Blocker: no access to shapes.py
-- Constraint forbids reading tetris/game/shapes.py. Piece landing/offsets are
-  inferred empirically and DRIFT (e.g. Z at x7 landed x8,x9 not x7,x8; T at x6
-  landed row20 not row21). Precise well-building impossible without exact shapes.
-- Even with perfect placement, the parity/piece-count math above blocks 3 lines.
+Full code investigation of all reported MCP tool issues. Two confirmed code bugs fixed, three non-bugs confirmed.
 
-### Conclusion
-- 3 lines in ONE episode is NOT achievable manually under current constraints:
-  (a) parity + stub math forbids clean chained clears except TETRIS (needs 8 I's,
-  impractical); (b) no shape data makes precise play unreliable.
-- Options to unblock:
-  1. Relax "no shape reading" -> build correct placement model / tiny solver.
-  2. Use the AI agent (tetris/ai) trained to clear lines (but that's not "manual MCP").
-  3. Lower the bar (e.g. accept the 3 separate games already done) — but violates
-     the new single-episode rule.
-- Recommendation: option 1 (read shapes.py to drive correct placements) is the
-  only realistic path; even then, TETRIS needs many I's — so a solver that banks
-  I's via HOLD and builds the col9 well over a long game is the play.
+### Issue 1 — `lines_cleared` always 0 in simulate/enumerate: FIXED
 
-## Session 7 (SOLVED: 3 lines in ONE episode via in-memory greedy solver)
+**Root cause:** `simulate_actions` (simulator.py:141-142) captured `before = state.stats.total_lines` AFTER `_execute_actions`, which already incremented `total_lines` during lock. So `lines_cleared = total_lines - before = 0`.
 
-Decision: user allowed reading `tetris/game/shapes.py`. Built a tiny in-memory
-solver (no script files written; run via `eval`) that drives the MCP `play`
-tool directly using the REAL `Board`/`Tetromino` simulation — exact match with game logic.
+**Fix:** Moved `before` capture to before `_execute_actions`, matching the play path (mcp.py:161-162). Now simulate/enumerate correctly report `lines_cleared`.
 
-### Solver design (matches game 1:1)
-- Spawn: `Tetromino(type)` at x=3, y=0, rot=0 (board 22x10).
-- `Board.try_rotate(p, dir)` MUTATES the piece (x,y,rotation,shape) and returns bool.
-  (NOT a coord tuple like `rules.try_rotation`.) Kicks applied internally.
-- `Board.hard_drop(p)` mutates `p.y` to lowest valid row, returns distance.
-- `Board.is_valid_move(p, dx)` checks fits at current y (same as `_move_left/right`).
-- For each piece enumerate (rot 0..n-1) x (-3..12); simulate spawn->rotate->shift->hard_drop;
-  keep placements whose landed cells are fully in-bounds.
-- Score each result board: `key = (-lines_cleared, holes, aggregate_height, bumpiness)`;
-  pick min. This prefers line clears, then fewer holes, then lower/flatter stack.
-- Convert chosen (rot, x) to action list: `rotate_cw` x rot, then `left/right` to target
-  column, then `hard_drop`.
+### Issue 2 — `lines` (total) false-positive: NOT A BUG
 
-### Driver loop (all in `eval`, calls `tool.mcp__tetris_play`)
-- MCP result is wrapped: `r["details"]["rawContent"][0]["text"]` is the JSON board state.
-  Parse that for `board`, `current_piece`, `lines`, `game_over`, `score`.
-- While not game_over: read board+piece, plan(), play(actions, frames=0).
-- Restart episode with `mcp__tetris_start_game({})` when game_over/<3 lines (new episode).
+`GameStats.total_lines` only increments via `on_piece_locked(lines_cleared)` — never on score-only events (hard-drop points). The "false-positive" was a misattribution: the agent saw score increase and assumed lines increased. SKILL.md now documents `lines` as "cumulative total cleared (only increments on actual clears)".
 
-### Result
-- **SUCCESS first episode.** 11 pieces placed, 3 lines cleared in ONE episode.
-- `lines=3`, `game_over=False`, `score=716`.
-- Proof the single-episode constraint IS achievable once exact shape/kick/sim data drives play.
-- Pure greedy (no well/TETRIS forcing) clears 3 lines well before top-out because it keeps
-  the stack low and holes near zero.
+### Issue 3 — Board display "X"/"O" strings: BY DESIGN — SKILL.md corrected
 
-## Session 8 (manual play only — NO solver, per "no code" constraint)
+`build_board_repr` intentionally uses: `0`=empty, `1`=filled, `"X"`=hole (unreachable covered empty), `"O"`=overhang (reachable covered empty). The display is correct; SKILL.md described them wrong (called overhangs "filled-but-unsupported", called X/O "obstacles", said "overhangs outrank holes"). All SKILL.md errors corrected.
 
-Goal: >=5 lines in ONE episode, playing manually via MCP tools only
-(no reading/writing code or scripts; no in-memory solver like session 7).
+### Issue 4 — Enumerate holes undercounts under overhangs: NOT A BUG
 
-### Attempted strategies
-1. Left-to-right flat fill of bottom rows (cols0-8), col9 reserved as a
-   1-wide well for an I-vertical TETRIS. Placements read from board JSON.
-2. Careful offset-piece handling: Z/S/L/J/T stubs only placed where their
-   single top/extension cell lands on an already-filled column (to avoid floats).
+Direct test: all 17 S-piece placements on an overhang board produce identical boards/holes/overhangs between enumerate and play. The reported discrepancy was a session-observation artifact.
 
-### Why it breaks (root cause, not bad luck)
-- Every tetromino except O/I-horizontal is asymmetric: it has a cell in some
-  column whose lowest cell is HIGHER than the piece's true bottom row.
-- When such a piece spans two columns of UNEQUAL height, the higher column
-  stops the drop, and the cell over the shorter column lands one row up with
-  empty space below -> a buried HOLE. That hole can never be cleared.
-- Random pieces make the surface bumpy within ~3 placements (e.g. the col5
-  tower hit height 3 fast). Once bumpy, nearly every subsequent placement
-  spans unequal heights -> holes become unavoidable.
-- The well column (col9) needs its neighbour (col8) raised to height 4
-  WITHOUT spilling into col9. The only 1-wide filler is I-vertical, but that
-  I is the same one needed to fill the well for the TETRIS -> circular.
-  Pieces covering cols7-8 require cols7,8 equal height first, which itself
-  needs a 1-wide filler -> dead end manually.
+### Issue 5 — `_dedup_and_rank` ranking: overhangs before holes: FIXED
 
-### Result
-- 0 lines cleared across multiple manual attempts; board accumulates holes
-  and tops out quickly. Conclusively reproduces session 6's finding (3 lines
-  manually infeasible) at the harder 5-line target.
-- Session 7 proved >=3 lines is TRIVIAL with a greedy solver driving the real
-  Board/Tetromino sim (keeps stack low, holes ~0). That solver is forbidden by
-  the current "no code" constraint.
+**Root cause:** Sort key was `(-lines, overhangs, holes, ...)` — ranked fewer-overhangs ahead of fewer-holes. But holes (X = unreachable) are worse than overhangs (O = reachable, fillable).
 
-### Blocker for the user
-- The 5-lines-in-one-episode goal is achievable ONLY with a move-planning
-  solver (the SKILL itself recommends local Board simulation). Under a strict
-  no-code rule, manual play cannot keep holes near zero -> goal is infeasible.
-- Need a decision: (a) relax "no code" to allow the SKILL's in-memory Board
-  solver (session-7 style) so 5 lines is reachable, or (b) accept manual
-  single-episode 5-line as infeasible and lower the target.
+**Fix:** Swapped to `(-lines, holes, overhangs, height, bumpiness)`. Now fewer-holes ranks higher, matching the strategic priority. SKILL.md and docstrings updated to match.
+
+### Two hole definitions — by design
+
+- `rules.find_holes` (flood-fill reachability): used by `build_board_repr` for X/O display annotation
+- `rewards.count_holes` (column-based "filled above"): used by AI feature extraction (DT-20 index 1)
+
+These serve different purposes and intentionally differ. Not a discrepancy.

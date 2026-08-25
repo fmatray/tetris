@@ -496,6 +496,8 @@ classDiagram
             - _setup_mcp() None
             +start() None
             +stop() None
+            +attach(action_queue) None
+            +detach() None
         }
     }
 
