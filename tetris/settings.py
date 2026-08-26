@@ -212,6 +212,9 @@ MODEL_PATH = os.path.join(DATA_DIR, "ai_model.pt")
 LOG_PATH = os.path.join(DATA_DIR, "ai_training_log.json")
 REPLAY_PATH = os.path.join(DATA_DIR, "replay_pieces.json")
 DEBUG_LOG_PATH = os.path.join(DATA_DIR, "debug.log")
+STEP_LOG_PATH = os.path.join(DATA_DIR, "ai_step_log.jsonl")
+BEHAVIOR_LOG_PATH = os.path.join(DATA_DIR, "ai_behavior_log.jsonl")
+TB_LOG_DIR = os.path.join(DATA_DIR, "runs")
 
 # --- MCP ---------------------------------------------------------------
 MCP_SERVER_PORT = 8765

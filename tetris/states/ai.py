@@ -12,8 +12,10 @@ the HUD for real-time learning feedback.
 
 from __future__ import annotations
 
+import json
 import os
 import random
+import statistics
 
 
 from dataclasses import dataclass
@@ -48,12 +50,13 @@ import numpy as np
 import pygame
 import torch
 
-from tetris.ai.agent import DQNAgent
 from tetris.ai.candidates import NUM_ROTATIONS, Placement, get_candidate_states  # noqa: F401
 from tetris.ai.hud import draw_ai_hud
+from tetris.ai.agent import DQNAgent
 from tetris.ai.rewards import (
     board_to_grid,
     compute_reward,
+    compute_reward_components,
     extract_features,
 )
 from tetris.ai.trainer import TrainingLog
@@ -62,17 +65,21 @@ from tetris.game.board import Board, LineClearResult
 from tetris.game.piece_provider import PieceProvider
 from tetris.game.stats import GameStats
 from tetris.game.tetromino import Tetromino
-from tetris.logger import get_logger
 from tetris.settings import (
     AI_ACTION_DELAY_MS,
     AI_MODEL_SAVE_INTERVAL,
+    BEHAVIOR_LOG_PATH,
+    BOARD_WIDTH,
     CURRICULUM_ORDER,
     LOCK_DELAY_MS,
     LOG_PATH,
     MODEL_PATH,
+    STEP_LOG_PATH,
+    TB_LOG_DIR,
 )
 from tetris.states.base import State
 from tetris.states.game import GameConfig, GameState
+from tetris.logger import get_logger
 from tetris.visuals.particles import ParticleSystem
 
 
@@ -164,6 +171,8 @@ class AIState(GameState):
             buffer_size=ai_config.buffer_size,
             device=device,
             seed=seed,
+            step_log_path=STEP_LOG_PATH if ai_config.ai_mode == "learning" else None,
+            tb_log_dir=TB_LOG_DIR if ai_config.ai_mode == "learning" else None,
         )
         self.log = TrainingLog(LOG_PATH)
         self.episode = self.log.total_episodes
@@ -175,6 +184,18 @@ class AIState(GameState):
         self._candidate_placements: list[Placement] = []
         # Last 5 moves for HUD display
         self._last_moves: list[MoveRecord] = []
+        # Per-episode observability counters
+        self._ep_n_random: int = 0
+        self._ep_n_greedy: int = 0
+        self._ep_n_hold: int = 0
+        self._ep_candidates: list[int] = []
+        self._ep_move_lens: list[int] = []
+        self._ep_losses: list[float] = []
+        self._ep_rewards: list[float] = []
+        self._ep_reward_components: list[dict[str, float]] = []
+        self._ep_col_hist: list[int] = []
+        self._ep_rot_hist: list[int] = []
+        self._ep_placement_success: list[bool] = []
         # Per-episode tracking
         self.episode_steps = 0
         self.episode_start_grid: np.ndarray = board_to_grid(self.board)
@@ -279,6 +300,21 @@ class AIState(GameState):
             step_survived=True,
             gamma=self.agent.gamma,
         )
+        # Observability: reward tracking
+        self._ep_rewards.append(reward)
+        self._ep_reward_components.append(
+            compute_reward_components(
+                lines_cleared=cleared,
+                prev_grid=self.episode_start_grid,
+                new_grid=new_grid,
+                game_over=self.game_over,
+                step_survived=True,
+                gamma=self.agent.gamma,
+            )
+        )
+        # ponytail: placement success ≈ !game_over this lock. Overhang
+        # placements that cause immediate top-out are the failure case.
+        self._ep_placement_success.append(not self.game_over)
 
         # current_piece is now the NEXT piece (P_{t+1}) after super()._lock_and_spawn
         current_state = extract_features(new_grid, cleared, self.current_piece.type)
@@ -299,6 +335,8 @@ class AIState(GameState):
             # Multiple gradient updates per piece for faster learning
             for _ in range(self.learn_per_action):
                 self.agent.learn()
+            if self.agent.last_loss is not None:
+                self._ep_losses.append(self.agent.last_loss)
 
         # Update pending transition for next lock
         if self.game_over:
@@ -343,6 +381,17 @@ class AIState(GameState):
                 self.episode_steps += 1
                 p = self._candidate_placements[chosen_idx]
                 rot, px, hold = p.rot, p.px, p.hold
+                # Observability: behavioral tracking
+                self._ep_candidates.append(len(candidates))
+                if hold:
+                    self._ep_n_hold += 1
+                self._ep_move_lens.append(len(p.moves))
+                self._ep_col_hist.append(px)
+                self._ep_rot_hist.append(rot)
+                if self.agent.last_action_was_random:
+                    self._ep_n_random += 1
+                else:
+                    self._ep_n_greedy += 1
                 if hold:
                     placed = self.hold_piece.type if self.hold_piece else self.next_piece.type
                 else:
@@ -376,8 +425,18 @@ class AIState(GameState):
         self._reset_episode()
         return None
 
+    def _ep_avg(self, values: list[float]) -> float:
+        return statistics.fmean(values) if values else 0.0
+
     def _log_and_learn(self) -> None:
         """Record episode stats, decay epsilon, advance curriculum, save model."""
+        tm = self.agent.training_metrics()
+        # Reward component averages
+        if self._ep_reward_components:
+            comp_keys = self._ep_reward_components[0].keys()
+            reward_comp = {f"reward_{k}": self._ep_avg([c[k] for c in self._ep_reward_components]) for k in comp_keys}
+        else:
+            reward_comp = {}
         self.log.record(
             episode=self.episode,
             score=self.stats.score,
@@ -387,7 +446,30 @@ class AIState(GameState):
             epsilon=self.agent.epsilon,
             loss=self.agent.last_loss,
             seed=self._episode_seed,
+            # Training dynamics
+            avg_loss=self._ep_avg(self._ep_losses),
+            max_td_error=self.agent.last_td_error_max,
+            avg_td_error=self.agent.last_td_error_mean,
+            lr=tm["lr"],
+            buffer_fill=tm["buffer_fill"],
+            grad_norm=self.agent.last_grad_norm,
+            target_syncs=tm["target_syncs"],
+            beta=tm["beta"],
+            # Network behavior
+            avg_v_spread=self.agent.last_v_spread,
+            avg_v_margin=self.agent.last_v_margin,
+            # Agent behavior
+            avg_candidates=self._ep_avg([float(c) for c in self._ep_candidates]),
+            n_random=self._ep_n_random,
+            n_greedy=self._ep_n_greedy,
+            n_hold=self._ep_n_hold,
+            avg_move_len=self._ep_avg([float(m) for m in self._ep_move_lens]),
+            # Reward
+            avg_reward=self._ep_avg(self._ep_rewards),
+            curriculum_level=self.agent.curriculum_level,
+            **reward_comp,
         )
+        self._write_behavior_log()
         logger.debug("Episode %d ended | score=%d, eps=%.4f", self.episode, self.stats.score, self.agent.epsilon)
         # Decay epsilon once per episode (not per transition)
         self.agent.decay_epsilon()
@@ -422,6 +504,18 @@ class AIState(GameState):
         self._last_level = 0
         self._last_moves: list[MoveRecord] = []
         self._pending_level_up = False
+        # Observability: reset per-episode counters
+        self._ep_n_random = 0
+        self._ep_n_greedy = 0
+        self._ep_n_hold = 0
+        self._ep_candidates = []
+        self._ep_move_lens = []
+        self._ep_losses = []
+        self._ep_rewards = []
+        self._ep_reward_components = []
+        self._ep_col_hist = []
+        self._ep_rot_hist = []
+        self._ep_placement_success = []
         self.audio.set_music_speed(1.0)
 
         # Derive per-episode seed for reproducible training
@@ -472,9 +566,35 @@ class AIState(GameState):
 
     # --- ESC handling (return to menu) -----------------------------------
 
+    def _write_behavior_log(self) -> None:
+        """Append one JSONL line of per-episode behavioral analytics."""
+        from pathlib import Path
+
+        col_dist = [self._ep_col_hist.count(c) for c in range(BOARD_WIDTH)]
+        rot_dist = [self._ep_rot_hist.count(r) for r in range(4)]
+        success_rate = (
+            sum(self._ep_placement_success) / len(self._ep_placement_success) if self._ep_placement_success else 0.0
+        )
+        entry = {
+            "episode": self.episode,
+            "score": self.stats.score,
+            "steps": self.episode_steps,
+            "placement_success_rate": success_rate,
+            "col_hist": col_dist,
+            "rot_hist": rot_dist,
+        }
+        try:
+            path = Path(BEHAVIOR_LOG_PATH)
+            path.parent.mkdir(parents=True, exist_ok=True)
+            with open(path, "a") as f:
+                f.write(json.dumps(entry) + "\n")
+        except OSError:
+            pass  # ponytail: behavior log is best-effort
+
     def _on_exit(self) -> None:
         """Save model and flush log before returning to menu on ESC."""
         self.log.flush()
+        self.agent.flush_logs()
         try:
             self.agent.save(MODEL_PATH)
         except (OSError, RuntimeError) as e:

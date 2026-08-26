@@ -271,9 +271,11 @@ All in `data/` (gitignored via blanket `data/` rule):
 | `leaderboard.json` | `LEADERBOARD_PATH` | JSON | Top 10 scores (capped) |
 | `human_stats.json` | `HUMAN_STATS_PATH` | JSON | Unbounded human game history |
 | `ai_model.pt` | `MODEL_PATH` | PyTorch | DQN weights + optimizer + epsilon |
-| `ai_training_log.json` | `LOG_PATH` | JSON | Per-episode training metrics |
+| `ai_training_log.json` | `LOG_PATH` | JSON | Per-episode training metrics (35 fields: 9 original + 26 observability) |
+| `ai_step_log.jsonl` | `STEP_LOG_PATH` | JSONL | Per-`learn()`-call metrics (loss, TD error, grad norm, LR, buffer fill); rotates at 100K lines |
+| `ai_behavior_log.jsonl` | `BEHAVIOR_LOG_PATH` | JSONL | Per-episode behavioral analytics (column/rotation histograms, placement success rate) |
+| `runs/` | `TB_LOG_DIR` | TensorBoard | TensorBoard event files for live dashboards (`tensorboard --logdir data/runs`) |
 | `replay_pieces.json` | `REPLAY_PATH` | JSON | Stored piece sequences for Replay mode |
-| `debug.log` | `DEBUG_LOG_PATH` | Text | Debug logging output (when debug ON) |
 
 ## Media Files
 
@@ -296,3 +298,4 @@ All in `data/` (gitignored via blanket `data/` rule):
 - **Curriculum**: Curriculum state (`curriculum_level`, `curriculum_episode_count`) lives in `DQNAgent`, persisted in checkpoint. `advance_curriculum(max_level, freq)` advances level every `freq` episodes. `_reset_episode` re-applies `set_allowed_types` on the new `PieceProvider`.
 - **Seed reproducibility**: `_reset_episode` derives `_episode_seed = seed + episode` and re-seeds `random`, `np.random`, `torch.manual_seed`, and `PieceProvider` for reproducible training.
 - **Modes**: `ai_mode="learning"` (epsilon-greedy + training updates + logging, fast-forwards lock delay) vs `"playing"` (greedy, epsilon=0, no learning, full lock delay). Set in `AIState.__init__` after `agent.load(MODEL_PATH)`. Training uses `lookahead_depth=1` + `preview_count=1` in `verify_training.py` for speed (6.9× faster); playing uses `lookahead_depth=3` + `preview_count=3` for best move quality. `online_net.eval()` during `select_action`, `online_net.train()` during `learn` (future-proofs for dropout/BN).
+- **Observability** (5 tiers): Tier 1 enriches per-episode JSON log with 26 new fields (LR, TD errors, grad norm, buffer fill, target syncs, PER beta, V-value spread/margin, candidate count, random/greedy ratio, hold rate, move-sequence length, avg reward, curriculum level, 9 reward components). Tier 2 writes per-`learn()`-call JSONL to `STEP_LOG_PATH` (rotates at 100K lines). Tier 3 writes per-episode behavioral JSONL to `BEHAVIOR_LOG_PATH` (column histogram 10 bins, rotation histogram 4 bins, placement success rate). Tier 4 decomposes reward via `compute_reward_components()` in `rewards.py` (9 components: lines, holes_delta, overhangs, height, bumpiness, wells, survival, pbrs, game_over — sum equals `compute_reward()`). Tier 5 writes TensorBoard scalars via `SummaryWriter` in `DQNAgent.learn()` to `TB_LOG_DIR` (runtime-guarded by `ImportError`). `DQNAgent.training_metrics()` snapshots dynamics; `flush_logs()` flushes TB writer; `AIState._write_behavior_log()` writes behavioral JSONL. `last_action_was_random` flag tracks actual exploration rate. `target_syncs` persisted in checkpoint. All logs are best-effort (I/O errors never crash training). Playing mode disables step log and TB writer.

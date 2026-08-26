@@ -468,3 +468,57 @@ def test_trend_just_below_threshold():
     log2 = TrainingLog(path=_tmp_path())
     log2.episodes = [_ep(score=100) for _ in range(100)] + [_ep(score=94) for _ in range(100)]
     assert log2._trend("score") == "down"
+
+
+# --- Observability tests --------------------------------------------------
+
+
+def test_record_accepts_extra_fields():
+    """record() accepts **extra kwargs and stores them in the episode entry."""
+    log = TrainingLog(path=_tmp_path())
+    log.record(0, 100, 5, 3, 200, 0.1, 0.01, seed=42, avg_loss=0.05, lr=1e-3, buffer_fill=500)
+    assert log.episodes[0]["avg_loss"] == 0.05
+    assert log.episodes[0]["lr"] == 1e-3
+    assert log.episodes[0]["buffer_fill"] == 500
+
+
+def test_record_backward_compatible():
+    """record() with only the 9 original args still works."""
+    log = TrainingLog(path=_tmp_path())
+    log.record(0, 100, 5, 3, 200, 0.1, 0.01, seed=42)
+    entry = log.episodes[0]
+    assert entry["score"] == 100
+    assert entry["episode"] == 0
+    assert "avg_loss" not in entry
+
+
+def test_record_extra_fields_persist_to_json():
+    """Extra fields survive save/load round-trip."""
+    log = TrainingLog(path=_tmp_path())
+    log.record(0, 100, 5, 3, 200, 0.1, 0.01, seed=42, target_syncs=3, beta=0.4)
+    log.flush()
+    log2 = TrainingLog(path=log.path)
+    assert log2.episodes[0]["target_syncs"] == 3
+    assert log2.episodes[0]["beta"] == 0.4
+
+
+def test_record_reward_components():
+    """Reward component fields pass through to the episode record."""
+    log = TrainingLog(path=_tmp_path())
+    log.record(
+        0,
+        100,
+        5,
+        3,
+        200,
+        0.1,
+        0.01,
+        seed=42,
+        reward_lines=50.0,
+        reward_holes_delta=-2.0,
+        reward_game_over=-100.0,
+    )
+    entry = log.episodes[0]
+    assert entry["reward_lines"] == 50.0
+    assert entry["reward_holes_delta"] == -2.0
+    assert entry["reward_game_over"] == -100.0

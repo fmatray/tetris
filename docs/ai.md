@@ -384,6 +384,14 @@ first draw. Any key returns to the AI submenu.
 | **Pieces placed** | Total tetrominoes placed |
 | **Survival time** | Steps before game over |
 | **Average V-value** | Network confidence over time |
+| **TD error** | Mean/max temporal-difference error per learn step |
+| **Grad norm** | Gradient magnitude after clipping |
+| **LR** | Current learning rate (scheduler-adjusted) |
+| **Buffer fill** | Replay buffer occupancy |
+| **V-value spread/margin** | Difference between best and worst candidate V-values |
+| **Random/greedy ratio** | Actual exploration rate (n_random / n_greedy per episode) |
+| **Hold rate** | Fraction of placements using the hold slot |
+| **Reward components** | Per-component averages (lines, holes, overhangs, height, bumpiness, wells, survival, PBRS, game_over) |
 
 ### 8.2 Milestones
 
@@ -408,6 +416,22 @@ first draw. Any key returns to the AI submenu.
 
 ---
 
+## 9a. Observability Infrastructure
+
+Five-tier instrumentation for training diagnostics:
+
+| Tier | Target | File | Format |
+| ---- | ------ | ---- | ----- |
+| **1. Enriched episode log** | Per-episode | `data/ai_training_log.json` | JSON (35 fields: 9 original + 26 observability) |
+| **2. Step log** | Per-`learn()` call | `data/ai_step_log.jsonl` | JSONL (rotates at 100K lines, ~20MB max) |
+| **3. Behavioral log** | Per-episode | `data/ai_behavior_log.jsonl` | JSONL (column histogram 10 bins, rotation histogram 4 bins, placement success rate) |
+| **4. Reward decomposition** | Per-episode | `data/ai_training_log.json` | `compute_reward_components()` returns 9 named components; sum equals `compute_reward()` |
+| **5. TensorBoard** | Per-`learn()` call | `data/runs/` | TensorBoard event files (`tensorboard --logdir data/runs`) |
+
+**Key APIs**: `DQNAgent.training_metrics()` snapshots dynamics; `DQNAgent.flush_logs()` flushes TB writer; `AIState._write_behavior_log()` writes behavioral JSONL; `compute_reward_components()` in `rewards.py` decomposes reward. All I/O is best-effort — training never crashes on log failures. Playing mode disables step log and TB writer.
+
+---
+
 ## 10. Future Enhancements
 - ~~**Double DQN**~~ — ✅ Implemented (now V-network DQN).
 - ✅ **Per-candidate evaluation** — V-network evaluates V(resulting_board) per valid placement.
@@ -422,6 +446,7 @@ first draw. Any key returns to the AI submenu.
 - ✅ **Soft-drop BFS** — SRS wall kicks + BFS candidate generation with move-sequence recording (overhangs, T-Spins).
 - ✅ **2-piece look-ahead** — Simulate best next-piece placement before evaluation.
 - ✅ **Feature normalization** — Standardize DT-20 features (mean/std) before network input.
+- ✅ **Observability infrastructure** — 5-tier instrumentation: enriched episode log (26 new fields), JSONL step log with rotation, behavioral JSONL, reward decomposition (`compute_reward_components`), TensorBoard integration.
 - **Self-Play Tournament** — run multiple AI agents in parallel, keep the
   best-performing model.
 - **Human Replay** — let a human play, record the session, and pre-train

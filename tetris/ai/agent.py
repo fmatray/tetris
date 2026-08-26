@@ -8,8 +8,10 @@ vectors, rewards, and done flags.
 
 from __future__ import annotations
 
+import json
 import random
 from collections import deque
+from pathlib import Path
 from typing import NamedTuple
 
 import numpy as np
@@ -63,6 +65,8 @@ class DQNAgent:
         buffer_size: int = 50_000,
         device: str = "auto",
         seed: int | None = None,
+        step_log_path: str | None = None,
+        tb_log_dir: str | None = None,
     ) -> None:
         """Initialize the DQN agent: network, target network, optimizer, buffer.
 
@@ -77,6 +81,8 @@ class DQNAgent:
             buffer_size: Replay buffer capacity.
             device: Torch device (``"auto"``, ``"cpu"``, or ``"cuda"``).
             seed: Random seed for reproducibility (``None`` = non-deterministic).
+            step_log_path: Path for per-step JSONL log (``None`` disables).
+            tb_log_dir: Directory for TensorBoard logs (``None`` disables).
         """
         self.state_size = state_size
         self.gamma = gamma
@@ -119,6 +125,24 @@ class DQNAgent:
         self.curriculum_level: int = 0
         self.curriculum_episode_count: int = 0
         self.last_loss: float = 0.0
+        # --- Observability ---
+        self.last_td_error_mean: float = 0.0
+        self.last_td_error_max: float = 0.0
+        self.last_grad_norm: float = 0.0
+        self.target_syncs: int = 0
+        self.last_v_spread: float = 0.0
+        self.last_v_margin: float = 0.0
+        self.last_action_was_random: bool = False
+        self.step_log_path = step_log_path
+        # TensorBoard writer (None if tensorboard not installed or tb_log_dir is None)
+        self._tb_writer = None
+        if tb_log_dir is not None:
+            try:
+                from torch.utils.tensorboard import SummaryWriter
+
+                self._tb_writer = SummaryWriter(tb_log_dir)
+            except ImportError:
+                pass  # tensorboard not installed — skip
 
     # --- Action selection -----------------------------------------------
 
@@ -136,16 +160,32 @@ class DQNAgent:
         """
         n = len(candidate_states)
         if random.random() < self.epsilon:
+            self.last_action_was_random = True
+            self.last_v_spread = 0.0
+            self.last_v_margin = 0.0
             if dellacherie_values is not None and len(dellacherie_values) == n:
                 # Warm-start: softmax over Dellacherie values (directed exploration)
                 probs = _softmax(dellacherie_values / WARM_START_TEMP)
                 return int(np.random.choice(n, p=probs))
             return random.randint(0, n - 1)
+        self.last_action_was_random = False
         self.online_net.eval()
         with torch.no_grad():
             states = torch.from_numpy(candidate_states).float().to(self.device)
             values = self.online_net(states).squeeze(-1)
-            return values.argmax(dim=0).item()
+            idx = values.argmax(dim=0).item()
+            vals_np = values.cpu().numpy()
+            if len(vals_np) >= 2:
+                sorted_vals = np.sort(vals_np)
+                self.last_v_spread = float(sorted_vals[-1] - sorted_vals[0])
+                self.last_v_margin = float(sorted_vals[-1] - sorted_vals[-2])
+            else:
+                self.last_v_spread = 0.0
+                self.last_v_margin = 0.0
+            if self._tb_writer is not None and self.steps > 0:
+                self._tb_writer.add_scalar("agent/v_spread", self.last_v_spread, self.steps)
+                self._tb_writer.add_scalar("agent/v_margin", self.last_v_margin, self.steps)
+            return idx
 
     # --- Learning --------------------------------------------------------
 
@@ -220,10 +260,13 @@ class DQNAgent:
             target_v = rewards_t + (self.gamma**n_steps_t) * target_v * (1 - dones_t)
 
         td_errors = (current_v - target_v).detach()
+        self.last_td_error_mean = td_errors.abs().mean().item()
+        self.last_td_error_max = td_errors.abs().max().item()
         loss = (self.loss_fn(current_v, target_v) * weights_t).mean()
         self.optimizer.zero_grad()
         loss.backward()
-        torch.nn.utils.clip_grad_norm_(self.online_net.parameters(), 1.0)
+        grad_norm = torch.nn.utils.clip_grad_norm_(self.online_net.parameters(), 1.0)
+        self.last_grad_norm = float(grad_norm)
         self.optimizer.step()
 
         # Update priorities based on TD errors
@@ -235,6 +278,21 @@ class DQNAgent:
         # LR scheduler: reduce LR if loss plateaus
         self.scheduler.step(self.last_loss)
 
+        # TensorBoard scalars
+        if self._tb_writer is not None:
+            self._tb_writer.add_scalar("train/loss", self.last_loss, self.steps)
+            self._tb_writer.add_scalar("train/td_error_mean", self.last_td_error_mean, self.steps)
+            self._tb_writer.add_scalar("train/td_error_max", self.last_td_error_max, self.steps)
+            self._tb_writer.add_scalar("train/grad_norm", self.last_grad_norm, self.steps)
+            self._tb_writer.add_scalar("train/lr", self.optimizer.param_groups[0]["lr"], self.steps)
+            self._tb_writer.add_scalar("train/buffer_fill", len(self.buffer), self.steps)
+            self._tb_writer.add_scalar("train/beta", self.buffer.beta, self.steps)
+            self._tb_writer.add_scalar("train/epsilon", self.epsilon, self.steps)
+
+        # Step-level JSONL log
+        if self.step_log_path is not None:
+            self._write_step_log()
+
         # Hard target sync every target_sync_freq steps
         self._sync_target()
 
@@ -244,6 +302,56 @@ class DQNAgent:
         """Hard-sync target network to online every target_sync_freq steps."""
         if self.steps % self.target_sync_freq == 0:
             self.target_net.load_state_dict(self.online_net.state_dict())
+            self.target_syncs += 1
+
+    def training_metrics(self) -> dict[str, float | int]:
+        """Snapshot of training dynamics for episode logging."""
+        return {
+            "lr": self.optimizer.param_groups[0]["lr"],
+            "buffer_fill": len(self.buffer),
+            "beta": self.buffer.beta,
+            "td_error_mean": self.last_td_error_mean,
+            "td_error_max": self.last_td_error_max,
+            "grad_norm": self.last_grad_norm,
+            "target_syncs": self.target_syncs,
+            "steps": self.steps,
+            "v_spread": self.last_v_spread,
+            "v_margin": self.last_v_margin,
+        }
+
+    STEP_LOG_MAX_LINES = 100_000
+
+    def _write_step_log(self) -> None:
+        """Append one JSONL line of step-level metrics. Rotate at max lines."""
+        entry = {
+            "step": self.steps,
+            "loss": self.last_loss,
+            "td_error_mean": self.last_td_error_mean,
+            "td_error_max": self.last_td_error_max,
+            "grad_norm": self.last_grad_norm,
+            "lr": self.optimizer.param_groups[0]["lr"],
+            "buffer_fill": len(self.buffer),
+            "beta": self.buffer.beta,
+            "epsilon": self.epsilon,
+        }
+        try:
+            assert self.step_log_path is not None  # guarded by caller
+            path = Path(self.step_log_path)
+            path.parent.mkdir(parents=True, exist_ok=True)
+            with open(path, "a") as f:
+                f.write(json.dumps(entry) + "\n")
+            # Rotate: keep last STEP_LOG_MAX_LINES
+            if self.steps % 1000 == 0 and path.exists():
+                lines = path.read_text().splitlines()
+                if len(lines) > self.STEP_LOG_MAX_LINES:
+                    path.write_text("\n".join(lines[-self.STEP_LOG_MAX_LINES :]) + "\n")
+        except OSError:
+            pass  # ponytail: step log is best-effort, training must not crash
+
+    def flush_logs(self) -> None:
+        """Flush TensorBoard writer."""
+        if self._tb_writer is not None:
+            self._tb_writer.flush()
 
     def advance_curriculum(self, max_level: int, freq: int) -> bool:
         """Advance curriculum level if enough episodes elapsed.
@@ -275,6 +383,7 @@ class DQNAgent:
                 "curriculum_level": self.curriculum_level,
                 "curriculum_episode_count": self.curriculum_episode_count,
                 "beta": self.buffer.beta,
+                "target_syncs": self.target_syncs,
             },
             path,
         )
@@ -291,4 +400,5 @@ class DQNAgent:
         self.steps = checkpoint.get("steps", 0)
         self.curriculum_level = checkpoint.get("curriculum_level", 0)
         self.curriculum_episode_count = checkpoint.get("curriculum_episode_count", 0)
+        self.target_syncs = checkpoint.get("target_syncs", 0)
         self.buffer.beta = checkpoint.get("beta", self.buffer.beta)

@@ -16,9 +16,15 @@ from tetris.logger import get_logger
 from tetris.settings import LOG_PATH
 
 
-class EpisodeRecord(TypedDict):
-    """A single episode's training metrics for the log."""
+class EpisodeRecord(TypedDict, total=False):
+    """A single episode's training metrics for the log.
 
+    Required fields are always present; optional fields are populated
+    by the observability instrumentation and default to 0/0.0 when
+    reading older logs.
+    """
+
+    # Required
     episode: int
     score: int
     lines: int
@@ -28,6 +34,37 @@ class EpisodeRecord(TypedDict):
     loss: float
     timestamp: str
     seed: int
+    # Training dynamics
+    avg_loss: float
+    max_td_error: float
+    avg_td_error: float
+    lr: float
+    buffer_fill: int
+    grad_norm: float
+    target_syncs: int
+    beta: float
+    # Network behavior
+    avg_v_spread: float
+    avg_v_margin: float
+    # Agent behavior
+    avg_candidates: float
+    n_random: int
+    n_greedy: int
+    n_hold: int
+    avg_move_len: float
+    # Reward
+    avg_reward: float
+    curriculum_level: int
+    # Reward decomposition (per-component averages)
+    reward_lines: float
+    reward_holes_delta: float
+    reward_overhangs: float
+    reward_height: float
+    reward_bumpiness: float
+    reward_wells: float
+    reward_survival: float
+    reward_pbrs: float
+    reward_game_over: float
 
 
 class TrainingLog:
@@ -65,9 +102,16 @@ class TrainingLog:
         epsilon: float,
         loss: float,
         seed: int,
+        **extra: Any,
     ) -> None:
-        """Append an episode record and persist to disk."""
-        entry: EpisodeRecord = {
+        """Append an episode record and persist to disk.
+
+        The 9 positional args are the original required fields. Any
+        additional observability fields pass through ``**extra`` and
+        are merged into the entry dict. Backward-compatible: callers
+        that pass only the 9 original args work unchanged.
+        """
+        entry: dict[str, Any] = {
             "episode": episode,
             "score": score,
             "lines": lines,
@@ -78,7 +122,8 @@ class TrainingLog:
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "seed": seed,
         }
-        self.episodes.append(dict(entry))
+        entry.update(extra)
+        self.episodes.append(entry)
         if len(self.episodes) % self._SAVE_INTERVAL == 0:
             self._save()
 

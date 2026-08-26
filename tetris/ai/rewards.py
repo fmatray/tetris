@@ -569,3 +569,69 @@ def compute_reward(
     reward += PBRS_SCALE * (gamma * phi_new - phi_prev)
 
     return reward
+
+
+def compute_reward_components(
+    lines_cleared: int,
+    prev_grid: np.ndarray,
+    new_grid: np.ndarray,
+    game_over: bool,
+    step_survived: bool,
+    gamma: float = 0.97,
+) -> dict[str, float]:
+    """Decompose the reward into named components for analysis.
+
+    Returns the same total as :func:`compute_reward` but split into
+    components so analysis can see which signal dominates.
+    """
+    if game_over:
+        phi_prev = dellacherie_value(prev_grid)
+        phi_new = dellacherie_value(new_grid)
+        pbrs = PBRS_SCALE * (gamma * phi_new - phi_prev)
+        return {
+            "lines": 0.0,
+            "holes_delta": 0.0,
+            "overhangs": 0.0,
+            "height": 0.0,
+            "bumpiness": 0.0,
+            "wells": 0.0,
+            "survival": 0.0,
+            "pbrs": pbrs,
+            "game_over": -GAME_OVER_PENALTY,
+        }
+
+    prev_mask, prev_fr, _ = compute_height_metrics(prev_grid)
+    new_mask, new_fr, new_heights = compute_height_metrics(new_grid)
+
+    lines = LINE_CLEAR_REWARD * lines_cleared + LINE_CLEAR_BONUS * lines_cleared * lines_cleared
+
+    old_holes = count_holes(prev_grid, prev_mask, prev_fr)
+    new_holes = count_holes(new_grid, new_mask, new_fr)
+    holes_created = max(0, new_holes - old_holes)
+    holes_delta = -(HOLE_CREATED_PENALTY * holes_created + HOLE_TOTAL_PENALTY * new_holes)
+
+    old_overhangs = count_overhangs(prev_grid, prev_mask, prev_fr)
+    new_overhangs = count_overhangs(new_grid, new_mask, new_fr)
+    overhangs_created = max(0, new_overhangs - old_overhangs)
+    overhangs = -(OVERHANG_CREATED_PENALTY * overhangs_created + OVERHANG_TOTAL_PENALTY * new_overhangs)
+
+    height = -HEIGHT_PENALTY * aggregate_height(new_grid, new_heights)
+    bumps = -BUMPINESS_PENALTY * bumpiness(new_grid, new_heights)
+    well_pen = -WELL_PENALTY * wells(new_grid, new_heights)
+    survival = SURVIVAL_REWARD if step_survived else 0.0
+
+    phi_prev = dellacherie_value(prev_grid, mask=prev_mask, first_row=prev_fr)
+    phi_new = dellacherie_value(new_grid, new_heights, new_mask, new_fr)
+    pbrs = PBRS_SCALE * (gamma * phi_new - phi_prev)
+
+    return {
+        "lines": lines,
+        "holes_delta": holes_delta,
+        "overhangs": overhangs,
+        "height": height,
+        "bumpiness": bumps,
+        "wells": well_pen,
+        "survival": survival,
+        "pbrs": pbrs,
+        "game_over": 0.0,
+    }

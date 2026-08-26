@@ -402,7 +402,6 @@ classDiagram
             +learn_per_action: int
             +lookahead: bool
             +lookahead_depth: int
-            +soft_drop: bool
             - _candidate_placements: list~Placement~
             - _handicap: int
             +seed: int | None
@@ -424,7 +423,9 @@ classDiagram
             - _lock_and_spawn(hard_drop: bool) tuple~int, list~
             +update(dt: float, particles: ParticleSystem) State | None
             - _on_episode_end() State | None
+            - _ep_avg(values: list~float~) float
             - _log_and_learn() None
+            - _write_behavior_log() None
             - _reset_episode() None
             - _apply_epsilon_policy() None
             +draw(screen: pygame.Surface, particles: ParticleSystem | None) None
@@ -439,8 +440,6 @@ classDiagram
         %% Module-level function: draw_ai_hud(ai_state) -> None
         %% Module-level function: _hud_table_rows(log, stats, episode_steps: int) -> list
         %% Module-level function: _trend_arrow(trend: str) -> str
-            - _on_exit() None
-        }
 
         class GameOverState {
             +screen: pygame.Surface
@@ -733,7 +732,16 @@ classDiagram
             +scheduler: optim.lr_scheduler.ReduceLROnPlateau
             +curriculum_level: int
             +curriculum_episode_count: int
-            +__init__(state_size, lr, gamma, epsilon_start, epsilon_end, epsilon_decay, batch_size, buffer_size, device, seed) None
+            +step_log_path: str | None
+            - _tb_writer: SummaryWriter | None
+            +last_td_error_mean: float
+            +last_td_error_max: float
+            +last_grad_norm: float
+            +target_syncs: int
+            +last_v_spread: float
+            +last_v_margin: float
+            +last_action_was_random: bool
+            +__init__(state_size, lr, gamma, epsilon_start, epsilon_end, epsilon_decay, batch_size, buffer_size, device, seed, step_log_path, tb_log_dir) None
             +select_action(candidate_states: np.ndarray, dellacherie_values: np.ndarray | None) int
             +store(state: np.ndarray, action: int, reward: float, next_state: np.ndarray, done: bool) None
             - _push_n_step() None
@@ -744,6 +752,9 @@ classDiagram
             +advance_curriculum(max_level: int, freq: int) bool
             +save(path: str) None
             +load(path: str) None
+            +training_metrics() dict
+            - _write_step_log() None
+            +flush_logs() None
         }
         %% Module-level function: _softmax(x: np.ndarray) -> np.ndarray
         %% Module-level constants: WARM_START_TEMP, N_STEP

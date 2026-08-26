@@ -691,3 +691,62 @@ def test_extract_features_batch_preserves_input():
     extract_features_batch(stacked, lines, piece_types)
     original = np.stack(grids).astype(np.float32)
     assert np.array_equal(stacked, original)
+
+
+# --- Reward decomposition tests ------------------------------------------
+
+
+from tetris.ai.rewards import compute_reward_components
+
+
+def test_reward_components_sum_matches_compute_reward_normal():
+    """Component sum equals compute_reward for non-game-over transitions."""
+    grid0 = np.zeros((BOARD_HEIGHT, BOARD_WIDTH), dtype=np.uint8)
+    grid1 = grid0.copy()
+    grid1[0, 3] = 1  # one block placed
+    for lines in [0, 1, 2, 3, 4]:
+        r = compute_reward(lines, grid0, grid1, game_over=False, step_survived=True)
+        c = sum(compute_reward_components(lines, grid0, grid1, game_over=False, step_survived=True).values())
+        assert abs(r - c) < 0.01, f"lines={lines}: {r} != {c}"
+
+
+def test_reward_components_sum_matches_compute_reward_game_over():
+    """Component sum equals compute_reward for game-over transitions."""
+    grid0 = np.zeros((BOARD_HEIGHT, BOARD_WIDTH), dtype=np.uint8)
+    grid1 = grid0.copy()
+    grid1[0, 0] = 1
+    r = compute_reward(0, grid0, grid1, game_over=True, step_survived=False)
+    c = sum(compute_reward_components(0, grid0, grid1, game_over=True, step_survived=False).values())
+    assert abs(r - c) < 0.01, f"{r} != {c}"
+
+
+def test_reward_components_returns_expected_keys():
+    """compute_reward_components returns all 9 expected keys."""
+    grid0 = np.zeros((BOARD_HEIGHT, BOARD_WIDTH), dtype=np.uint8)
+    grid1 = grid0.copy()
+    grid1[0, 3] = 1
+    comps = compute_reward_components(0, grid0, grid1, game_over=False, step_survived=True)
+    expected = {
+        "lines",
+        "holes_delta",
+        "overhangs",
+        "height",
+        "bumpiness",
+        "wells",
+        "survival",
+        "pbrs",
+        "game_over",
+    }
+    assert set(comps.keys()) == expected
+
+
+def test_reward_components_game_over_only_pbrs_and_penalty():
+    """On game_over, only pbrs and game_over are non-zero."""
+    grid0 = np.zeros((BOARD_HEIGHT, BOARD_WIDTH), dtype=np.uint8)
+    grid1 = grid0.copy()
+    grid1[0, 0] = 1
+    comps = compute_reward_components(0, grid0, grid1, game_over=True, step_survived=False)
+    assert comps["game_over"] < 0
+    assert comps["lines"] == 0.0
+    assert comps["survival"] == 0.0
+    assert comps["height"] == 0.0

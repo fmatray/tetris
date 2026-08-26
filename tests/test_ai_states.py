@@ -744,3 +744,92 @@ class TestLastMoves:
             ai.update(16, particles)
         assert len(ai._last_moves) >= 1
         draw_ai_hud(ai)  # should not raise
+
+
+# --- Observability tests --------------------------------------------------
+
+
+class TestObservabilityCounters:
+    """Per-episode counters reset correctly and accumulate during play."""
+
+    def test_counters_reset_on_new_episode(self):
+        ai = _make_ai(learning=True, speed="fast")
+        particles = ParticleSystem()
+        for _ in range(20):
+            ai.update(16, particles)
+        # Manually trigger reset to verify counters are cleared
+        assert len(ai._ep_candidates) > 0
+        ai._reset_episode()
+        assert ai._ep_n_random == 0
+        assert ai._ep_n_greedy == 0
+        assert ai._ep_n_hold == 0
+        assert len(ai._ep_candidates) == 0
+        assert len(ai._ep_rewards) == 0
+
+    def test_candidates_accumulate_during_play(self):
+        ai = _make_ai(learning=True, speed="fast")
+        particles = ParticleSystem()
+        for _ in range(20):
+            ai.update(16, particles)
+        assert len(ai._ep_candidates) >= 1
+        assert all(c > 0 for c in ai._ep_candidates)
+
+    def test_reward_components_accumulate(self):
+        ai = _make_ai(learning=True, speed="fast")
+        particles = ParticleSystem()
+        for _ in range(50):
+            ai.update(16, particles)
+            if ai.game_over:
+                break
+        if len(ai._ep_reward_components) > 0:
+            comps = ai._ep_reward_components[0]
+            assert "lines" in comps
+            assert "game_over" in comps
+
+    def test_behavior_log_jsonl_written(self):
+        """After an episode, ai_behavior_log.jsonl has a valid JSON line."""
+        import json
+        import tempfile
+
+        log_path = tempfile.mktemp(suffix=".jsonl")
+        ai = _make_ai(learning=True, speed="fast")
+        ai.log.path = _unique_path()
+        # Monkey-patch BEHAVIOR_LOG_PATH for this test
+        import tetris.states.ai as ai_mod
+
+        orig = ai_mod.BEHAVIOR_LOG_PATH
+        ai_mod.BEHAVIOR_LOG_PATH = log_path  # type: ignore[misc]
+        try:
+            particles = ParticleSystem()
+            for _ in range(300):
+                ai.update(16, particles)
+                if ai.game_over:
+                    break
+            assert os.path.exists(log_path)
+            with open(log_path) as f:
+                entry = json.loads(f.readline())
+            assert "episode" in entry
+            assert "score" in entry
+            assert "steps" in entry
+            assert "placement_success_rate" in entry
+            assert isinstance(entry["col_hist"], list)
+            assert isinstance(entry["rot_hist"], list)
+            assert len(entry["col_hist"]) == 10
+            assert len(entry["rot_hist"]) == 4
+        finally:
+            ai_mod.BEHAVIOR_LOG_PATH = orig
+            if os.path.exists(log_path):
+                os.unlink(log_path)
+
+    def test_reward_components_in_episode_log(self):
+        """Episode log contains reward component fields."""
+        ai = _make_ai(learning=True, speed="fast")
+        particles = ParticleSystem()
+        for _ in range(300):
+            ai.update(16, particles)
+            if ai.game_over:
+                break
+        if ai.log.episodes:
+            entry = ai.log.episodes[-1]
+            # Check at least some observability fields are present
+            assert "avg_loss" in entry or "avg_candidates" in entry

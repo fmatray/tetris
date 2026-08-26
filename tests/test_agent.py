@@ -487,3 +487,148 @@ def test_lr_scheduler_reduces_lr_on_plateau():
         agent.scheduler.step(1.0)
     reduced_lr = agent.optimizer.param_groups[0]["lr"]
     assert reduced_lr < initial_lr
+
+
+# --- Observability tests --------------------------------------------------
+
+
+def test_learn_sets_td_error_metrics():
+    """After learn() with batch≥4, td_error_mean and td_error_max are set."""
+    agent = DQNAgent(batch_size=4)
+    for i in range(8):
+        agent.store(_state(i), 0, float(i), _state(i + 1), done=False)
+    agent.learn()
+    assert agent.last_td_error_mean > 0
+    assert agent.last_td_error_max > 0
+
+
+def test_learn_sets_grad_norm():
+    """After learn(), grad_norm is a non-negative float."""
+    agent = DQNAgent(batch_size=4)
+    for i in range(8):
+        agent.store(_state(i), 0, float(i), _state(i + 1), done=False)
+    agent.learn()
+    assert agent.last_grad_norm >= 0
+
+
+def test_target_sync_increments_counter():
+    """target_syncs increments when steps hit target_sync_freq."""
+    agent = DQNAgent(batch_size=4, seed=42)
+    agent.target_sync_freq = 2
+    for i in range(8):
+        agent.store(_state(i), 0, float(i), _state(i + 1), done=False)
+    agent.learn()
+    assert agent.target_syncs == 0  # steps=1, not yet 2
+    agent.learn()
+    assert agent.target_syncs == 1  # steps=2, sync fires
+
+
+def test_select_action_sets_v_spread_greedy():
+    """With epsilon=0, select_action computes V-value spread and margin."""
+    agent = DQNAgent(seed=42)
+    agent.epsilon = 0.0
+    states = np.array([_state(i) for i in range(5)], dtype=np.float32)
+    agent.select_action(states)
+    assert agent.last_v_spread >= 0
+    assert agent.last_v_margin >= 0
+    assert not agent.last_action_was_random
+
+
+def test_select_action_zero_spread_on_random():
+    """With epsilon=1.0, V-value spread is 0 (no network eval)."""
+    agent = DQNAgent(seed=42)
+    agent.epsilon = 1.0
+    states = np.array([_state(i) for i in range(5)], dtype=np.float32)
+    agent.select_action(states)
+    assert agent.last_v_spread == 0.0
+    assert agent.last_v_margin == 0.0
+    assert agent.last_action_was_random
+
+
+def test_training_metrics_returns_all_fields():
+    """training_metrics() returns all expected keys."""
+    agent = DQNAgent(seed=42)
+    tm = agent.training_metrics()
+    expected = {
+        "lr",
+        "buffer_fill",
+        "beta",
+        "td_error_mean",
+        "td_error_max",
+        "grad_norm",
+        "target_syncs",
+        "steps",
+        "v_spread",
+        "v_margin",
+    }
+    assert expected.issubset(tm.keys())
+
+
+def test_step_log_writes_jsonl():
+    """Step log writes valid JSONL with expected keys."""
+    import json
+    import tempfile
+
+    log_path = tempfile.mktemp(suffix=".jsonl")
+    agent = DQNAgent(batch_size=4, seed=42, step_log_path=log_path)
+    for i in range(8):
+        agent.store(_state(i), 0, float(i), _state(i + 1), done=False)
+    agent.learn()
+    with open(log_path) as f:
+        line = json.loads(f.readline())
+    assert line["step"] == 1
+    assert "loss" in line
+    assert "td_error_mean" in line
+    assert "lr" in line
+    assert "buffer_fill" in line
+    assert "epsilon" in line
+
+
+def test_step_log_rotation():
+    """Step log rotates to keep only STEP_LOG_MAX_LINES lines."""
+    import tempfile
+
+    log_path = tempfile.mktemp(suffix=".jsonl")
+    agent = DQNAgent(batch_size=4, seed=42, step_log_path=log_path)
+    agent.STEP_LOG_MAX_LINES = 3
+    for batch_start in range(5):
+        for i in range(8):
+            agent.store(_state(batch_start * 10 + i), 0, float(i), _state(batch_start * 10 + i + 1), done=False)
+        # Force rotation check by setting steps to multiple of 1000
+        agent.steps = batch_start * 1000
+        agent._write_step_log()
+    with open(log_path) as f:
+        lines = f.readlines()
+    assert len(lines) <= agent.STEP_LOG_MAX_LINES
+
+
+def test_save_load_persists_target_syncs():
+    """target_syncs is saved and loaded from checkpoint."""
+    import tempfile
+
+    agent = DQNAgent(batch_size=4, seed=42)
+    agent.target_syncs = 5
+    path = tempfile.mktemp(suffix=".pt")
+    agent.save(path)
+    agent2 = DQNAgent(batch_size=4, seed=42)
+    agent2.load(path)
+    assert agent2.target_syncs == 5
+
+
+def test_tensorboard_writer_none_by_default():
+    """Without tb_log_dir, _tb_writer is None."""
+    agent = DQNAgent(seed=42)
+    assert agent._tb_writer is None
+
+
+def test_tensorboard_writer_created_with_dir():
+    """With tb_log_dir, _tb_writer is created (if tensorboard installed)."""
+    import tempfile
+
+    try:
+        tb_dir = tempfile.mktemp(suffix="_tb")
+        agent = DQNAgent(seed=42, tb_log_dir=tb_dir)
+        assert agent._tb_writer is not None
+        agent.flush_logs()
+    except ImportError:
+        pass  # tensorboard not installed
