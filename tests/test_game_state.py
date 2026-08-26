@@ -101,6 +101,16 @@ def test_handle_event_mute_calls_audio():
     assert game.audio.muted
 
 
+def test_handle_event_d_toggles_debug():
+    game = _make_game()
+    assert not game.debug
+    game.handle_event(_key_down(pygame.K_d))
+    new_val = bool(game.debug)
+    assert new_val, "K_d should enable debug"
+    game.handle_event(_key_down(pygame.K_d))
+    assert not bool(game.debug), "second K_d should disable debug"
+
+
 def test_handle_event_esc_returns_menu():
     game = _make_game()
     result = game.handle_event(_key_down(pygame.K_ESCAPE))

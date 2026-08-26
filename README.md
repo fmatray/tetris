@@ -30,7 +30,7 @@ Un jeu Tetris complet développé en Python avec Pygame, incluant des effets vis
 
 ### Débogage
 
-- ✅ **Mode Débogage** : Option activable dans le menu principal (Débogage ON/OFF). Journalise les événements de jeu (apparition de pièces, verrouillage, fin de partie, épisodes IA, curriculum) dans `data/debug.log` via Python `logging`. Visualise le contenu restant du sac 7-bag (pièces colorées avec lettres) à droite de l'aperçu de la prochaine pièce.
+- ✅ **Mode Débogage** : Option activable dans le menu principal (Débogage ON/OFF). Journalise les événements de jeu (apparition de pièces, verrouillage, fin de partie, épisodes IA, curriculum) dans `data/debug.log` via Python `logging`. Visualise le contenu restant du sac 7-bag (pièces colorées avec lettres) à droite de l'aperçu de la prochaine pièce. Pendant le jeu, la touche **`d`** active/désactive l'overlay visuel de débogage (Humain, IA, MCP).
 
 ### Expérience utilisateur
 - ✅ Menu de démarrage avec sélection du joueur (Humain/IA), du son, du générateur (Aléatoire/7-bag), du débogage (ON/OFF), et sous-menus dédiés.

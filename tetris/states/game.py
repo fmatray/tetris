@@ -347,6 +347,8 @@ class GameState(State):
         if event.type == pygame.KEYDOWN:
             if event.key == self._mute_key:
                 self.audio.toggle_mute()
+            elif event.key == pygame.K_d:
+                self.debug = not self.debug
             elif event.key == pygame.K_ESCAPE:
                 self.audio.stop_music()
                 self.pieces.save()
