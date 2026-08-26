@@ -414,31 +414,31 @@ def _make_hyperparam(ai_menu=None):
 
 
 def test_hyperparam_options_count():
-    assert len(HyperparamMenuState._OPTIONS) == 16
+    assert len(HyperparamMenuState._OPTIONS) == 19
 
 
 def test_hyperparam_toggle_indices():
-    assert HyperparamMenuState._toggle_indices == frozenset(range(14))
+    assert HyperparamMenuState._toggle_indices == frozenset({1, 2, 3, 5, 6, 7, 8, 9, 11, 12, 13, 15, 16})
 
 
 def test_hyperparam_value_labels():
     state = _make_hyperparam()
-    assert state._value_label(0) == f"{state.menu.ai_epsilon_decay:.4f}"
-    assert state._value_label(1) == f"{state.menu.ai_epsilon_end:.2f}"
-    assert state._value_label(3) == f"{state.menu.ai_gamma:.3f}"
-    assert state._value_label(4) == str(state.menu.ai_batch_size)
-    assert state._value_label(5) == f"{state.menu.ai_buffer_size:,}"
-    assert state._value_label(6) == "OFF"
-    assert state._value_label(9) == "ON"
-    assert state._value_label(13) == "ON"
-    assert state._value_label(14) == ""  # Réinitialiser
-    assert state._value_label(15) == ""  # Retour
+    assert state._value_label(1) == f"{state.menu.ai_epsilon_decay:.4f}"
+    assert state._value_label(2) == f"{state.menu.ai_epsilon_end:.2f}"
+    assert state._value_label(6) == f"{state.menu.ai_gamma:.3f}"
+    assert state._value_label(7) == str(state.menu.ai_batch_size)
+    assert state._value_label(8) == f"{state.menu.ai_buffer_size:,}"
+    assert state._value_label(11) == "OFF"
+    assert state._value_label(3) == "ON"
+    assert state._value_label(15) == "ON"
+    assert state._value_label(17) == ""  # Réinitialiser
+    assert state._value_label(18) == ""  # Retour
 
 
 def test_hyperparam_toggle_epsilon_decay_up():
     state = _make_hyperparam()
     original = state.menu.ai_epsilon_decay
-    state.selection = 0
+    state.selection = 1
     state._toggle(1)
     assert state.menu.ai_epsilon_decay == round(min(0.9999, original + 0.0001), 4)
 
@@ -446,7 +446,7 @@ def test_hyperparam_toggle_epsilon_decay_up():
 def test_hyperparam_toggle_epsilon_decay_clamp_high():
     state = _make_hyperparam()
     state.menu.ai_epsilon_decay = 0.9999
-    state.selection = 0
+    state.selection = 1
     state._toggle(1)
     assert state.menu.ai_epsilon_decay == 0.9999
 
@@ -454,7 +454,7 @@ def test_hyperparam_toggle_epsilon_decay_clamp_high():
 def test_hyperparam_toggle_epsilon_decay_clamp_low():
     state = _make_hyperparam()
     state.menu.ai_epsilon_decay = 0.990
-    state.selection = 0
+    state.selection = 1
     state._toggle(-1)
     assert state.menu.ai_epsilon_decay == 0.990
 
@@ -462,7 +462,7 @@ def test_hyperparam_toggle_epsilon_decay_clamp_low():
 def test_hyperparam_toggle_epsilon_end_clamp():
     state = _make_hyperparam()
     state.menu.ai_epsilon_end = 0.10
-    state.selection = 1
+    state.selection = 2
     state._toggle(1)
     assert state.menu.ai_epsilon_end == 0.10
     state.menu.ai_epsilon_end = 0.02
@@ -472,14 +472,14 @@ def test_hyperparam_toggle_epsilon_end_clamp():
 
 def test_hyperparam_toggle_lr_up():
     state = _make_hyperparam()
-    state.selection = 2
+    state.selection = 5
     state._toggle(1)
     assert state.menu.ai_lr == state.menu.ai_lr  # just check no crash
 
 
 def test_hyperparam_toggle_lr_down():
     state = _make_hyperparam()
-    state.selection = 2
+    state.selection = 5
     state._toggle(-1)
     # lr should decrease by factor of 10
     assert state.menu.ai_lr <= 1e-3
@@ -488,7 +488,7 @@ def test_hyperparam_toggle_lr_down():
 def test_hyperparam_toggle_gamma_clamp():
     state = _make_hyperparam()
     state.menu.ai_gamma = 0.99
-    state.selection = 3
+    state.selection = 6
     state._toggle(1)
     assert state.menu.ai_gamma == 0.99
     state.menu.ai_gamma = 0.80
@@ -499,7 +499,7 @@ def test_hyperparam_toggle_gamma_clamp():
 def test_hyperparam_toggle_batch_size_clamp():
     state = _make_hyperparam()
     state.menu.ai_batch_size = 256
-    state.selection = 4
+    state.selection = 7
     state._toggle(1)
     assert state.menu.ai_batch_size == 256
     state.menu.ai_batch_size = 8
@@ -510,7 +510,7 @@ def test_hyperparam_toggle_batch_size_clamp():
 def test_hyperparam_toggle_buffer_size_clamp():
     state = _make_hyperparam()
     state.menu.ai_buffer_size = 200_000
-    state.selection = 5
+    state.selection = 8
     state._toggle(1)
     assert state.menu.ai_buffer_size == 200_000
     state.menu.ai_buffer_size = 1_000
@@ -521,7 +521,7 @@ def test_hyperparam_toggle_buffer_size_clamp():
 def test_hyperparam_toggle_curriculum_bool():
     state = _make_hyperparam()
     original = state.menu.ai_curriculum
-    state.selection = 6
+    state.selection = 11
     state._toggle(1)
     assert state.menu.ai_curriculum is not original
 
@@ -529,7 +529,7 @@ def test_hyperparam_toggle_curriculum_bool():
 def test_hyperparam_toggle_curriculum_freq_clamp():
     state = _make_hyperparam()
     state.menu.ai_curriculum_freq = 2000
-    state.selection = 7
+    state.selection = 12
     state._toggle(1)
     assert state.menu.ai_curriculum_freq == 2000
     state.menu.ai_curriculum_freq = 10
@@ -540,7 +540,7 @@ def test_hyperparam_toggle_curriculum_freq_clamp():
 def test_hyperparam_toggle_curriculum_epsilon_cycle():
     state = _make_hyperparam()
     state.menu.ai_curriculum_epsilon = "reset"
-    state.selection = 8
+    state.selection = 13
     state._toggle(1)
     assert state.menu.ai_curriculum_epsilon == "boost"
     state._toggle(1)
@@ -552,7 +552,7 @@ def test_hyperparam_toggle_curriculum_epsilon_cycle():
 def test_hyperparam_toggle_warm_start_bool():
     state = _make_hyperparam()
     original = state.menu.ai_warm_start
-    state.selection = 9
+    state.selection = 3
     state._toggle(1)
     assert state.menu.ai_warm_start is not original
 
@@ -560,7 +560,7 @@ def test_hyperparam_toggle_warm_start_bool():
 def test_hyperparam_toggle_learn_per_action_clamp():
     state = _make_hyperparam()
     state.menu.ai_learn_per_action = 8
-    state.selection = 10
+    state.selection = 9
     state._toggle(1)
     assert state.menu.ai_learn_per_action == 8
     state.menu.ai_learn_per_action = 1
@@ -571,7 +571,7 @@ def test_hyperparam_toggle_learn_per_action_clamp():
 def test_hyperparam_toggle_lookahead_bool():
     state = _make_hyperparam()
     original = state.menu.ai_lookahead
-    state.selection = 11
+    state.selection = 15
     state._toggle(1)
     assert state.menu.ai_lookahead is not original
 
@@ -579,7 +579,7 @@ def test_hyperparam_toggle_lookahead_bool():
 def test_hyperparam_toggle_lookahead_depth_clamp():
     state = _make_hyperparam()
     state.menu.ai_lookahead_depth = 3
-    state.selection = 12
+    state.selection = 16
     state._toggle(1)
     assert state.menu.ai_lookahead_depth == 3
     state.menu.ai_lookahead_depth = 1
@@ -587,18 +587,10 @@ def test_hyperparam_toggle_lookahead_depth_clamp():
     assert state.menu.ai_lookahead_depth == 1
 
 
-def test_hyperparam_toggle_soft_drop_bool():
-    state = _make_hyperparam()
-    original = state.menu.ai_soft_drop
-    state.selection = 13
-    state._toggle(1)
-    assert state.menu.ai_soft_drop is not original
-
-
 def test_hyperparam_select_retour_returns_ai_menu():
     ai_menu = _make_ai_menu()
     state = _make_hyperparam(ai_menu)
-    state.selection = 15
+    state.selection = 18
     result = state._on_select()
     assert result is ai_menu
 
@@ -610,7 +602,7 @@ def test_hyperparam_select_reset_restores_defaults():
     state.menu.ai_epsilon_decay = 0.990
     state.menu.ai_batch_size = 8
     state.menu.ai_curriculum = True
-    state.selection = 14
+    state.selection = 17
     state._on_select()
     assert state.menu.ai_epsilon_decay == HyperparamMenuState._DEFAULTS["ai_epsilon_decay"]
     assert state.menu.ai_batch_size == HyperparamMenuState._DEFAULTS["ai_batch_size"]

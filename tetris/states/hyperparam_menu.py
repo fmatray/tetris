@@ -3,7 +3,7 @@
 Nested under the AI menu (Apprentissage entry). Exposes the DQN
 hyperparameters that are configurable at runtime via left/right
 toggles.  Rendered as a multi-column table (param, current, min,
-max, step, explanation).
+max, step, explanation) grouped by category.
 """
 
 from __future__ import annotations
@@ -23,48 +23,61 @@ from tetris.visuals.fonts import (
     get_large_font,
 )
 
+# Option indices that are category headers (non-selectable, non-toggleable).
+_HEADERS: frozenset[int] = frozenset()
+
 
 class HyperparamMenuState(MenuBase):
     """AI learning sub-menu: DQN learning params, reset, back."""
 
     _title = "Apprentissage"
 
+    # Category headers are uppercase, rendered as section separators.
+    # Non-header options are toggleable or selectable.
     _OPTIONS = (
-        "Epsilon decay",
-        "Epsilon fin",
-        "Learning rate",
-        "Gamma",
-        "Batch size",
-        "Buffer size",
-        "Curriculum",
-        "Fréq. curriculum",
-        "Epsilon curr.",
-        "Warm-start",
-        "Maj. par pièce",
-        "Look-ahead",
-        "Prof. lookahead",
-        "Soft-drop",
-        "Réinitialiser",
-        "Retour",
+        "EXPLORATION",  # 0  header
+        "Epsilon decay",  # 1  toggle
+        "Epsilon fin",  # 2  toggle
+        "Warm-start",  # 3  toggle
+        "APPRENTISSAGE",  # 4  header
+        "Learning rate",  # 5  toggle
+        "Gamma",  # 6  toggle
+        "Batch size",  # 7  toggle
+        "Buffer size",  # 8  toggle
+        "Maj. par pièce",  # 9  toggle
+        "CURRICULUM",  # 10 header
+        "Curriculum",  # 11 toggle
+        "Fréq. curriculum",  # 12 toggle
+        "Epsilon curr.",  # 13 toggle
+        "JEU",  # 14 header
+        "Look-ahead",  # 15 toggle
+        "Prof. lookahead",  # 16 toggle
+        "Réinitialiser",  # 17 select
+        "Retour",  # 18 select
     )
-    _toggle_indices = frozenset({0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13})
+    _header_indices: ClassVar[frozenset[int]] = frozenset({0, 4, 10, 14})
+    _toggle_indices = frozenset({1, 2, 3, 5, 6, 7, 8, 9, 11, 12, 13, 15, 16})
 
-    # Per-param metadata: (min, max, step, explanation)
+    # Per-param metadata: (min, max, step, explanation). Headers and
+    # action rows use empty strings.
     _PARAM_META: ClassVar[tuple[tuple[str, str, str, str], ...]] = (
+        ("", "", "", ""),  # EXPLORATION header
         ("0.990", "0.9999", "0.0001", "Décroissance d'epsilon. ↑ = exploration plus longue, apprentissage plus lent"),
         ("0.02", "0.10", "0.01", "Epsilon minimal. ↑ = plus d'exploration résiduelle, moins de convergence"),
+        ("OFF", "ON", "ON/OFF", "Exploration dirigée par heuristique Dellacherie (warm-start)"),
+        ("", "", "", ""),  # APPRENTISSAGE header
         ("1e-6", "1e-2", "x10", "Taux d'apprentissage Adam. ↑ = apprentissage plus rapide mais instable"),
         ("0.80", "0.99", "0.01", "Actualisation récompenses futures. ↑ = long terme, ↓ = court terme"),
         ("8", "256", "8", "Taille du mini-batch. ↑ = gradients plus stables mais plus de mémoire"),
         ("1000", "200000", "5000", "Capacité du replay buffer. ↑ = plus de diversité, moins de corrélation"),
+        ("1", "8", "1", "Mises à jour gradient par pièce verrouillée"),
+        ("", "", "", ""),  # CURRICULUM header
         ("OFF", "ON", "ON/OFF", "Apprentissage progressif: O → +I → +L → +J → +T → +S → +Z"),
         ("10", "2000", "10", "Épisodes entre ajout de pièce (curriculum)"),
         ("reset", "decay", "", "Epsilon à l'ajout: reset=1.0, boost=0.5, decay=normal"),
-        ("OFF", "ON", "ON/OFF", "Exploration dirigée par heuristique Dellacherie (warm-start)"),
-        ("1", "8", "1", "Mises à jour gradient par pièce verrouillée"),
+        ("", "", "", ""),  # JEU header
         ("OFF", "ON", "ON/OFF", "Anticipation 2 pièces: simule le meilleur placement de la pièce suivante"),
         ("1", "3", "1", "Profondeur d'anticipation: 1=une pièce, 3=trois pièces"),
-        ("OFF", "ON", "ON/OFF", "Recherche BFS: placements en glissé (surplombs, T-Spins)"),
         ("", "", "", ""),  # Réinitialiser
         ("", "", "", ""),  # Retour
     )
@@ -82,7 +95,6 @@ class HyperparamMenuState(MenuBase):
         "ai_warm_start": True,
         "ai_lookahead": True,
         "ai_lookahead_depth": 3,
-        "ai_soft_drop": True,
     }
 
     def __init__(self, screen, font, audio, ai_menu) -> None:
@@ -96,68 +108,79 @@ class HyperparamMenuState(MenuBase):
 
     # --- Hooks ----------------------------------------------------------
 
-    _VALUE_SPECS: ClassVar[list[tuple[str, Any]]] = [
+    # (attr, fmt) per option index; None for headers and action rows.
+    _VALUE_SPECS: ClassVar[list[tuple[str, Any] | None]] = [
+        None,  # 0: EXPLORATION
         ("ai_epsilon_decay", lambda v: f"{v:.4f}"),
         ("ai_epsilon_end", lambda v: f"{v:.2f}"),
+        ("ai_warm_start", lambda v: "ON" if v else "OFF"),
+        None,  # 4: APPRENTISSAGE
         ("ai_lr", lambda v: f"{v:.1e}"),
         ("ai_gamma", lambda v: f"{v:.3f}"),
         ("ai_batch_size", str),
         ("ai_buffer_size", lambda v: f"{v:,}"),
+        ("ai_learn_per_action", str),
+        None,  # 10: CURRICULUM
         ("ai_curriculum", lambda v: "ON" if v else "OFF"),
         ("ai_curriculum_freq", str),
         ("ai_curriculum_epsilon", str),
-        ("ai_warm_start", lambda v: "ON" if v else "OFF"),
-        ("ai_learn_per_action", str),
+        None,  # 14: JEU
         ("ai_lookahead", lambda v: "ON" if v else "OFF"),
         ("ai_lookahead_depth", str),
-        ("ai_soft_drop", lambda v: "ON" if v else "OFF"),
+        None,  # 17: Réinitialiser
+        None,  # 18: Retour
     ]
+
+    def _is_disabled(self, i: int) -> bool:
+        """Category headers are non-selectable."""
+        return i in self._header_indices
 
     def _value_label(self, i: int) -> str:
         if i >= len(self._VALUE_SPECS):
             return ""
-        attr, fmt = self._VALUE_SPECS[i]
+        spec = self._VALUE_SPECS[i]
+        if spec is None:
+            return ""
+        attr, fmt = spec
         return fmt(getattr(self.menu, attr))
 
     def _toggle(self, direction: int) -> None:
         m = self.menu
         match self.selection:
-            case 0:  # Epsilon decay
+            case 1:  # Epsilon decay
                 m.ai_epsilon_decay = round(
                     max(0.990, min(0.9999, m.ai_epsilon_decay + direction * 0.0001)),
                     4,
                 )
-            case 1:  # Epsilon fin
+            case 2:  # Epsilon fin
                 m.ai_epsilon_end = round(
                     max(0.02, min(0.10, m.ai_epsilon_end + direction * 0.01)),
                     2,
                 )
-            case 2:  # Learning rate
+            case 3:  # Warm-start
+                m.ai_warm_start = not m.ai_warm_start
+            case 5:  # Learning rate
                 m.ai_lr = round(max(1e-6, min(1e-2, m.ai_lr * (10**direction))), 6)
-            case 3:  # Gamma
+            case 6:  # Gamma
                 m.ai_gamma = round(max(0.80, min(0.99, m.ai_gamma + direction * 0.01)), 2)
-            case 4:  # Batch size
+            case 7:  # Batch size
                 m.ai_batch_size = max(8, min(256, m.ai_batch_size + direction * 8))
-            case 5:  # Buffer size
+            case 8:  # Buffer size
                 m.ai_buffer_size = max(1_000, min(200_000, m.ai_buffer_size + direction * 5_000))
-            case 6:  # Curriculum
+            case 9:  # Maj. par pièce
+                m.ai_learn_per_action = max(1, min(8, m.ai_learn_per_action + direction))
+            case 11:  # Curriculum
                 m.ai_curriculum = not m.ai_curriculum
-            case 7:  # Curriculum frequency
+            case 12:  # Curriculum frequency
                 m.ai_curriculum_freq = max(10, min(2000, m.ai_curriculum_freq + direction * 10))
-            case 8:  # Curriculum epsilon policy
+            case 13:  # Curriculum epsilon policy
                 policies = ["reset", "boost", "decay"]
                 idx = policies.index(m.ai_curriculum_epsilon)
                 m.ai_curriculum_epsilon = policies[(idx + direction) % len(policies)]
-            case 9:  # Warm-start
-                m.ai_warm_start = not m.ai_warm_start
-            case 10:  # Maj. par pièce
-                m.ai_learn_per_action = max(1, min(8, m.ai_learn_per_action + direction))
-            case 11:  # Look-ahead
+            case 15:  # Look-ahead
                 m.ai_lookahead = not m.ai_lookahead
-            case 12:  # Prof. lookahead
+            case 16:  # Prof. lookahead
                 m.ai_lookahead_depth = max(1, min(3, m.ai_lookahead_depth + direction))
-            case 13:  # Soft-drop
-                m.ai_soft_drop = not m.ai_soft_drop
 
     def _save(self) -> None:
         self.menu.save_settings()
@@ -166,19 +189,19 @@ class HyperparamMenuState(MenuBase):
         return self.ai_menu
 
     def _on_select(self) -> State | None:
-        if self.selection == 14:  # Réinitialiser
+        if self.selection == 17:  # Réinitialiser
             for attr, val in self._DEFAULTS.items():
                 setattr(self.menu, attr, val)
             self.menu.save_settings()
             return None
-        if self.selection == 15:  # Retour
+        if self.selection == 18:  # Retour
             return self.ai_menu
         return None
 
     # --- Custom table draw ------------------------------------------------
 
     def draw(self, screen: pygame.Surface, *, particles=None) -> None:
-        """Render hyperparameters as a multi-column table.
+        """Render hyperparameters as a multi-column table grouped by category.
 
         Draw order: black fill → background animation → explosion
         particles → title → table → instructions.  Overrides
@@ -226,8 +249,17 @@ class HyperparamMenuState(MenuBase):
         # --- Data rows ---
         for i, option in enumerate(self._OPTIONS):
             is_sel = i == self.selection
-            color = WHITE if is_sel else GRAY
+            is_header = i in self._header_indices
             meta = self._PARAM_META[i]
+
+            if is_header:
+                # Category header: render in white, slightly indented, no table columns
+                surf = self.font.render(option, True, WHITE)
+                screen.blit(surf, (x_left, y))
+                y += lh
+                continue
+
+            color = WHITE if is_sel else GRAY
 
             # Param name (left-aligned, prefixed with cursor)
             prefix = "> " if is_sel else "  "

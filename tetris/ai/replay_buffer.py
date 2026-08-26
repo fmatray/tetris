@@ -36,7 +36,7 @@ class PrioritizedReplayBuffer:
         capacity: int = 50_000,
         alpha: float = 0.6,
         beta: float = 0.4,
-        beta_increment: float = 0.001,
+        beta_increment: float = (1.0 - 0.4) / 10_000,
     ) -> None:
         """Initialize the PER buffer.
 

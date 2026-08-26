@@ -9,7 +9,7 @@ Profiling conducted on the AIv2 branch with the following tools:
 - **py-spy** — native sampling profiler (low overhead, flamegraph output)
 - **memory_profiler** — memory usage tracking
 
-All measurements use headless mode (`SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy`) with `AIState` in learning mode (`lookahead_depth=1`, `preview_count=1`, `soft_drop=True`, `warm_start=True`, `learn_per_action=2`).
+All measurements use headless mode (`SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy`) with `AIState` in learning mode (`lookahead_depth=1`, `preview_count=1`, `warm_start=True`, `learn_per_action=2`).
 
 ## Baseline (before optimization)
 
@@ -190,3 +190,16 @@ Replaced `np.vstack([np.zeros((lines, W)), batch[i][keep]])` with in-place slice
 - **`numpy.ufunc.reduce`** (3.4s self, 375K calls) — inherent to numpy scatter-reduction operations (`np.minimum.at` in `hard_drop_y_batch`, reductions in `_compute_board_metrics_batch`).
 - **`_reachable_from_flood` in `find_overhangs`** (0.3s self, ~480 calls) — Python flood fill. Could be vectorized but called infrequently.
 - **`compute_reward` scalar `dellacherie_value`** (0.8s cumulative, 250 calls) — called per piece lock, not in the hot loop.
+
+## Note: AI Redesign Impact (post-profiling)
+
+The profiling benchmarks above were recorded **before** the AI redesign. The following changes affect comparability but were not re-profiled:
+
+- **Network widened** from 17→128→64→1 to 17→256→128→1. The forward/backward pass per `learn()` step is ~3–4× more compute (two layers doubled in width). `learn()` is not in the per-frame hot path (called `learn_per_action=2` times per piece lock), so total-frame impact is modest, but per-step GPU/CPU cost is higher.
+- **Target sync** changed from Polyak averaging (τ=0.005 per step) to hard sync every 500 learn steps. No per-step target-net copy — slight per-`learn()` speedup, but a periodic full-state-copy spike at every 500th step.
+- **LR scheduler** (`ReduceLROnPlateau`) added — negligible per-step overhead (one dict lookup + comparison).
+- **PER beta annealing** fixed to 10K-sample window (was buffer_size-based). No runtime cost change.
+- **Move-sequence planner** replaced `_execute_macro_action` with `_execute_move_sequence`, which replays the BFS-recorded move path. `soft_drop_placements` now records parent pointers during BFS (minor memory increase for move lists, negligible CPU overhead — the BFS already visited every state). The old `soft_drop` config parameter and hard-drop execution mode are removed; all placements now use soft-drop BFS.
+- **Curriculum state** moved from `AIState` to `DQNAgent` (persisted in checkpoint). No runtime cost change — pure data relocation.
+
+**Benchmarks should be re-run with the new architecture.** The vectorization optimizations (Rounds 1–3) target the candidate-generation and feature-extraction pipeline, which is unchanged by the redesign. The BFS path recording adds a small constant overhead to `soft_drop_placements` (storing move lists per visited state). The wider network increases `learn()` cost but does not affect the per-frame game loop profiled here.

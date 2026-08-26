@@ -16,7 +16,7 @@ from tetris.ai.rewards import (
     place_and_clear_batch,
 )
 from tetris.game import rules
-from tetris.game.rules import hard_drop_y, try_rotation
+from tetris.game.rules import try_rotation
 from tetris.game.shapes import SHAPES_TYPES, get_shape_rot, num_shape_rot
 from tetris.settings import BOARD_HEIGHT, BOARD_WIDTH
 
@@ -24,9 +24,11 @@ from typing import NamedTuple
 
 
 class Placement(NamedTuple):
-    """A piece placement: piece type, rotation, column, row, hold flag.
+    """A piece placement: piece type, rotation, column, row, hold flag, move sequence.
 
     shape is derivable: get_shape_rot(piece_type, rot).
+    moves is the list of atomic actions ("left", "right", "soft_drop",
+    "rot_cw", "rot_ccw") to reach this placement from spawn.
     """
 
     piece_type: str
@@ -34,6 +36,7 @@ class Placement(NamedTuple):
     px: int
     py: int
     hold: bool
+    moves: list[str]
 
     @property
     def shape(self) -> list[tuple[int, int]]:
@@ -145,6 +148,7 @@ def soft_drop_placements(
 
     Returns list of Placement — every position the piece can reach by
     moving left/right, soft-dropping, and rotating (with SRS wall kicks).
+    Each placement carries the move sequence to reach it from spawn.
     This includes placements under overhangs that hard-drop cannot reach.
     """
     # ponytail: numpy scalar indexing (grid[y][x]) is ~5× slower than list
@@ -154,62 +158,64 @@ def soft_drop_placements(
     num_rots = num_shape_rot(piece_type)
     spawn_x = BOARD_WIDTH // 2 - 2
     spawn_y = 0
-    # ponytail: BFS frontier — state = (x, y, rot). O(W*H*4) states.
-    visited: set[tuple[int, int, int]] = set()
-    frontier: list[tuple[int, int, int]] = [(spawn_x, spawn_y, 0)]
-    visited.add((spawn_x, spawn_y, 0))
+    # BFS: state = (x, y, rot). Track shortest path of moves to each state.
+    start = (spawn_x, spawn_y, 0)
+    visited: dict[tuple[int, int, int], list[str]] = {start: []}
+    frontier: list[tuple[int, int, int]] = [start]
     placements: list[Placement] = []
     seen_placements: set[tuple[int, int, int]] = set()
 
     while frontier:
         x, y, rot = frontier.pop()
+        moves = visited[(x, y, rot)]
         shape = get_shape_rot(piece_type, rot)
 
         # Try left
-        if rules.shape_fits(grid, shape, x - 1, y) and (x - 1, y, rot) not in visited:
-            visited.add((x - 1, y, rot))
-            frontier.append((x - 1, y, rot))
+        nx = (x - 1, y, rot)
+        if rules.shape_fits(grid, shape, x - 1, y) and nx not in visited:
+            visited[nx] = moves + ["left"]
+            frontier.append(nx)
 
         # Try right
-        if rules.shape_fits(grid, shape, x + 1, y) and (x + 1, y, rot) not in visited:
-            visited.add((x + 1, y, rot))
-            frontier.append((x + 1, y, rot))
+        nx = (x + 1, y, rot)
+        if rules.shape_fits(grid, shape, x + 1, y) and nx not in visited:
+            visited[nx] = moves + ["right"]
+            frontier.append(nx)
 
         # Try soft drop (y+1)
+        nx = (x, y + 1, rot)
         if rules.shape_fits(grid, shape, x, y + 1):
-            if (x, y + 1, rot) not in visited:
-                visited.add((x, y + 1, rot))
-                frontier.append((x, y + 1, rot))
+            if nx not in visited:
+                visited[nx] = moves + ["soft_drop"]
+                frontier.append(nx)
         else:
             # Can't drop further — this is a landing position
             key = (x, y, rot)
             if key not in seen_placements:
                 seen_placements.add(key)
-                placements.append(Placement(piece_type, rot, x, y, False))
+                placements.append(Placement(piece_type, rot, x, y, False, moves))
 
         # Try rotations CW and CCW
         for direction in (1, -1):
             to_rot = (rot + direction) % num_rots
             result = try_rotation(grid, piece_type, rot, to_rot, x, y)
-            if result and (*result, to_rot) not in visited:
-                visited.add((*result, to_rot))
-                frontier.append((*result, to_rot))
+            if result:
+                nx = (*result, to_rot)
+                if nx not in visited:
+                    label = "rot_cw" if direction == 1 else "rot_ccw"
+                    visited[nx] = moves + [label]
+                    frontier.append(nx)
 
     return placements
 
 
-def gen_placements(base_grid: np.ndarray, piece_type: str, soft_drop: bool) -> Iterator[Placement]:
-    """Yield Placement for all valid placements of a piece type."""
-    if soft_drop:
-        yield from soft_drop_placements(base_grid, piece_type)
-    else:
-        for shape, rot, px in iter_column_positions(piece_type):
-            if not rules.shape_fits(base_grid, shape, px, 0):
-                continue
-            py = hard_drop_y(base_grid, shape, px)
-            if py < 0:
-                continue
-            yield Placement(piece_type, rot, px, py, False)
+def gen_placements(base_grid: np.ndarray, piece_type: str) -> Iterator[Placement]:
+    """Yield Placement for all valid placements of a piece type.
+
+    Uses soft-drop BFS exclusively — records the move sequence for each
+    placement so the executor can replay it exactly.
+    """
+    yield from soft_drop_placements(base_grid, piece_type)
 
 
 def get_candidate_states(
@@ -219,7 +225,6 @@ def get_candidate_states(
     next_piece_type: str,
     preview_piece_types: list[str],
     can_hold: bool,
-    soft_drop: bool,
     lookahead: bool,
     lookahead_depth: int,
 ) -> tuple[np.ndarray, list[int], np.ndarray, list[Placement]]:
@@ -240,7 +245,7 @@ def get_candidate_states(
     all_next_piece_types: list[str] = []
 
     # Non-hold candidates: place current piece
-    for p in gen_placements(base_grid, current_piece_type, soft_drop):
+    for p in gen_placements(base_grid, current_piece_type):
         all_placements.append(p)
         all_shapes.append(p.shape)
         all_next_piece_types.append(upcoming_types[0] if upcoming_types else "I")
@@ -253,8 +258,8 @@ def get_candidate_states(
             # No held piece: current → hold, next → current, preview shifts.
             hold_upcoming = preview_piece_types
             hold_piece_type = next_piece_type
-        for p in gen_placements(base_grid, hold_piece_type, soft_drop):
-            all_placements.append(Placement(p.piece_type, p.rot, p.px, p.py, True))
+        for p in gen_placements(base_grid, hold_piece_type):
+            all_placements.append(Placement(p.piece_type, p.rot, p.px, p.py, True, p.moves))
             all_shapes.append(p.shape)
             all_next_piece_types.append(hold_upcoming[0] if hold_upcoming else "I")
 

@@ -127,7 +127,7 @@ python -m tetris.verify_training
 | `tetris/game/tetromino.py` | `Tetromino` class — stateful piece model (type, color, rotation, position) |
 | `tetris/game/stats.py` | `GameStats` (score, lines, level, combo, B2B, piece count) + `ClearCounts` (single/double/triple/tetris line-clear tallies) |
 | `tetris/game/piece_provider.py` | `PieceProvider` facade + `PieceGenerator` hierarchy (`RandomGenerator`, `BagGenerator`→`SevenBagGenerator`/`ThirtyFiveBagGenerator`, `WeightedGenerator`, `ReplayGenerator`) — tetromino spawning with record/replay, curriculum, first-piece safety, seed support for reproducible sequences |
-| `tetris/ai/network.py` | `DQNetwork` — 17→128→64→1 V-network MLP |
+| `tetris/ai/network.py` | `DQNetwork` — 17→256→128→1 V-network MLP |
 | `tetris/verify_training.py` | Headless training validation script |
 | `data/settings.json` | Persisted menu settings + keybinds |
 | `tetris/logger.py` | Central logging — `configure_logging(debug)`, `get_logger(name)` |
@@ -228,7 +228,7 @@ config = GameConfig(handicap=0, sound_volume=0, music_volume=0, music_song='koro
 ai_config = AIConfig(epsilon_decay=0.999, epsilon_end=0.1, lr=1e-3, gamma=0.97,
     batch_size=64, buffer_size=50_000, ai_mode='learning', curriculum=False,
     curriculum_freq=50, curriculum_epsilon='reset', warm_start=True,
-    learn_per_action=2, lookahead=True, lookahead_depth=1, soft_drop=True)
+    learn_per_action=2, lookahead=True, lookahead_depth=1)
 state = AIState(screen=screen, font=font, audio=audio, config=config, ai_config=ai_config,
     piece_provider=PieceProvider(generator='7bag'), speed='fast')
 dt = 1/60
@@ -282,11 +282,17 @@ All in `data/` (gitignored via blanket `data/` rule):
 | `media/korobeiniki.mid` | `MUSIC_SONG_PATHS["korobeiniki"]` | MIDI | Korobeiniki music (melody + bass) |
 | `media/kalinka.mid` | `MUSIC_SONG_PATHS["kalinka"]` | MIDI | Kalinka music (melody + bass) |
 
-**`settings.json` schema**: `player` ("Humain"/"IA"/"MCP"), `mode` ("Normal"/"Replay"), `handicap` (0-5), `sound` (int 0-3), `music` (int 0-3), `song` ("korobeiniki"/"kalinka"), `debug` (bool), `ghost_piece` (bool), `preview_count` (int 0/1/3), `piece_generator` ("random"/"7bag"/"35bag"/"weighted"), `speed_mode` ("none"/"easy"/"normal"/"medium"/"hard"/"crazy"/"insane"), `ai_speed` ("normal"/"fast"), `ai_epsilon_decay` (float), `ai_epsilon_end` (float), `ai_lr` (float), `ai_gamma` (float), `ai_batch_size` (int), `ai_buffer_size` (int), `ai_mode` ("learning"/"playing"), `ai_curriculum` (bool), `ai_curriculum_freq` (int), `ai_curriculum_epsilon` (str), `ai_warm_start` (bool), `ai_learn_per_action` (int), `ai_lookahead` (bool), `ai_lookahead_depth` (int 1-3), `ai_soft_drop` (bool), `mcp_port` (int), `seed` (int|null), `keybinds` (dict: action→pygame keycode, includes `mute` and `hold`)
+**`settings.json` schema**: `player` ("Humain"/"IA"/"MCP"), `mode` ("Normal"/"Replay"), `handicap` (0-5), `sound` (int 0-3), `music` (int 0-3), `song` ("korobeiniki"/"kalinka"), `debug` (bool), `ghost_piece` (bool), `preview_count` (int 0/1/3), `piece_generator` ("random"/"7bag"/"35bag"/"weighted"), `speed_mode` ("none"/"easy"/"normal"/"medium"/"hard"/"crazy"/"insane"), `ai_speed` ("normal"/"fast"), `ai_epsilon_decay` (float), `ai_epsilon_end` (float), `ai_lr` (float), `ai_gamma` (float), `ai_batch_size` (int), `ai_buffer_size` (int), `ai_mode` ("learning"/"playing"), `ai_curriculum` (bool), `ai_curriculum_freq` (int), `ai_curriculum_epsilon` (str), `ai_warm_start` (bool), `ai_learn_per_action` (int), `ai_lookahead` (bool), `ai_lookahead_depth` (int 1-3), `mcp_port` (int), `seed` (int|null), `keybinds` (dict: action→pygame keycode, includes `mute` and `hold`)
 
 ## DQN AI Specifics
 
-- **Network**: `DQNetwork` — Input(17, normalized) → Dense(128, ReLU) → Dense(64, ReLU) → Output(1, Linear). V-function evaluates board quality per candidate placement.
+- **Network**: `DQNetwork` — Input(17, normalized) → Dense(256, ReLU) → Dense(128, ReLU) → Output(1, Linear). V-function evaluates board quality per candidate placement.
 - **State vector** (`extract_features`, 17-dim DT-20, normalized via `(x - mean) / std`): `[lines_cleared, holes, aggregate_height, bumpiness, max_height, row_transitions, column_transitions, wells, hole_depth, rows_with_holes, *next_piece_one_hot(7)]`.
-- **Candidate generation**: soft-drop BFS (`soft_drop_placements` in `tetris/ai/candidates.py`) with SRS wall kicks (`SRS_KICKS_JLSTZ`, `SRS_KICKS_I`) — enumerates all reachable placements including overhangs. Placements are `Placement` NamedTuples `(piece_type, rot, px, py, hold)` — `shape` is derived from `get_shape_rot(piece_type, rot)` (see `tetris/game/shapes.py`). Hold candidates: when `_can_hold` is True, the AI also enumerates placements for the held piece (or next piece if hold is empty), doubling the candidate space. Look-ahead depth configurable (`ai_lookahead_depth` 1–3): simulates best next-piece placement (Dellacherie-optimal) for N upcoming pieces. Hard-drop fallback when soft-drop is OFF (uses `iter_column_positions` helper shared by hard-drop and look-ahead paths). Shared game-…
+- **Candidate generation**: soft-drop BFS (`soft_drop_placements` in `tetris/ai/candidates.py`) with SRS wall kicks (`SRS_KICKS_JLSTZ`, `SRS_KICKS_I`) — enumerates all reachable placements including overhangs. Placements are `Placement` NamedTuples `(piece_type, rot, px, py, hold, moves)` — `shape` is derived from `get_shape_rot(piece_type, rot)` (see `tetris/game/shapes.py`); `moves` is the full path of atomic actions (`["left", "rot_cw", "soft_drop", ...]`) from BFS. Hold candidates: when `_can_hold` is True, the AI also enumerates placements for the held piece (or next piece if hold is empty), doubling the candidate space. Look-ahead depth configurable (`ai_lookahead_depth` 1–3): simulates best next-piece placement (Dellacherie-optimal) for N upcoming pieces. Look-ahead uses hard-drop (`best_next_placement`), independent of the main soft-drop BFS path.
+- **Move execution**: `_execute_move_sequence` replays `p.moves` atomic actions using `Board.is_valid_move`/`try_rotate`, eliminating execution mismatch for overhang placements.
+- **Target network sync**: Hard sync every 500 learn steps (`target_sync_freq=500`), replacing Polyak averaging.
+- **LR scheduling**: `ReduceLROnPlateau(optimizer, mode="min", factor=0.5, patience=50, min_lr=1e-6)` — `learn()` calls `scheduler.step(last_loss)` after each gradient step.
+- **PER beta annealing**: `beta` anneals from 0.4 → 1.0 over 10,000 learn steps (fixed, not buffer-size-based).
+- **Curriculum**: Curriculum state (`curriculum_level`, `curriculum_episode_count`) lives in `DQNAgent`, persisted in checkpoint. `advance_curriculum(max_level, freq)` advances level every `freq` episodes. `_reset_episode` re-applies `set_allowed_types` on the new `PieceProvider`.
+- **Seed reproducibility**: `_reset_episode` derives `_episode_seed = seed + episode` and re-seeds `random`, `np.random`, `torch.manual_seed`, and `PieceProvider` for reproducible training.
 - **Modes**: `ai_mode="learning"` (epsilon-greedy + training updates + logging, fast-forwards lock delay) vs `"playing"` (greedy, epsilon=0, no learning, full lock delay). Set in `AIState.__init__` after `agent.load(MODEL_PATH)`. Training uses `lookahead_depth=1` + `preview_count=1` in `verify_training.py` for speed (6.9× faster); playing uses `lookahead_depth=3` + `preview_count=3` for best move quality. `online_net.eval()` during `select_action`, `online_net.train()` during `learn` (future-proofs for dropout/BN).

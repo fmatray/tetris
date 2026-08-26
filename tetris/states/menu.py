@@ -82,7 +82,6 @@ class MenuState(MenuBase):
         self.ai_learn_per_action = 2
         self.ai_lookahead = True
         self.ai_lookahead_depth = 1
-        self.ai_soft_drop = True
         self.mcp_port = MCP_SERVER_PORT
 
         # DEFAULT_KEYBINDS imported locally to avoid circular import at module load.
@@ -116,8 +115,6 @@ class MenuState(MenuBase):
         "ai_learn_per_action": "ai_learn_per_action",
         "ai_lookahead": "ai_lookahead",
         "ai_lookahead_depth": "ai_lookahead_depth",
-        "ai_soft_drop": "ai_soft_drop",
-        "ghost_piece": "ghost_piece",
         "preview_count": "preview_count",
         "debug": "debug",
         "speed_mode": "speed_mode",
@@ -284,7 +281,6 @@ class MenuState(MenuBase):
                 learn_per_action=self.ai_learn_per_action,
                 lookahead=self.ai_lookahead,
                 lookahead_depth=self.ai_lookahead_depth,
-                soft_drop=self.ai_soft_drop,
             ),
             ai_provider,
             self.ai_speed,

@@ -21,6 +21,7 @@ from tetris.game.tetromino import Tetromino
 from tetris.settings import (
     BOARD_HEIGHT,
     BOARD_WIDTH,
+    CURRICULUM_ORDER,
     GRAY,
     LOG_PATH,
     MODEL_PATH,
@@ -54,7 +55,6 @@ from typing import cast
 
 
 def _make_ai_full(learning: bool = True, speed: str = "fast", **kwargs: object) -> AIState:
-    soft_drop = bool(kwargs.pop("soft_drop", True))
     audio = AudioManager(sound_volume=0, music_volume=0)
     provider = PieceProvider(generator="7bag", path=_unique_path())
     ai = AIState(
@@ -86,7 +86,6 @@ def _make_ai_full(learning: bool = True, speed: str = "fast", **kwargs: object) 
             learn_per_action=cast(int, kwargs.get("learn_per_action", 2)),
             lookahead=cast(bool, kwargs.get("lookahead", True)),
             lookahead_depth=cast(int, kwargs.get("lookahead_depth", 1)),
-            soft_drop=soft_drop,
         ),
         piece_provider=provider,
         speed=speed,
@@ -126,7 +125,6 @@ class TestInit:
         assert ai.ghost_piece is True
         assert ai.warm_start is True
         assert ai.lookahead is True
-        assert ai.soft_drop is True
 
     def test_playing_mode_epsilon_zero(self):
         ai = _make_ai(learning=False)
@@ -194,39 +192,22 @@ class TestBestNextPlacement:
 
 
 class TestGenPlacements:
-    def test_soft_drop_yields_placements(self):
+    def test_yields_placements(self):
         grid = np.zeros((BOARD_HEIGHT, BOARD_WIDTH), dtype=np.float32)
-        placements = list(gen_placements(grid, "I", soft_drop=True))
+        placements = list(gen_placements(grid, "I"))
         assert len(placements) > 0
         for p in placements:
             assert len(p.shape) == 4
             assert p.py >= 0
             assert 0 <= p.rot < NUM_ROTATIONS
+            # Each placement has a move sequence
+            assert isinstance(p.moves, list)
 
-    def test_hard_drop_yields_placements(self):
-        grid = np.zeros((BOARD_HEIGHT, BOARD_WIDTH), dtype=np.float32)
-        placements = list(gen_placements(grid, "I", soft_drop=False))
-        assert len(placements) > 0
-        for p in placements:
-            assert len(p.shape) == 4
-            assert -2 <= p.px < BOARD_WIDTH
-            assert p.py >= 0
-
-    def test_full_grid_soft_drop_yields_spawn(self):
-        """Full grid: soft_drop BFS finds spawn position (py=0)."""
+    def test_full_grid_yields_spawn(self):
+        """Full grid: BFS finds spawn position (py=0)."""
         grid = np.ones((BOARD_HEIGHT, BOARD_WIDTH), dtype=np.float32)
-        placements = list(gen_placements(grid, "O", soft_drop=True))
+        placements = list(gen_placements(grid, "O"))
         assert len(placements) >= 1
-
-    def test_full_grid_hard_drop_yields_nothing(self):
-        """Full grid: shape_fits at y=0 fails → no hard-drop placements."""
-        grid = np.ones((BOARD_HEIGHT, BOARD_WIDTH), dtype=np.float32)
-        placements = list(gen_placements(grid, "O", soft_drop=False))
-        assert len(placements) == 0
-
-
-class TestGetCandidateStates:
-    def test_returns_correct_shapes(self):
         ai = _make_ai()
         candidates, actions, dellvals = ai._get_candidate_states()
         assert candidates.ndim == 2
@@ -266,25 +247,16 @@ class TestGetCandidateStates:
 # ---------------------------------------------------------------------------
 
 
-class TestExecuteMacroAction:
-    def test_non_hold_soft_drop(self):
-        ai = _make_ai(soft_drop=True)
+class TestExecuteMoveSequence:
+    def test_non_hold_move_sequence(self):
+        ai = _make_ai()
         ai._get_candidate_states()
         assert len(ai._candidate_placements) > 0
         # Find a non-hold candidate
         idx = next(i for i, p in enumerate(ai._candidate_placements) if not p.hold)
         original_y = ai.current_piece.y
-        ai._execute_macro_action(idx)
+        ai._execute_move_sequence(idx)
         assert ai.current_piece.y >= original_y
-
-    def test_non_hold_hard_drop(self):
-        ai = _make_ai(soft_drop=False)
-        ai._get_candidate_states()
-        assert len(ai._candidate_placements) > 0
-        idx = next(i for i, p in enumerate(ai._candidate_placements) if not p.hold)
-        ai._execute_macro_action(idx)
-        # Hard-drop path locks immediately
-        assert ai._prev_action is None
 
     def test_hold_candidate(self):
         ai = _make_ai()
@@ -292,7 +264,7 @@ class TestExecuteMacroAction:
         hold_idx = next((i for i, p in enumerate(ai._candidate_placements) if p.hold), None)
         if hold_idx is None:
             pytest.skip("No hold candidate")
-        ai._execute_macro_action(hold_idx)
+        ai._execute_move_sequence(hold_idx)
         assert ai._can_hold is False
 
 
@@ -478,25 +450,23 @@ class TestResetEpisode:
         assert ai.stats.total_lines == 0
 
 
-class TestMaybeAdvanceCurriculum:
+class TestAdvanceCurriculum:
     def test_advances_at_freq(self):
         ai = _make_ai(learning=True, curriculum=True, curriculum_freq=1)
-        assert ai._maybe_advance_curriculum() is True
-        assert ai._curriculum_types == ["O", "I"]
+        assert ai.agent.advance_curriculum(len(CURRICULUM_ORDER) - 1, 1) is True
+        assert ai.agent.curriculum_level == 1
 
     def test_no_advance_before_freq(self):
         ai = _make_ai(learning=True, curriculum=True, curriculum_freq=10)
-        assert ai._maybe_advance_curriculum() is False
-        assert ai._curriculum_types == ["O"]
+        assert ai.agent.advance_curriculum(len(CURRICULUM_ORDER) - 1, 10) is False
+        assert ai.agent.curriculum_level == 0
 
     def test_all_pieces_reached(self):
         ai = _make_ai(learning=True, curriculum=True, curriculum_freq=1)
-        from tetris.settings import CURRICULUM_ORDER
-
         for _ in range(len(CURRICULUM_ORDER) - 1):
-            ai._maybe_advance_curriculum()
-        assert ai._curriculum_types == list(CURRICULUM_ORDER)
-        assert ai._maybe_advance_curriculum() is False
+            ai.agent.advance_curriculum(len(CURRICULUM_ORDER) - 1, 1)
+        assert ai.agent.curriculum_level == len(CURRICULUM_ORDER) - 1
+        assert ai.agent.advance_curriculum(len(CURRICULUM_ORDER) - 1, 1) is False
 
 
 class TestApplyEpsilonPolicy:

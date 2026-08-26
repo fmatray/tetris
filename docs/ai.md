@@ -1,6 +1,6 @@
 # AI Player Mode — Design Document
 
-(Updated: 2026-08-10)
+_(Updated: 2026-08-26)_
 
 
 ## Overview
@@ -21,7 +21,7 @@ highest score possible.
 | ----------- | -------- | -------- |
 | Algorithm | V-network DQN | Per-candidate board value evaluation; picks max-V placement |
 | Experience Replay | Yes (buffer size 50,000) | Stabilizes training by breaking correlation |
-| Target Network | Yes (Polyak averaging τ=0.005, every step) | Reduces moving-target instability |
+| Target Network | Yes (hard sync every 500 learn steps) | Reduces moving-target instability |
 | Exploration | ε-greedy, decay 1.0 → ε_end (configurable) | Balances exploration vs exploitation |
 | Reward Shaping | PBRS (Dellacherie potential) | Speeds convergence without reward hacking (Ng et al. 1999) |
 
@@ -75,25 +75,28 @@ candidate with the highest V-value is selected.
 
 ### 3.1 Candidate Generation
 
-Two modes:
+**Soft-drop BFS** (always on): BFS over (x, y, rotation) states —
+move left/right, soft-drop, rotate with SRS wall kicks. Enumerates
+ALL reachable landing positions, including placements under
+overhangs that hard-drop cannot reach. Uses SRS wall kick tables
+(`SRS_KICKS_JLSTZ`, `SRS_KICKS_I`) for rotation around obstacles.
 
-**Hard-drop** (default when soft-drop is OFF): for each valid
-(rotation, column) combination, simulate hard-drop + line clear.
-
-**Soft-drop BFS** (default when soft-drop is ON): BFS over
-(x, y, rotation) states — move left/right, soft-drop, rotate with
-SRS wall kicks. Enumerates ALL reachable landing positions, including
-placements under overhangs that hard-drop cannot reach. Uses SRS
-wall kick tables (`SRS_KICKS_JLSTZ`, `SRS_KICKS_I`) for rotation
-around obstacles.
+Each placement records its **move sequence** — the list of atomic
+actions (`left`, `right`, `soft_drop`, `rot_cw`, `rot_ccw`) that
+leads from spawn to the landing position. The `Placement` NamedTuple
+carries a `moves: list[str]` field, and `_execute_move_sequence()`
+replays these actions atom-by-atom using `Board.is_valid_move` /
+`Board.try_rotate`. This guarantees the piece reaches the exact
+`(px, py, rot)` the BFS evaluated — no execution mismatch.
 
 **2-piece look-ahead** (when enabled): after simulating the current
 piece placement, simulate the best placement of the NEXT piece on
 the resulting board (Dellacherie-optimal). The V-network evaluates
-the board after both pieces are placed.
+the board after both pieces are placed. Look-ahead uses hard-drop
+internally for speed (board-quality evaluation only, not executed).
 
 For each candidate:
-1. Simulate placement (hard-drop or soft-drop BFS)
+1. Simulate placement via soft-drop BFS (records move sequence)
 2. Simulate line clears on the resulting board
 3. If look-ahead: simulate best next-piece placement
 4. Extract 17-dim DT-20 features from the resulting board
@@ -157,9 +160,9 @@ meaningful without dominating the base reward (±130).
 ```
 Input  (17, normalized)
   ↓
-Dense (128, ReLU)
+Dense (256, ReLU)
   ↓
-Dense (64, ReLU)
+Dense (128, ReLU)
   ↓
 Output (1, Linear) → V(board) = board value
 ```
@@ -168,7 +171,8 @@ Output (1, Linear) → V(board) = board value
 - **Loss**: SmoothL1Loss (Huber) — V-function Bellman target
 - **Batch size**: 64
 - **Discount factor (γ)**: 0.97
-- **Polyak τ**: 0.005 (soft target update every step)
+- **Target sync**: hard sync every 500 learn steps (`target_sync_freq=500`). Target network weights copied from online network at the sync boundary.
+- **LR scheduler**: `ReduceLROnPlateau(optimizer, mode="min", factor=0.5, patience=50, min_lr=1e-6)` — called after each `learn()` step with `self.last_loss`. Halves the learning rate when loss plateaus for 50 steps, down to 1e-6.
 - **Device**: `auto` (CUDA if available, else CPU). No MPS — transfer overhead negates gains on this small network.
 - **Seed**: `None` by default (random). Set `seed=N` for reproducible weight init + sampling + piece generation + handicap. Per-episode seed derived as `seed + episode` for varied but reproducible training. Logged in `TrainingLog`.
 - **Mode toggling**: `online_net.eval()` during inference, `online_net.train()` during learning.
@@ -223,7 +227,6 @@ optional dependency.
 | `ai_curriculum` | OFF | ON/OFF | toggle |
 | `ai_curriculum_freq` | 50 | 10–500 | 10 |
 | `ai_curriculum_epsilon` | reset | reset/boost/decay | cycle |
-| `ai_soft_drop` | ON | ON/OFF | toggle |
 
 Constructor-only parameters (not in menu, for `verify_training` / programmatic use):
 
@@ -231,27 +234,46 @@ Constructor-only parameters (not in menu, for `verify_training` / programmatic u
 | --------- | ------- | ----------- |
 | `seed` | `None` | Random seed for reproducible training (torch + numpy + random + piece generation + handicap). Per-episode seed = `seed + episode` |
 | `device` | `auto` | Torch device: `auto` (CUDA if available), `cpu`, or `cuda` |
-
+| `target_sync_freq` | 500 | Hard target network sync interval (learn steps) |
 
 These are configurable in the **AI submenu** and persisted to
 `settings.json`.
 
 ### 6.3 Episode = One Game
 
-An episode runs from game start to game over. One macro-action per piece:
+An episode runs from game start to game over. One placement per piece:
 
-1. Generate candidate states: enumerate valid (rotation, column) placements, simulate hard-drop + line clear, extract DT-20 features
+1. Generate candidate states: soft-drop BFS enumerates all reachable placements, records move sequence for each, extracts DT-20 features
 2. Select candidate via ε-greedy: random or `argmax(V(candidate_states))`
-3. Execute placement: rotate → move to column → hard-drop → lock
+3. Execute placement: replay move sequence (`_execute_move_sequence`) — atomic actions validated via `Board.is_valid_move` / `Board.try_rotate`, then lock via lock delay
 4. Observe reward `r` (delta holes + line bonus + board quality + PBRS shaping)
 5. Store `(s, 0, r, s', done)` in n-step buffer → PER (delayed: s = board after prev placement, s' = board after this placement)
 6. Run `learn_per_action` V-function Bellman gradient updates via prioritized mini-batch (IS-weighted)
-7. Polyak soft target update (τ=0.005, every step)
-8. Decay ε once per episode
+7. LR scheduler step: `scheduler.step(last_loss)` — reduces LR on plateau
+8. Hard target sync every `target_sync_freq` learn steps
+9. Decay ε once per episode
+10. Advance curriculum if enabled (`agent.advance_curriculum`)
+
+### 6.4 Curriculum Learning
+
+Curriculum state (`curriculum_level`, `curriculum_episode_count`)
+lives in `DQNAgent`, not `AIState`. The agent's `advance_curriculum(max_level, freq)`
+method increments the level after `freq` episodes, up to `max_level`.
+Both fields are persisted in the checkpoint, so resuming training
+restores curriculum progress. `AIState` applies the piece-type
+restriction (`pieces.set_allowed_types`) based on the agent's level
+— re-applied in `_reset_episode` after creating a fresh `PieceProvider`.
+
+### 6.5 Seed Reproducibility
+
+`_reset_episode` derives `_episode_seed = seed + episode` and re-seeds
+`random`, `np.random`, `torch.manual_seed`, and the `PieceProvider`.
+Given the same `seed`, the same episode number produces the same piece
+sequence AND the same exploration decisions.
 
 | File | Purpose |
 | ------ | --------- |
-| `data/ai_model.pt` | Trained Q-network weights + optimizer state + ε |
+| `data/ai_model.pt` | Trained weights + optimizer + scheduler + ε + curriculum level + PER β |
 | `data/ai_training_log.json` | Per-episode stats (score, lines, level, steps, ε, loss) |
 | `data/settings.json` | Menu options + AI hyperparameters (ε decay, ε end, speed) |
 
@@ -265,7 +287,7 @@ An episode runs from game start to game over. One macro-action per piece:
 tetris/
 ├── ai/
 │   ├── __init__.py
-│   ├── network.py        # DQNetwork (17→128→64→1 V-network)
+│   ├── network.py        # DQNetwork (17→256→128→1 V-network)
 │   ├── replay_buffer.py  # Experience replay buffer (50,000)
 │   ├── rewards.py        # DT-20 features, Dellacherie value, PBRS reward, simulation helpers
 │   ├── candidates.py     # Candidate placement generation (pure functions)
@@ -284,12 +306,10 @@ MenuState (Joueur: IA)
     ↓
 AIState (subclass of GameState)
     ↓
-  AI generates candidate states (rotation + column + hard-drop simulation)
+  AI generates candidate states (soft-drop BFS, records move sequences)
   AI evaluates V(candidate_states) per-candidate, picks max
   AIState executes action:
-    - Rotate piece to target rotation
-    - Move to target column
-    - Hard-drop to lowest position
+    - Replay move sequence (_execute_move_sequence)
     - Lock piece → compute reward (PBRS) → store transition → learn
 ```
 
@@ -298,7 +318,7 @@ AIState (subclass of GameState)
 `tetris/ai/candidates.py` and `tetris/ai/hud.py` as pure functions.
 It overrides:
 
-- `update()` — AI macro-action selection and execution
+- `update()` — AI candidate selection and move-sequence execution
 - `_lock_and_spawn()` — intercepts piece locking for reward + transition
 - `draw()` — delegates AI HUD overlay to `tetris.ai.hud.draw_ai_hud`
 - `_on_episode_end()` — logs episode, saves model, auto-restarts
@@ -382,10 +402,9 @@ first draw. Any key returns to the AI submenu.
 | ----------- | ------------ |
 | **Sparse rewards** (few lines cleared early) | Shape reward with height/bumpiness penalties + PBRS (Dellacherie potential) |
 | **Catastrophic forgetting** | Experience replay + target network |
-| **Slow training** | Macro-actions + DT-20 features (17-dim vs 220-dim) + frame skipping |
-| **Reward hacking** | PBRS (policy-preserving, Ng et al. 1999) — cannot change optimal policy |
-| **Overfitting to one piece sequence** | Randomized piece generator (already in `tetris/game/tetromino.py`) |
-| **Memory growth** | Cap replay buffer; LRU eviction |
+| **Overhang execution mismatch** | Move-sequence planner: BFS records full atomic action path; `_execute_move_sequence` replays it exactly, guaranteeing the piece reaches the evaluated position |
+| **Training plateau** | Wider network (256→128), hard target sync (500 steps), LR scheduler (ReduceLROnPlateau) |
+| **PER beta never reaches 1.0** | Beta annealed over fixed 10K samples (not buffer_size-based) |
 
 ---
 
@@ -395,11 +414,12 @@ first draw. Any key returns to the AI submenu.
 - ✅ **DT-20 features** — 17-dim engineered features replace 220-dim raw board.
 - ✅ **PBRS** — Potential-based reward shaping with Dellacherie board value.
 - ✅ **Prioritized Experience Replay (PER)** — Proportional PER with IS weights (Schaul et al. 2015).
-- ✅ ~~**Soft target update (Polyak averaging)**~~ — Implemented (τ=0.005, every step).
-- ✅ ~~**Heuristic warm-start**~~ — Implemented (Dellacherie-weighted softmax exploration).
-- ✅ ~~**Curriculum Learning**~~ — Implemented (O → I → L → J → T → S → Z).
+- ✅ ~~**Hard target sync**~~ — Implemented (every 500 learn steps, replaces Polyak averaging).
+- ✅ ~~**LR scheduling**~~ — Implemented (ReduceLROnPlateau, factor 0.5, patience 50).
+- ✅ ~~**Curriculum Learning**~~ — Implemented (O → I → L → J → T → S → Z). State lives in `DQNAgent`, persisted in checkpoint.
+- ✅ ~~**Move-sequence planner**~~ — Implemented (Option D: BFS records atomic action path, `_execute_move_sequence` replays it).
 - ✅ **N-step returns** — 3-step Bellman targets for faster credit assignment.
-- ✅ **Soft-drop BFS** — SRS wall kicks + BFS candidate generation (overhangs, T-Spins).
+- ✅ **Soft-drop BFS** — SRS wall kicks + BFS candidate generation with move-sequence recording (overhangs, T-Spins).
 - ✅ **2-piece look-ahead** — Simulate best next-piece placement before evaluation.
 - ✅ **Feature normalization** — Standardize DT-20 features (mean/std) before network input.
 - **Self-Play Tournament** — run multiple AI agents in parallel, keep the
@@ -446,7 +466,7 @@ AI agent generates candidate states (17 DT-20 features each)
         ↓
 ε-greedy evaluates V per candidate, picks max
         ↓
-Action executed: rotate → move → hard-drop
+Action executed: replay move sequence (soft-drop BFS path)
         ↓
 Reward computed (delta holes, lines, height, bumpiness + PBRS)
         ↓
@@ -469,7 +489,7 @@ Tetris as well as — or better than — a skilled human.
 
 ## Limitations de l'IA
 
-L'IA utilise un espace d'actions basé sur le **soft-drop BFS** : pour chaque pièce, elle énumère toutes les positions atteignables via BFS (déplacement latéral, chute douce, rotation avec SRS wall kicks), simule le placement, et évalue le plateau résultant via la V-function. Cette approche couvre les surplombs et les T-Spins.
+L'IA utilise un espace d'actions basé sur le **soft-drop BFS avec planification de séquence de mouvements** : pour chaque pièce, elle énumère toutes les positions atteignables via BFS (déplacement latéral, chute douce, rotation avec SRS wall kicks), enregistre la séquence de mouvements atomiques pour chaque placement, simule le placement, et évalue le plateau résultant via la V-function. La séquence est ensuite rejouée par `_execute_move_sequence` pour garantir que la pièce atteint la position évaluée. Cette approche couvre les surplombs et les T-Spins.
 
 ### Surplombs et placements en glissé
 

@@ -274,43 +274,44 @@ def test_decay_epsilon_noop_at_floor():
 # ---------------------------------------------------------------------------
 
 
-def test_sync_target_moves_toward_online():
-    """_sync_target blends target weights toward online by tau."""
-    agent = DQNAgent()
+def test_hard_sync_copies_weights():
+    """_sync_target hard-copies online weights to target at target_sync_freq."""
+    agent = DQNAgent(batch_size=4)
     # Perturb online weights so they differ from target
     with torch.no_grad():
         for p in agent.online_net.parameters():
             p.add_(1.0)
-    # Snapshot target weights before sync
+    # At step 1 (not at sync boundary), target should NOT change
+    agent.steps = 1
     before = [tp.clone() for tp in agent.target_net.parameters()]
     agent._sync_target()
-    moved = False
     for tp, bp in zip(agent.target_net.parameters(), before):
-        if not torch.allclose(tp, bp):
-            moved = True
-            # Target should move toward online (which is before+1.0)
-            assert (tp - bp).abs().mean() > 0
-    assert moved
+        assert torch.allclose(tp, bp)
+
+    # Advance to target_sync_freq boundary → hard sync
+    agent.steps = agent.target_sync_freq
+    agent._sync_target()
+    for tp, op in zip(agent.target_net.parameters(), agent.online_net.parameters()):
+        assert torch.allclose(tp, op)
 
 
-def test_sync_target_called_by_learn():
-    """learn() triggers _sync_target, so target weights change after learning."""
+def test_hard_sync_triggered_by_learn():
+    """learn() triggers _sync_target; at target_sync_freq boundary, target = online."""
     agent = DQNAgent(batch_size=4)
     for i in range(20):
         agent.store(_state(i), 0, 1.0, _state(i + 1), done=(i == 19))
+    # Set steps to just before sync boundary
+    agent.steps = agent.target_sync_freq - 1
     before = [tp.clone() for tp in agent.target_net.parameters()]
-    agent.learn()
+    agent.learn()  # steps becomes target_sync_freq → hard sync
     moved = any(not torch.allclose(tp, bp) for tp, bp in zip(agent.target_net.parameters(), before))
     assert moved
 
 
 # ---------------------------------------------------------------------------
 # Tests for save() / load() round-trip
-# ---------------------------------------------------------------------------
-
-
 def test_save_load_roundtrip():
-    """save() then load() preserves weights, optimizer, epsilon, and steps."""
+    """save() then load() preserves weights, optimizer, epsilon, steps, curriculum, beta."""
     import tempfile
 
     agent = DQNAgent(batch_size=4)
@@ -319,6 +320,9 @@ def test_save_load_roundtrip():
     agent.learn()  # train one step to populate optimizer state
     agent.decay_epsilon()
     agent.steps = 42
+    agent.curriculum_level = 3
+    agent.curriculum_episode_count = 7
+    beta_before = agent.buffer.beta
 
     # Snapshot online weights
     online_before = {k: v.clone() for k, v in agent.online_net.state_dict().items()}
@@ -340,6 +344,11 @@ def test_save_load_roundtrip():
         # Training progress preserved
         assert loaded.epsilon == eps_before
         assert loaded.steps == 42
+        # Curriculum state preserved
+        assert loaded.curriculum_level == 3
+        assert loaded.curriculum_episode_count == 7
+        # PER beta preserved
+        assert loaded.buffer.beta == beta_before
     finally:
         os.unlink(path)
 
@@ -435,3 +444,46 @@ def test_learn_uses_per_transition_discount():
     result = agent.learn()
     assert result is not None
     assert isinstance(result, float)
+
+
+# ---------------------------------------------------------------------------
+# Tests for advance_curriculum
+# ---------------------------------------------------------------------------
+
+
+def test_advance_curriculum_increments_at_freq():
+    """advance_curriculum increments level when episode count reaches freq."""
+    agent = DQNAgent()
+    agent.curriculum_level = 0
+    agent.curriculum_episode_count = 0
+    # freq=2: first call increments count to 1, no advance
+    assert agent.advance_curriculum(max_level=6, freq=2) is False
+    assert agent.curriculum_level == 0
+    # Second call: count=2 → advance, reset count
+    assert agent.advance_curriculum(max_level=6, freq=2) is True
+    assert agent.curriculum_level == 1
+    assert agent.curriculum_episode_count == 0
+
+
+def test_advance_curriculum_caps_at_max_level():
+    """advance_curriculum returns False when level is already at max."""
+    agent = DQNAgent()
+    agent.curriculum_level = 6
+    assert agent.advance_curriculum(max_level=6, freq=1) is False
+    assert agent.curriculum_level == 6
+
+
+# ---------------------------------------------------------------------------
+# Tests for LR scheduler
+# ---------------------------------------------------------------------------
+
+
+def test_lr_scheduler_reduces_lr_on_plateau():
+    """ReduceLROnPlateau reduces LR when loss stays constant for patience steps."""
+    agent = DQNAgent(batch_size=4)
+    initial_lr = agent.optimizer.param_groups[0]["lr"]
+    # Feed the scheduler a constant loss for patience+1 steps
+    for _ in range(60):
+        agent.scheduler.step(1.0)
+    reduced_lr = agent.optimizer.param_groups[0]["lr"]
+    assert reduced_lr < initial_lr

@@ -95,7 +95,6 @@ classDiagram
             +ai_learn_per_action: int
             +ai_lookahead: bool
             +ai_lookahead_depth: int
-            +ai_soft_drop: bool
             +mcp_port: int
             +speed_mode: str
             +seed: int | None
@@ -165,15 +164,17 @@ classDiagram
 
         class HyperparamMenuState {
             # _OPTIONS: tuple~str, ...~ ClassVar
+            # _header_indices: frozenset~int~ ClassVar
             # _toggle_indices: frozenset~int~ ClassVar
             # _title: str ClassVar
             # _PARAM_META: ClassVar~tuple~ ClassVar
             # _DEFAULTS: ClassVar~dict~str, float | int | bool | str~~ ClassVar
-            # _VALUE_SPECS: ClassVar~list~tuple~str, Any~~~ ClassVar
+            # _VALUE_SPECS: ClassVar~list~tuple~str, Any | None~~~ ClassVar
             +ai_menu: AIMenuState
             +menu: MenuState
             +__init__(screen, font, audio, ai_menu) None
             # _value_label(i: int) str
+            # _is_disabled(i: int) bool
             # _toggle(direction: int) None
             # _save() None
             # _on_back() State | None
@@ -390,7 +391,6 @@ classDiagram
             +learn_per_action: int
             +lookahead: bool
             +lookahead_depth: int
-            +soft_drop: bool
         }
         class AIState {
             +ghost_piece: bool
@@ -418,24 +418,21 @@ classDiagram
             +curriculum_freq: int
             +curriculum_epsilon: str
             - _curriculum_types: list~str~ | None
-            - _curriculum_level: int
-            - _curriculum_episode_count: int
             +__init__(screen, font, audio, config, ai_config, piece_provider, speed, menu, seed, device) None
             - _get_candidate_states() tuple~np.ndarray, list~int~, np.ndarray~
-            - _execute_macro_action(action: int) None
+            - _execute_move_sequence(action: int) None
             - _lock_and_spawn(hard_drop: bool) tuple~int, list~
             +update(dt: float, particles: ParticleSystem) State | None
             - _on_episode_end() State | None
             - _log_and_learn() None
             - _reset_episode() None
-            - _maybe_advance_curriculum() bool
             - _apply_epsilon_policy() None
             +draw(screen: pygame.Surface, particles: ParticleSystem | None) None
             - _on_exit() None
         }
         %% Module-level function: iter_column_positions(piece_type: str) -> Iterator
         %% Module-level function: best_next_placement(grid: np.ndarray, piece_type: str) -> np.ndarray
-        %% Module-level function: gen_placements(base_grid: np.ndarray, piece_type: str, soft_drop: bool) -> Iterator
+        %% Module-level function: gen_placements(base_grid: np.ndarray, piece_type: str) -> Iterator
         %% Module-level function: hard_drop_y_batch(grid: np.ndarray, shapes: list, x_positions: list) -> np.ndarray
         %% Module-level function: soft_drop_placements(grid, piece_type: str) -> list[Placement]
         %% Module-level function: get_candidate_states(...) -> tuple
@@ -711,6 +708,7 @@ classDiagram
             +px: int
             +py: int
             +hold: bool
+            +moves: list~str~
             +shape: list~tuple~ [property]
         }
 
@@ -721,7 +719,7 @@ classDiagram
             +epsilon_end: float
             +epsilon_decay: float
             +batch_size: int
-            +tau: float
+            +target_sync_freq: int
             +device: torch.device
             +seed: int | None
             +online_net: DQNetwork
@@ -732,6 +730,9 @@ classDiagram
             - _n_step_buffer: deque
             +steps: int
             +last_loss: float
+            +scheduler: optim.lr_scheduler.ReduceLROnPlateau
+            +curriculum_level: int
+            +curriculum_episode_count: int
             +__init__(state_size, lr, gamma, epsilon_start, epsilon_end, epsilon_decay, batch_size, buffer_size, device, seed) None
             +select_action(candidate_states: np.ndarray, dellacherie_values: np.ndarray | None) int
             +store(state: np.ndarray, action: int, reward: float, next_state: np.ndarray, done: bool) None
@@ -740,12 +741,12 @@ classDiagram
             +decay_epsilon() None
             +learn() float | None
             - _sync_target() None
+            +advance_curriculum(max_level: int, freq: int) bool
             +save(path: str) None
             +load(path: str) None
         }
         %% Module-level function: _softmax(x: np.ndarray) -> np.ndarray
         %% Module-level constants: WARM_START_TEMP, N_STEP
-
         class DQNetwork {
             +net: nn.Sequential
             +__init__(state_size: int) None

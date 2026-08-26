@@ -10,7 +10,7 @@ Le projet repose sur une architecture modulaire et extensible :
 - **Rendu Isolé** : Classe `Renderer` dédiée pour séparer la logique de mise à jour du moteur graphique.
 - **Détection partagée des trous/surplombs** : fonctions pures dans `tetris/game/rules.py` (`find_holes`, `find_overhangs`, `count_overhangs`) — un *trou* est une case vide isolée du haut (inaccessible), un *surplomb* une case vide atteignable depuis le haut mais recouverte par une case pleine. Partagées par le rendu (marqueurs X/O blancs selon le menu « Trous et surplombs ») et la récompense IA (pénalité sur les surplombs créés).
 - **Persistance JSON** : Leaderboard stocké dans `leaderboard.json`, trié par score décroissant, incluant le nom, le score, le niveau, les lignes effacées, le générateur de pièces, le mode de jeu et la date.
-- **Apprentissage par Renforcement (V-network DQN)** : Agent V-network DQN implémenté avec PyTorch. L'IA apprend en jouant de manière autonome : évaluation par candidat (V-function, features DT-20 17-dim normalisées), exploration ε-greedy (decay et fin configurables), Prioritized Experience Replay (PER Schaul et al. 2015, avec importance sampling), n-step returns (3-step), target network (Polyak τ=0.005, Bellman). La récompense pénalise les nouveaux trous (delta), la hauteur, l'irrégularité et les puits, avec PBRS (Dellacherie, scale 0.1). Soft-drop BFS avec SRS wall kicks pour les surplombs et T-Spins. Look-ahead 2 pièces. Le modèle, les statistiques et les paramètres sont sauvegardés entre les sessions (`ai_model.pt`, `ai_training_log.json`, `settings.json`).
+- **Apprentissage par Renforcement (V-network DQN)** : Agent V-network DQN implémenté avec PyTorch. L'IA apprend en jouant de manière autonome : évaluation par candidat (V-function, features DT-20 17-dim normalisées), exploration ε-greedy (decay et fin configurables), Prioritized Experience Replay (PER Schaul et al. 2015, avec importance sampling), n-step returns (3-step), target network (hard sync toutes les 500 étapes, Bellman), LR scheduler (ReduceLROnPlateau). La récompense pénalise les nouveaux trous (delta), la hauteur, l'irrégularité et les puits, avec PBRS (Dellacherie, scale 0.1). Soft-drop BFS avec SRS wall kicks pour les surplombs et T-Spins, move-sequence planner (Placement.moves). Look-ahead 2 pièces. Le modèle, les statistiques et les paramètres sont sauvegardés entre les sessions (`ai_model.pt`, `ai_training_log.json`, `settings.json`).
 
 ## Structure du projet
 
@@ -34,7 +34,7 @@ tetris/
 │   │   └── stats.py             # Score, lignes, niveau
 │   ├── ai/                      # Apprentissage par renforcement (V-network DQN)
 │   │   ├── __init__.py
-│   │   ├── network.py           # Réseau de neurones (17→128→64→1)
+│   │   ├── network.py           # Réseau de neurones (17→256→128→1)
 │   │   ├── agent.py             # DQNAgent (ε-greedy, per-candidate eval, replay, target net)
 │   │   ├── replay_buffer.py     # Prioritized Experience Replay (PER, 50 000)
 │   │   ├── rewards.py           # Récompense (delta trous + PBRS scale 0.1), features DT-20 normalisées, simulation soft-drop BFS + SRS

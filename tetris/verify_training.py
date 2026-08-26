@@ -66,7 +66,6 @@ def run_training(n_episodes: int) -> None:
         learn_per_action=2,
         lookahead=True,
         lookahead_depth=1,
-        soft_drop=True,
     )
     state = AIState(
         screen,

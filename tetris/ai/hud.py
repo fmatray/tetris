@@ -36,7 +36,6 @@ def draw_ai_hud(ai_state: AIState) -> None:
         f"Curriculum: {'ON' if ai_state.curriculum else 'OFF'}",
         f"Pieces: {''.join(ai_state._curriculum_types) if ai_state._curriculum_types else 'ALL'}",
         f"Warm-start: {'ON' if ai_state.warm_start else 'OFF'}",
-        f"Soft-drop: {'ON' if ai_state.soft_drop else 'OFF'}",
         f"Maj/pièce: {ai_state.learn_per_action}",
     ]
     col_w = (SCREEN_WIDTH - x0) // 3

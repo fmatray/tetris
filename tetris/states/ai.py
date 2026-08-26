@@ -37,7 +37,6 @@ class AIConfig:
     learn_per_action: int
     lookahead: bool
     lookahead_depth: int
-    soft_drop: bool
 
 
 from typing import TYPE_CHECKING, NamedTuple
@@ -47,6 +46,7 @@ if TYPE_CHECKING:
 
 import numpy as np
 import pygame
+import torch
 
 from tetris.ai.agent import DQNAgent
 from tetris.ai.candidates import NUM_ROTATIONS, Placement, get_candidate_states  # noqa: F401
@@ -61,7 +61,6 @@ from tetris.audio import AudioManager
 from tetris.game.board import Board, LineClearResult
 from tetris.game.piece_provider import PieceProvider
 from tetris.game.stats import GameStats
-from tetris.game.shapes import num_shape_rot
 from tetris.game.tetromino import Tetromino
 from tetris.logger import get_logger
 from tetris.settings import (
@@ -108,6 +107,8 @@ class AIState(GameState):
     reward computation (delayed storage), and ``render`` to draw the
     AI HUD overlay.
     """
+
+    _curriculum_types: list[str] | None
 
     def __init__(
         self,
@@ -171,7 +172,6 @@ class AIState(GameState):
         self.learn_per_action = ai_config.learn_per_action
         self.lookahead = ai_config.lookahead
         self.lookahead_depth = ai_config.lookahead_depth
-        self.soft_drop = ai_config.soft_drop
         self._candidate_placements: list[Placement] = []
         # Last 5 moves for HUD display
         self._last_moves: list[MoveRecord] = []
@@ -205,9 +205,8 @@ class AIState(GameState):
         self.curriculum_epsilon: str = ai_config.curriculum_epsilon
         self._curriculum_types: list[str] | None = None
         if ai_config.curriculum and self.ai_mode == "learning":
-            self._curriculum_types = ["O"]
-            self._curriculum_level = 0
-            self._curriculum_episode_count = 0
+            self._curriculum_types = CURRICULUM_ORDER[: 1 + self.agent.curriculum_level]
+            self.pieces.set_allowed_types(self._curriculum_types)
 
     # --- Candidate generation -------------------------------------------
     def _get_candidate_states(self) -> tuple[np.ndarray, list[int], np.ndarray]:
@@ -225,61 +224,45 @@ class AIState(GameState):
             next_piece_type=self.next_piece.type,
             preview_piece_types=preview_types,
             can_hold=self._can_hold,
-            soft_drop=self.soft_drop,
             lookahead=self.lookahead,
             lookahead_depth=self.lookahead_depth,
         )
         self._candidate_placements = placements
         return candidates, actions, dellvals
 
-    # --- Macro-action execution -----------------------------------------
+    # --- Move-sequence execution ----------------------------------------
 
-    def _execute_macro_action(self, action: int) -> None:
-        """Rotate, move to target position, then drop (and lock if hard-drop)."""
+    def _execute_move_sequence(self, action: int) -> None:
+        """Replay the placement's recorded move sequence (from BFS path).
+
+        Guarantees the piece reaches the exact (px, py, rot) that the
+        V-network evaluated — no execution mismatch.
+        """
         p = self._candidate_placements[action]
-        rot, px, py, hold = p.rot, p.px, p.py, p.hold
 
-        if hold:
-            self._hold()  # GameState._hold swaps current with held/next
+        if p.hold:
+            self._hold()
 
-        piece = self.current_piece  # piece after hold (if any)
+        piece = self.current_piece
 
-        # Rotate to target rotation with SRS wall kicks
-        num_rots = num_shape_rot(piece.type)
-        target_rot = rot % num_rots
-        while piece.rotation != target_rot:
-            if not self.board.try_rotate(piece, 1):
-                break
-
-        # Move to target x
-        dx = px - piece.x
-        if dx > 0:
-            for _ in range(dx):
-                if self.board.is_valid_move(piece, dx=1):
-                    piece.move(1, 0)
-                else:
-                    break
-        elif dx < 0:
-            for _ in range(-dx):
+        for move in p.moves:
+            if move == "left":
                 if self.board.is_valid_move(piece, dx=-1):
                     piece.move(-1, 0)
-                else:
-                    break
-
-        # Soft-drop to target y (or hard-drop if soft_drop off)
-        if not self.paused:
-            if self.soft_drop:
-                drop_cells = 0
-                while piece.y < py and self.board.is_valid_move(piece, dy=1):
+            elif move == "right":
+                if self.board.is_valid_move(piece, dx=1):
+                    piece.move(1, 0)
+            elif move == "soft_drop":
+                if self.board.is_valid_move(piece, dy=1):
                     piece.move(0, 1)
-                    drop_cells += 1
-                self.stats.add_soft_drop(drop_cells)
-                # Lock delay: don't lock here. super().update() will detect
-                # the grounded piece and start the lock timer (LOCK_DELAY_MS).
-            else:
-                distance = self.board.hard_drop(piece)
-                self.stats.add_hard_drop(distance)
-                self._lock_and_spawn(hard_drop=True)
+            elif move == "rot_cw":
+                self.board.try_rotate(piece, 1)
+            elif move == "rot_ccw":
+                self.board.try_rotate(piece, -1)
+
+        # Lock delay: super().update() detects grounded piece and starts
+        # the lock timer (LOCK_DELAY_MS). In learning mode, lock delay is
+        # fast-forwarded in update().
 
     # --- Override _lock_and_spawn to capture RL transitions --------------
 
@@ -367,7 +350,7 @@ class AIState(GameState):
                 self._last_moves.append(MoveRecord(placed, rot, px, hold))
                 if len(self._last_moves) > 5:
                     self._last_moves.pop(0)
-                self._execute_macro_action(actions[chosen_idx])
+                self._execute_move_sequence(actions[chosen_idx])
 
         # Learning mode: fast-forward lock delay — piece is already positioned,
         # _prev_action blocks re-selection, so 500ms wait is pure overhead.
@@ -409,8 +392,10 @@ class AIState(GameState):
         # Decay epsilon once per episode (not per transition)
         self.agent.decay_epsilon()
 
-        # Curriculum: add next piece type if enough episodes elapsed
-        if self.curriculum and self._maybe_advance_curriculum():
+        # Curriculum: advance level via agent (persisted in checkpoint)
+        if self.curriculum and self.agent.advance_curriculum(len(CURRICULUM_ORDER) - 1, self.curriculum_freq):
+            self._curriculum_types = CURRICULUM_ORDER[: 1 + self.agent.curriculum_level]
+            self.pieces.set_allowed_types(self._curriculum_types)
             self._apply_epsilon_policy()
         if self.episode % AI_MODEL_SAVE_INTERVAL == 0:
             try:
@@ -444,11 +429,21 @@ class AIState(GameState):
             self._episode_seed = self.seed + self.episode
         else:
             self._episode_seed = random.randint(0, 999_999_999)
+
+        # Re-seed global RNG for reproducible exploration
+        random.seed(self._episode_seed)
+        np.random.seed(self._episode_seed)
+        torch.manual_seed(self._episode_seed)
+
         rng = random.Random(self._episode_seed)
 
         # Reset pieces (re-seed for reproducible sequence) and board
         gen_name = self.pieces.generator
         self.pieces = PieceProvider(generator=gen_name, seed=self._episode_seed)
+        # Restore curriculum restriction on the new provider
+        curriculum_types = self._curriculum_types
+        if self.curriculum and self.ai_mode == "learning" and curriculum_types is not None:
+            self.pieces.set_allowed_types(curriculum_types)
         self.board = Board()
         self.board.apply_handicap(self._handicap, rng)
         self.current_piece = Tetromino(self.pieces.next_type())
@@ -457,20 +452,6 @@ class AIState(GameState):
         self.hold_piece = None
         self._can_hold = True
         self.stats: GameStats = GameStats()
-
-    def _maybe_advance_curriculum(self) -> bool:
-        """Add next piece from CURRICULUM_ORDER if enough episodes elapsed."""
-        if self._curriculum_level >= len(CURRICULUM_ORDER) - 1:
-            return False  # all pieces already available
-        self._curriculum_episode_count += 1
-        if self._curriculum_episode_count >= self.curriculum_freq:
-            self._curriculum_episode_count = 0
-            self._curriculum_level += 1
-            self._curriculum_types = CURRICULUM_ORDER[: 1 + self._curriculum_level]
-            self.pieces.set_allowed_types(self._curriculum_types)
-            logger.debug("Curriculum level %d, pieces=%s", self._curriculum_level, self._curriculum_types)
-            return True
-        return False
 
     def _apply_epsilon_policy(self) -> None:
         """Adjust epsilon when new piece added, per user setting."""

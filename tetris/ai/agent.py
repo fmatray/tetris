@@ -46,7 +46,8 @@ class DQNAgent:
     """V-network DQN agent with PER, n-step returns, and target network.
 
     Hyperparameters: lr=1e-3, gamma=0.97, epsilon 1.0→0.10 (decay 0.999/episode),
-    batch=64, Polyak τ=0.005 (soft target update every step), SmoothL1Loss + grad clipping at 1.0.
+    batch=64, hard target sync every 500 steps, SmoothL1Loss + grad clipping at 1.0.
+    ReduceLROnPlateau scheduler (factor=0.5, patience=50, min_lr=1e-6).
     State: 17-dim DT-20 features. Action: per-candidate evaluation.
     """
 
@@ -83,7 +84,7 @@ class DQNAgent:
         self.epsilon_end = epsilon_end
         self.epsilon_decay = epsilon_decay
         self.batch_size = batch_size
-        self.tau: float = 0.005
+        self.target_sync_freq: int = 500
         self.seed = seed
         if seed is not None:
             torch.manual_seed(seed)
@@ -106,6 +107,17 @@ class DQNAgent:
         self._n_step_buffer: deque[NStepTransition] = deque(maxlen=N_STEP)
 
         self.steps = 0
+        # LR scheduler: reduces LR when loss plateaus
+        self.scheduler = optim.lr_scheduler.ReduceLROnPlateau(
+            self.optimizer,
+            mode="min",
+            factor=0.5,
+            patience=50,
+            min_lr=1e-6,
+        )
+        # Curriculum state (persisted in checkpoint)
+        self.curriculum_level: int = 0
+        self.curriculum_episode_count: int = 0
         self.last_loss: float = 0.0
 
     # --- Action selection -----------------------------------------------
@@ -220,16 +232,32 @@ class DQNAgent:
         self.last_loss = loss.item()
         self.steps += 1
 
-        # Polyak soft target update (every step)
+        # LR scheduler: reduce LR if loss plateaus
+        self.scheduler.step(self.last_loss)
+
+        # Hard target sync every target_sync_freq steps
         self._sync_target()
 
         return self.last_loss
 
     def _sync_target(self) -> None:
-        """Polyak averaging: blend target toward online by τ."""
-        with torch.no_grad():
-            for tp, op in zip(self.target_net.parameters(), self.online_net.parameters()):
-                tp.mul_(1 - self.tau).add_(self.tau * op)
+        """Hard-sync target network to online every target_sync_freq steps."""
+        if self.steps % self.target_sync_freq == 0:
+            self.target_net.load_state_dict(self.online_net.state_dict())
+
+    def advance_curriculum(self, max_level: int, freq: int) -> bool:
+        """Advance curriculum level if enough episodes elapsed.
+
+        Returns True if the level was advanced.
+        """
+        if self.curriculum_level >= max_level:
+            return False
+        self.curriculum_episode_count += 1
+        if self.curriculum_episode_count >= freq:
+            self.curriculum_episode_count = 0
+            self.curriculum_level += 1
+            return True
+        return False
 
     # --- Persistence -----------------------------------------------------
 
@@ -240,9 +268,13 @@ class DQNAgent:
                 "online_net": self.online_net.state_dict(),
                 "target_net": self.target_net.state_dict(),
                 "optimizer": self.optimizer.state_dict(),
+                "scheduler": self.scheduler.state_dict(),
                 "epsilon": self.epsilon,
                 "steps": self.steps,
                 "state_size": self.state_size,
+                "curriculum_level": self.curriculum_level,
+                "curriculum_episode_count": self.curriculum_episode_count,
+                "beta": self.buffer.beta,
             },
             path,
         )
@@ -253,5 +285,10 @@ class DQNAgent:
         self.online_net.load_state_dict(checkpoint["online_net"])
         self.target_net.load_state_dict(checkpoint["target_net"])
         self.optimizer.load_state_dict(checkpoint["optimizer"])
+        if "scheduler" in checkpoint:
+            self.scheduler.load_state_dict(checkpoint["scheduler"])
         self.epsilon = checkpoint.get("epsilon", self.epsilon)
         self.steps = checkpoint.get("steps", 0)
+        self.curriculum_level = checkpoint.get("curriculum_level", 0)
+        self.curriculum_episode_count = checkpoint.get("curriculum_episode_count", 0)
+        self.buffer.beta = checkpoint.get("beta", self.buffer.beta)

@@ -46,7 +46,6 @@ def _make_ai(audio, curriculum=True, freq=2, epsilon_policy="reset"):
             learn_per_action=2,
             lookahead=True,
             lookahead_depth=3,
-            soft_drop=True,
         ),
         provider,
         speed="fast",
@@ -89,7 +88,6 @@ class TestCurriculumInit:
                 learn_per_action=2,
                 lookahead=True,
                 lookahead_depth=3,
-                soft_drop=True,
             ),
             provider,
             speed="fast",
@@ -102,43 +100,69 @@ class TestCurriculumInit:
 class TestCurriculumAdvancement:
     def test_advance_adds_piece_at_freq(self, audio):
         ai = _make_ai(audio, curriculum=True, freq=2)
-        # Need 2 episode ends to advance
-        assert ai._maybe_advance_curriculum() is False  # count=1
-        added = ai._maybe_advance_curriculum()  # count=2 → advance
-        assert added is True
-        assert ai._curriculum_types == ["O", "I"]
-        assert ai.pieces.allowed_types == ["O", "I"]
+        max_level = len(CURRICULUM_ORDER) - 1
+        # Need 2 calls to advance
+        assert ai.agent.advance_curriculum(max_level, 2) is False  # count=1
+        assert ai.agent.advance_curriculum(max_level, 2) is True  # count=2 → advance
+        assert ai.agent.curriculum_level == 1
 
     def test_no_advance_before_freq(self, audio):
         ai = _make_ai(audio, curriculum=True, freq=10)
+        max_level = len(CURRICULUM_ORDER) - 1
         for _ in range(9):
-            assert ai._maybe_advance_curriculum() is False
-        assert ai._curriculum_types == ["O"]
+            assert ai.agent.advance_curriculum(max_level, 10) is False
+        assert ai.agent.curriculum_level == 0
 
     def test_advances_through_all_pieces(self, audio):
         ai = _make_ai(audio, curriculum=True, freq=1)
-        for _ in range(len(CURRICULUM_ORDER) - 1):
-            assert ai._maybe_advance_curriculum() is True
-        assert ai._curriculum_types == list(CURRICULUM_ORDER)
-        assert ai._maybe_advance_curriculum() is False
-
-    def test_advance_persists_to_piece_provider(self, audio):
-        ai = _make_ai(audio, curriculum=True, freq=2)
-        ai._maybe_advance_curriculum()  # count=1, no advance
-        ai._maybe_advance_curriculum()  # count=2 → advance
-        for _ in range(50):
-            assert ai.pieces.next_type() in ("O", "I")
+        max_level = len(CURRICULUM_ORDER) - 1
+        for _ in range(max_level):
+            assert ai.agent.advance_curriculum(max_level, 1) is True
+        assert ai.agent.curriculum_level == max_level
+        assert ai.agent.advance_curriculum(max_level, 1) is False
 
     def test_counter_resets_after_advance(self, audio):
         ai = _make_ai(audio, curriculum=True, freq=3)
-        ai._maybe_advance_curriculum()  # count=1
-        ai._maybe_advance_curriculum()  # count=2
-        ai._maybe_advance_curriculum()  # count=3 → advance, reset
-        assert ai._curriculum_episode_count == 0
-        assert ai._curriculum_types == ["O", "I"]
+        max_level = len(CURRICULUM_ORDER) - 1
+        ai.agent.advance_curriculum(max_level, 3)  # count=1
+        ai.agent.advance_curriculum(max_level, 3)  # count=2
+        ai.agent.advance_curriculum(max_level, 3)  # count=3 → advance, reset
+        assert ai.agent.curriculum_episode_count == 0
+        assert ai.agent.curriculum_level == 1
         # Need 3 more for next advance
-        ai._maybe_advance_curriculum()  # count=1
-        assert ai._curriculum_types == ["O", "I"]
+        ai.agent.advance_curriculum(max_level, 3)  # count=1
+        assert ai.agent.curriculum_level == 1
+
+    def test_curriculum_restored_after_reset(self, audio):
+        """_reset_episode restores allowed_types on the new PieceProvider."""
+        ai = _make_ai(audio, curriculum=True, freq=10)
+        assert ai.pieces.allowed_types == ["O"]
+        ai._reset_episode()
+        assert ai.pieces.allowed_types == ["O"]
+
+    def test_curriculum_resume_from_saved_model(self, audio):
+        """Save model with curriculum_level=3, load, verify level restored."""
+        import os
+        from tetris.settings import MODEL_PATH
+
+        # Clean any existing model
+        if os.path.exists(MODEL_PATH):
+            os.unlink(MODEL_PATH)
+        try:
+            ai = _make_ai(audio, curriculum=True, freq=1)
+            # Advance to level 3
+            for _ in range(3):
+                ai.agent.advance_curriculum(len(CURRICULUM_ORDER) - 1, 1)
+            assert ai.agent.curriculum_level == 3
+            # Save to MODEL_PATH so the new AIState loads it
+            ai.agent.save(MODEL_PATH)
+            # Create a fresh AIState and verify level is restored from loaded model
+            ai2 = _make_ai(audio, curriculum=True, freq=1)
+            assert ai2.agent.curriculum_level == 3
+            assert ai2._curriculum_types == CURRICULUM_ORDER[:4]
+        finally:
+            if os.path.exists(MODEL_PATH):
+                os.unlink(MODEL_PATH)
 
 
 class TestEpsilonPolicy:
@@ -226,7 +250,6 @@ class TestCurriculum7Bag:
                 learn_per_action=2,
                 lookahead=True,
                 lookahead_depth=3,
-                soft_drop=True,
             ),
             provider,
             speed="fast",
