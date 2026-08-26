@@ -7,7 +7,6 @@ One font family (Arial), two sizes:
 Layout constants ensure consistent vertical positioning across every screen:
 - ``TITLE_Y``      — y of the page title (large font).
 - ``CONTENT_Y``    — y where content begins below the title.
-- ``LINE_HEIGHT_LARGE``  — row spacing when using the large font.
 - ``LINE_HEIGHT_SMALL``  — row spacing when using the small font.
 - ``INSTRUCTIONS_Y``     — y of the bottom navigation hint.
 

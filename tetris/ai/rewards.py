@@ -485,7 +485,8 @@ def place_and_clear_batch(
     valid = (all_cx >= 0) & (all_cx < BOARD_WIDTH) & (all_cy >= 0) & (all_cy < BOARD_HEIGHT)
     if valid.any():
         batch_idx = np.repeat(np.arange(N, dtype=np.int32), 4)
-        batch[batch_idx[valid.ravel()], all_cy.ravel()[valid.ravel()], all_cx.ravel()[valid.ravel()]] = 1.0
+        valid_flat = valid.ravel()
+        batch[batch_idx[valid_flat], all_cy.ravel()[valid_flat], all_cx.ravel()[valid_flat]] = 1.0
     mask = batch > 0
     full = mask.all(axis=2)  # (N, H)
     lines = full.sum(axis=1).astype(np.int32)  # (N,)

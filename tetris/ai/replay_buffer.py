@@ -13,7 +13,7 @@ from typing import NamedTuple
 import numpy as np
 
 
-# N-step return horizon (matches agent.N_STEP; duplicated to avoid circular import).
+# N-step return horizon for multi-step Bellman targets.
 N_STEP = 3
 
 

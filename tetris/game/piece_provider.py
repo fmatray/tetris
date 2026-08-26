@@ -73,9 +73,9 @@ class PieceGenerator(ABC):
         """Clear internal state (bag, etc.) for a new game."""
 
     @property
-    @abstractmethod
     def bag_remaining(self) -> list[str]:
         """Pieces left in the current bag (empty for non-bag generators)."""
+        return []
 
 
 class RandomGenerator(PieceGenerator):
@@ -90,10 +90,6 @@ class RandomGenerator(PieceGenerator):
 
     def reset(self) -> None:
         pass
-
-    @property
-    def bag_remaining(self) -> list[str]:
-        return []
 
 
 class BagGenerator(PieceGenerator):
@@ -177,10 +173,6 @@ class WeightedGenerator(PieceGenerator):
         self._weights = {}
 
     @property
-    def bag_remaining(self) -> list[str]:
-        return []
-
-    @property
     def weights(self) -> dict[str, float]:
         """Current weight per tetromino type (copy for read-only access)."""
         return dict(self._weights)
@@ -219,10 +211,6 @@ class ReplayGenerator(PieceGenerator):
 
     def reset(self) -> None:
         pass
-
-    @property
-    def bag_remaining(self) -> list[str]:
-        return []
 
     @staticmethod
     def _load(path: Path | str) -> list[str]:

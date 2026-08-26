@@ -17,16 +17,13 @@ import torch
 from torch import nn, optim
 
 from tetris.ai.network import DQNetwork
-from tetris.ai.replay_buffer import PrioritizedReplayBuffer
+from tetris.ai.replay_buffer import N_STEP, PrioritizedReplayBuffer
 from tetris.ai.rewards import FEATURE_SIZE
 
 
 # Temperature for Dellacherie-weighted softmax during exploration (warm-start).
 # Calibrated to typical Dellacherie value range (-200 to -10).
 WARM_START_TEMP: float = 30.0
-
-# N-step return horizon for multi-step Bellman targets.
-N_STEP = 3
 
 
 class NStepTransition(NamedTuple):
