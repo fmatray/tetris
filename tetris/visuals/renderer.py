@@ -69,9 +69,13 @@ class Renderer:
         self._draw_text(f"TETROMINOS: {game.stats.piece_count}", HUD_POSITIONS["tetrominos"])
         self._draw_text(f"LIGNES: {game.stats.total_lines}", HUD_POSITIONS["lines"])
         self._draw_text(f"NIVEAU: {game.stats.level}", HUD_POSITIONS["level"])
-        if game.stats.combo > 0:
-            self._draw_text(f"COMBO: x{game.stats.combo}", HUD_POSITIONS["speed"])
-        elif game.debug:
+        cc = game.stats.clear_counts
+        self._draw_text(f"SIMPLES: {cc.single}", HUD_POSITIONS["clear_single"])
+        self._draw_text(f"DOUBLES: {cc.double}", HUD_POSITIONS["clear_double"])
+        self._draw_text(f"TRIPLES: {cc.triple}", HUD_POSITIONS["clear_triple"])
+        self._draw_text(f"TETRIS: {cc.tetris}", HUD_POSITIONS["clear_tetris"])
+        self._draw_text(f"COMBO: x{max(0, game.stats.combo)}", HUD_POSITIONS["combo"])
+        if game.debug:
             self._draw_text(f"SPEED: {int(game.current_speed * 1000)}ms", HUD_POSITIONS["speed"])
         self._draw_text("HOLD:", HUD_POSITIONS["hold"])
         if game.hold_piece is not None:

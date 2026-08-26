@@ -1,14 +1,41 @@
-"""Mutable running game statistics (score, lines, level, combo)."""
+"""Mutable running game statistics (score, lines, level, combo, clear counts)."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from tetris.game.scoring import ScoreEngine
 from tetris.settings import LINES_PER_LEVEL
 
 
 @dataclass
+class ClearCounts:
+    """Per-game counts of single, double, triple, and tetris line clears."""
+
+    single: int = 0
+    double: int = 0
+    triple: int = 0
+    tetris: int = 0
+
+    @property
+    def total(self) -> int:
+        """Total number of line-clearing events."""
+        return self.single + self.double + self.triple + self.tetris
+
+    def add(self, lines_cleared: int) -> None:
+        """Increment the counter matching ``lines_cleared`` (1–4). No-op for 0."""
+        match lines_cleared:
+            case 1:
+                self.single += 1
+            case 2:
+                self.double += 1
+            case 3:
+                self.triple += 1
+            case 4:
+                self.tetris += 1
+
+
+@dataclass
 class GameStats:
-    """Tracks score, total lines, level, combo, and piece count."""
+    """Tracks score, total lines, level, combo, B2B, clear counts, and piece count."""
 
     score: int = 0
     total_lines: int = 0
@@ -16,6 +43,7 @@ class GameStats:
     piece_count: int = 0
     combo: int = -1
     b2b: bool = False  # True if last clear was Tetris or T-Spin
+    clear_counts: ClearCounts = field(default_factory=ClearCounts)
 
     def on_piece_locked(self, lines_cleared: int, tspin: bool = False) -> None:
         """Update score, lines, level, combo, and B2B after a piece locks.
@@ -44,6 +72,7 @@ class GameStats:
             self.combo += 1
             if self.combo > 0:
                 self.score += ScoreEngine.combo_points(self.combo, self.level)
+            self.clear_counts.add(lines_cleared)
         else:
             self.combo = -1
         self.b2b = is_b2b_clear

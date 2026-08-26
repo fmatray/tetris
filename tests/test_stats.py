@@ -1,6 +1,6 @@
 """Tests for GameStats: score, level, combo, piece count tracking."""
 
-from tetris.game.stats import GameStats
+from tetris.game.stats import ClearCounts, GameStats
 from tetris.settings import LINES_PER_LEVEL
 
 
@@ -64,3 +64,80 @@ def test_hard_drop_score():
     stats = GameStats()
     stats.add_hard_drop(10)
     assert stats.score == 20
+
+
+# --- ClearCounts ---
+
+
+def test_clear_counts_initial():
+    cc = ClearCounts()
+    assert cc.single == 0
+    assert cc.double == 0
+    assert cc.triple == 0
+    assert cc.tetris == 0
+    assert cc.total == 0
+
+
+def test_clear_counts_add_single():
+    cc = ClearCounts()
+    cc.add(1)
+    assert cc.single == 1
+    assert cc.total == 1
+
+
+def test_clear_counts_add_double():
+    cc = ClearCounts()
+    cc.add(2)
+    assert cc.double == 1
+
+
+def test_clear_counts_add_triple():
+    cc = ClearCounts()
+    cc.add(3)
+    assert cc.triple == 1
+
+
+def test_clear_counts_add_tetris():
+    cc = ClearCounts()
+    cc.add(4)
+    assert cc.tetris == 1
+
+
+def test_clear_counts_add_zero_noop():
+    cc = ClearCounts()
+    cc.add(0)
+    assert cc.total == 0
+
+
+def test_clear_counts_accumulate():
+    cc = ClearCounts()
+    cc.add(1)
+    cc.add(4)
+    cc.add(1)
+    cc.add(2)
+    assert cc.single == 2
+    assert cc.double == 1
+    assert cc.tetris == 1
+    assert cc.triple == 0
+    assert cc.total == 4
+
+
+def test_stats_clear_counts_on_lock():
+    stats = GameStats()
+    stats.on_piece_locked(1)
+    stats.on_piece_locked(4)
+    stats.on_piece_locked(2)
+    stats.on_piece_locked(0)
+    stats.on_piece_locked(3)
+    assert stats.clear_counts.single == 1
+    assert stats.clear_counts.double == 1
+    assert stats.clear_counts.triple == 1
+    assert stats.clear_counts.tetris == 1
+
+
+def test_stats_clear_counts_per_instance():
+    """Each GameStats gets its own ClearCounts (default_factory)."""
+    a = GameStats()
+    b = GameStats()
+    a.on_piece_locked(1)
+    assert b.clear_counts.single == 0

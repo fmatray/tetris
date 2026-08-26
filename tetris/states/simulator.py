@@ -166,6 +166,12 @@ def simulate_actions(state: GameState, actions: list[str], frames: int, dt: floa
             "lines": state.stats.total_lines,
             "level": state.stats.level,
             "game_over": state.game_over,
+            "clear_counts": {
+                "single": state.stats.clear_counts.single,
+                "double": state.stats.clear_counts.double,
+                "triple": state.stats.clear_counts.triple,
+                "tetris": state.stats.clear_counts.tetris,
+            },
             "seed": state.seed,
             "holes": holes,
             "overhangs": overhangs,

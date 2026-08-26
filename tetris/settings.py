@@ -109,10 +109,15 @@ HUD_POSITIONS = {
     "tetrominos": (20, 60),
     "lines": (20, 100),
     "level": (20, 140),
-    "speed": (20, 180),
-    "hold": (20, 220),  # "HOLD:" label
-    "hold_panel": (20, 250),  # hold piece drawing position
-    "debug_holes_overhang": (20, 340),  # hole/overhang debug count readout
+    "clear_single": (20, 180),
+    "clear_double": (20, 220),
+    "clear_triple": (20, 260),
+    "clear_tetris": (20, 300),
+    "combo": (20, 340),
+    "speed": (20, 380),
+    "hold": (20, 420),  # "HOLD:" label
+    "hold_panel": (20, 450),  # hold piece drawing position
+    "debug_holes_overhang": (20, 540),  # hole/overhang debug count readout
     "next": (570, 50),  # "NEXT:" label
     "next_panel": (570, 80),  # next pieces drawing (30px below label)
     "ai_stats": (570, 350),

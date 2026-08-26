@@ -671,6 +671,14 @@ classDiagram
             +b2b_bonus(base_points: int) int
         }
 
+        class ClearCounts {
+            +single: int
+            +double: int
+            +triple: int
+            +tetris: int
+            +total: int
+            +add(lines_cleared: int) None
+        }
         class GameStats {
             +score: int
             +total_lines: int
@@ -678,7 +686,7 @@ classDiagram
             +piece_count: int
             +combo: int
             +b2b: bool
-            +__init__() None
+            +clear_counts: ClearCounts
             +on_piece_locked(lines_cleared: int, tspin: bool) None
             +add_soft_drop(cells: int) None
             +add_hard_drop(cells: int) None
@@ -1018,6 +1026,7 @@ classDiagram
     GameState "1" *-- "1" Board : owns
     GameState "1" *-- "1" PieceProvider : owns
     GameState "1" *-- "1" GameStats : owns
+    GameStats "1" *-- "1" ClearCounts : owns
     GameState "1" *-- "1" GameConfig : owns
 
     AIState "1" *-- "1" DQNAgent : owns

@@ -154,6 +154,12 @@ class MCPState(GameState):
             "lines": self.stats.total_lines,
             "level": self.stats.level,
             "game_over": self.game_over,
+            "clear_counts": {
+                "single": self.stats.clear_counts.single,
+                "double": self.stats.clear_counts.double,
+                "triple": self.stats.clear_counts.triple,
+                "tetris": self.stats.clear_counts.tetris,
+            },
             "seed": self.seed,
             "holes": holes,
             "overhangs": overhangs,

@@ -81,7 +81,7 @@ field). Key fields:
     hole_depth:     int   # max holes in any single column
     merit:          float # weighted quality score (higher = better board)
     action_results: list[str]   # "ok"|"blocked"|"unknown:<action>" (play only)
-    lines_cleared:  int | None   # lines removed by this call (play, simulate, enumerate)
+    clear_counts:   {"single": int, "double": int, "triple": int, "tetris": int}  # per-game cumulative clear-type counts
 
 ## Board & pieces
 
