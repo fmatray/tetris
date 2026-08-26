@@ -98,7 +98,7 @@ class Board:
         tetromino.y = py
         return distance
 
-    def apply_handicap(self, level: int) -> None:
+    def apply_handicap(self, level: int, rng: random.Random | None = None) -> None:
         """Pre-fill bottom rows with random gray blocks.
 
         Each handicap level adds two partial rows (3-7 random cells) so
@@ -106,11 +106,11 @@ class Board:
         """
         if level == 0:
             return
-
+        r = rng or random
         num_rows = level * 2
         for y in range(BOARD_HEIGHT - 1, max(0, BOARD_HEIGHT - 1 - num_rows), -1):
-            fill_count = random.randint(3, 7)
-            cells = random.sample(range(BOARD_WIDTH), fill_count)
+            fill_count = r.randint(3, 7)
+            cells = r.sample(range(BOARD_WIDTH), fill_count)
             for x in cells:
                 self.grid[y][x] = GRAY
 

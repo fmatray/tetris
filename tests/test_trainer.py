@@ -90,7 +90,7 @@ def test_load_os_error():
 def test_record_appends_episode():
     """record() appends a dict with the given fields."""
     log = TrainingLog(path=_tmp_path())
-    log.record(0, 100, 5, 3, 200, 0.1, 0.01)
+    log.record(0, 100, 5, 3, 200, 0.1, 0.01, seed=42)
     assert len(log.episodes) == 1
     ep = log.episodes[0]
     assert ep["score"] == 100
@@ -100,6 +100,7 @@ def test_record_appends_episode():
     assert ep["epsilon"] == 0.1
     assert ep["loss"] == 0.01
     assert "timestamp" in ep
+    assert ep["seed"] == 42
 
 
 def test_record_saves_at_interval():
@@ -107,7 +108,7 @@ def test_record_saves_at_interval():
     path = _tmp_path()
     log = TrainingLog(path=path)
     for i in range(TrainingLog._SAVE_INTERVAL):
-        log.record(i, 100, 5, 3, 200, 0.1, 0.01)
+        log.record(i, 100, 5, 3, 200, 0.1, 0.01, seed=42)
     # After exactly _SAVE_INTERVAL records, file should exist on disk.
     assert Path(path).exists()
     loaded = json.loads(Path(path).read_text())
@@ -119,7 +120,7 @@ def test_record_no_save_before_interval():
     path = _tmp_path()
     log = TrainingLog(path=path)
     for i in range(TrainingLog._SAVE_INTERVAL - 1):
-        log.record(i, 100, 5, 3, 200, 0.1, 0.01)
+        log.record(i, 100, 5, 3, 200, 0.1, 0.01, seed=42)
     assert not Path(path).exists()
 
 
@@ -127,7 +128,7 @@ def test_flush_forces_save():
     """flush() writes to disk regardless of count."""
     path = _tmp_path()
     log = TrainingLog(path=path)
-    log.record(0, 100, 5, 3, 200, 0.1, 0.01)
+    log.record(0, 100, 5, 3, 200, 0.1, 0.01, seed=42)
     assert not Path(path).exists()
     log.flush()
     assert Path(path).exists()

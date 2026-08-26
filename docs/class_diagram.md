@@ -98,6 +98,7 @@ classDiagram
             +ai_soft_drop: bool
             +mcp_port: int
             +speed_mode: str
+            +seed: int | None
             +__init__(screen, font, audio) None
             - _load_settings() None
             +save_settings() None
@@ -239,6 +240,18 @@ classDiagram
         }
         %% Module-level function: key_name(key: int) -> str
 
+        class SeedEntryState {
+            +screen: pygame.Surface
+            +font: pygame.font.Font
+            +audio: AudioManager
+            +menu: MenuState
+            +text: str
+            +__init__(screen, font, audio, menu) None
+            +handle_event(event: pygame.event.Event) State | None
+            +update(dt: float, particles: ParticleSystem) State | None
+            +draw(screen: pygame.Surface, particles: ParticleSystem | None) None
+        }
+
         class HumanStatsState {
             +screen: pygame.Surface
             +font: pygame.font.Font
@@ -276,6 +289,8 @@ classDiagram
             +ghost_piece: bool
             +preview_count: int
             +speed_mode: str
+            +holes_overhangs_help: str
+            +seed: int | None
         }
         class GameState {
             +screen: pygame.Surface
@@ -291,6 +306,7 @@ classDiagram
             +renderer: Renderer
             +board: Board
             +pieces: PieceProvider
+            +seed: int | None
             +current_piece: Tetromino
             +next_piece: Tetromino
             +preview_pieces: list~Tetromino~
@@ -389,6 +405,8 @@ classDiagram
             +soft_drop: bool
             - _candidate_placements: list~Placement~
             - _handicap: int
+            +seed: int | None
+            - _episode_seed: int
             +episode_steps: int
             +episode_start_grid: np.ndarray
             - _pending: PendingTransition | None
@@ -471,6 +489,7 @@ classDiagram
             - _last_tool_call: dict | None
             - _last_snapshot: dict | None
             - _handicap: int
+            +seed: int | None
             # _ACTIONS: dict~str, str~ ClassVar
             +__init__(screen, font, audio, config, mcp_config, piece_provider, menu, start_server) None
             - _start_server() None
@@ -479,7 +498,7 @@ classDiagram
             - _board_snapshot(action_results: list~str~ | None) dict
             +update(dt: float, particles: ParticleSystem) State | None
             - _do_game_over() State | None
-            - _reset_game() None
+            - _reset_game(seed: int | None) None
             +draw(screen: pygame.Surface, particles: ParticleSystem | None) None
         }
 
@@ -490,6 +509,7 @@ classDiagram
             +simulate: bool
             +depth: int
             +hold: bool
+            +seed: int | None
         }
         %% Module-level function: draw_mcp_hud(screen, font, state: MCPState) -> None
     }
@@ -505,7 +525,7 @@ classDiagram
             - _mcp: FastMCP | None
             +__init__(action_queue, port) None
             - _setup_mcp() None
-            - _run_command(actions: list~str~, frames: int, simulate: bool, depth: int, hold: bool, error_fallback: dict) dict
+            - _run_command(actions: list~str~, frames: int, simulate: bool, depth: int, hold: bool, seed: int | None, error_fallback: dict) dict
             +start() None
             +stop() None
             +attach(action_queue) None
@@ -535,7 +555,7 @@ classDiagram
             +is_tspin(tetromino: Tetromino) bool
             +lock_tetromino(tetromino: Tetromino) tuple~int, list~
             +hard_drop(tetromino: Tetromino) int
-            +apply_handicap(level: int) None
+            +apply_handicap(level: int, rng: random.Random | None) None
             +clear_lines() tuple~int, list~
             +find_holes() set~tuple~int, int~~
             +find_overhangs() set~tuple~int, int~~
@@ -567,6 +587,8 @@ classDiagram
         }
 
         class RandomGenerator {
+            - _rng: random.Random | random
+            +__init__(seed: int | None) None
             +next(pool: list~str~, is_first: bool) str
             +reset() None
             +bag_remaining: list~str~
@@ -575,23 +597,24 @@ classDiagram
         class BagGenerator {
             - _copies: int
             - _bag: list~str~
-            +__init__(copies: int) None
+            - _rng: random.Random | random
+            +__init__(copies: int, seed: int | None) None
             +next(pool: list~str~, is_first: bool) str
             +reset() None
             +bag_remaining: list~str~
         }
-
         class SevenBagGenerator {
-            +__init__() None
+            +__init__(seed: int | None) None
         }
 
         class ThirtyFiveBagGenerator {
-            +__init__() None
+            +__init__(seed: int | None) None
         }
 
         class WeightedGenerator {
             - _weights: dict~str, float~
-            +__init__() None
+            - _rng: random.Random | random
+            +__init__(seed: int | None) None
             +next(pool: list~str~, is_first: bool) str
             +reset() None
             +bag_remaining: list~str~
@@ -616,20 +639,22 @@ classDiagram
             +allowed_types: list~str~ | None
             +generator: str
             - _generator_name: str
+            - _seed: int | None
             - _recorded: list~str~
             - _first_piece: bool
             - _all_types: list~str~
             - _fallback: PieceGenerator
             - _generator: PieceGenerator
             +bag_remaining: list~str~
-            +__init__(mode: str, path: str | Path, allowed_types: list~str~ | None, generator: str) None
+            +__init__(mode: str, path: str | Path, allowed_types: list~str~ | None, generator: str, seed: int | None) None
+            +seed: int | None
             +weights: dict~str, float~
             +reset() None
             +next_type() str
             +set_allowed_types(types: list~str~) None
             +save() None
         }
-        %% Module-level function: _make_generator(name: str) -> PieceGenerator
+        %% Module-level function: _make_generator(name: str, seed: int | None) -> PieceGenerator
 
         class ScoreEngine {
             %% static
@@ -751,8 +776,8 @@ classDiagram
             +epsilon: float
             +loss: float
             +timestamp: str
+            +seed: int
         }
-
         class TrainingLog {
             # _SAVE_INTERVAL: int ClassVar
             +path: str
@@ -779,7 +804,7 @@ classDiagram
             - _safe_max(key: str) int
             - _safe_avg(key: str) float
             - _last_n_avg(key: str, n: int) float
-            +record(episode: int, score: int, lines: int, level: int, steps: int, epsilon: float, loss: float) None
+            +record(episode: int, score: int, lines: int, level: int, steps: int, epsilon: float, loss: float, seed: int) None
             +flush() None
             - _save() None
             - _trend(key: str) str
@@ -958,6 +983,7 @@ classDiagram
     State <|-- KeybindState
     State <|-- HumanStatsState
     State <|-- AIStatsState
+    State <|-- SeedEntryState
 
     MenuBase <|-- MenuState
     MenuBase <|-- HumanMenuState

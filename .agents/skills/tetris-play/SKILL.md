@@ -23,7 +23,8 @@ advances only when you send `play`; it stays frozen between calls.
 
 ## Tools
 
-- **start_game** `{}` — reset board/score/lines; spawn fresh pieces.
+- **start_game** `{ "seed": int|null }` — reset board/score/lines; spawn fresh
+  pieces. Optional `seed` makes the piece sequence reproducible.
 - **simulate** `{ "actions": [...] }` — run the action list on a throwaway copy
   and return a snapshot, **without mutating** the real board or piece queue. Use
   it to preview a placement before committing. The horizon is bounded to known
@@ -70,8 +71,8 @@ field). Key fields:
     preview_pieces: list[str]
     hold_piece:     str | None
     can_hold:       bool
-    score, lines, level: int       # lines = cumulative total cleared (only increments on actual clears)
     game_over:      bool
+    seed:           int   # random seed for this game (reproducible sequence)
     holes:          int   # "X" cells (empty, covered, no top path)
     overhangs:      int   # "O" cells (reachable covered empty — fillable now)
     aggregate_height: int   # sum of column heights
@@ -141,7 +142,7 @@ next snapshot shows the new piece and updated board.
   the floor, or `soft_drop` + shift to tuck at a chosen height, then `hard_drop`.
 - `action_results` reports rejected actions (`unknown:<action>`); the valid
   rotation is `rotate_cw`, not `rotate`.
-- Pieces are random and not seeded — re-plan from each snapshot; never assume a
-  sequence.
+- Pieces are seeded by default. Use `start_game(seed=N)` for a reproducible
+  sequence; omit `seed` for a random one. The seed appears in the snapshot.
 - On `game_over` the server stays alive (frozen); `start_game` resets in place,
   `quit` leaves MCP.

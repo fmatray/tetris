@@ -24,7 +24,10 @@ class GameConfig:
     speed_mode: str
 
     holes_overhangs_help: str = "none"
+    seed: int | None = None
 
+
+import random
 
 import pygame
 
@@ -115,9 +118,20 @@ class GameState(State):
         self.holes_overhangs_help = config.holes_overhangs_help
         self.renderer = Renderer(screen, font)
         self.speed_mode = config.speed_mode
+        self.seed: int | None = config.seed if config.seed is not None else random.randint(0, 999_999_999)
+        rng = random.Random(self.seed)
         self.board = Board()
-        self.board.apply_handicap(config.handicap)
-        self.pieces = piece_provider or PieceProvider()
+        self.board.apply_handicap(config.handicap, rng)
+        if piece_provider is not None:
+            self.pieces = PieceProvider(
+                mode=piece_provider.mode,
+                path=piece_provider.path,
+                allowed_types=piece_provider.allowed_types,
+                generator=piece_provider.generator,
+                seed=self.seed,
+            )
+        else:
+            self.pieces = PieceProvider(seed=self.seed)
         self.current_piece = Tetromino(self.pieces.next_type())
         self.next_piece = Tetromino(self.pieces.next_type())
         self.preview_pieces = [Tetromino(self.pieces.next_type()) for _ in range(max(0, config.preview_count - 1))]

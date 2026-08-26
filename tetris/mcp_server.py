@@ -190,13 +190,16 @@ class TetrisMCPServer:
             )
 
         @self._mcp.tool()
-        def start_game() -> dict[str, Any]:
+        def start_game(seed: int | None = None) -> dict[str, Any]:
             """Reset the board and start a fresh game.
 
             Clears all locked pieces, resets score/lines/level to zero,
             spawns new pieces, and returns the initial board snapshot.
+
+            Args:
+                seed: Random seed for reproducible piece sequence. None = random.
             """
-            return self._run_command(["start_game"], 0, simulate=False)
+            return self._run_command(["start_game"], 0, simulate=False, seed=seed)
 
         @self._mcp.tool()
         def quit() -> dict[str, Any]:
@@ -238,6 +241,7 @@ class TetrisMCPServer:
         depth: int = 1,
         hold: bool = True,
         error_fallback: dict[str, Any] | None = None,
+        seed: int | None = None,
     ) -> dict[str, Any]:
         """Send a command to the active game and wait for the result."""
         if self._action_queue is None:
@@ -249,7 +253,7 @@ class TetrisMCPServer:
                 "overhangs": 0,
             }
         result_q: queue.Queue[dict[str, Any]] = queue.Queue()
-        self._action_queue.put(MCPRequest(actions, frames, result_q, simulate, depth=depth, hold=hold))
+        self._action_queue.put(MCPRequest(actions, frames, result_q, simulate, depth=depth, hold=hold, seed=seed))
         return result_q.get()
 
     def attach(self, action_queue: queue.Queue[MCPRequest]) -> None:

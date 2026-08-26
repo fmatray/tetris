@@ -90,6 +90,7 @@ class GameOverState(State):
                 self.game.pieces.generator,
                 self.game.menu.mode if self.game.menu else "Normal",
                 speed_mode=self.game.speed_mode,
+                seed=self.game.seed,
             )
             if self.game.player_type == "Humain":
                 save_human_game(
@@ -98,6 +99,7 @@ class GameOverState(State):
                     self.game.stats.level,
                     self.game.stats.total_lines,
                     self.game.stats.piece_count,
+                    seed=self.game.seed,
                 )
             self._scores = load_leaderboard()
             # Find the just-saved entry to highlight it in red.

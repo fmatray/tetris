@@ -8,12 +8,14 @@ control over game timing.
 from __future__ import annotations
 
 import queue
+import random
 from dataclasses import dataclass
 from typing import NamedTuple, TYPE_CHECKING, Any
 
 import pygame
 
 from tetris.game.board import Board
+from tetris.game.piece_provider import PieceProvider
 from tetris.game.stats import GameStats
 from tetris.game.tetromino import Tetromino
 from tetris.logger import get_logger
@@ -30,7 +32,6 @@ from tetris.visuals.particles import ParticleSystem
 
 if TYPE_CHECKING:
     from tetris.audio import AudioManager
-    from tetris.game.piece_provider import PieceProvider
     from tetris.mcp_server import TetrisMCPServer
     from tetris.states.base import State
     from tetris.states.menu import MenuState
@@ -51,6 +52,7 @@ class MCPRequest(NamedTuple):
     simulate: bool
     depth: int = 1
     hold: bool = True
+    seed: int | None = None
 
 
 @dataclass(frozen=True)
@@ -83,6 +85,7 @@ class MCPState(GameState):
         self.player_type = "MCP"
         self.mcp_config = mcp_config
         self._handicap = config.handicap
+        self.seed: int | None = config.seed
         self._action_queue: queue.Queue[MCPRequest] = queue.Queue()
         self._server: TetrisMCPServer | None = None
         self._last_tool_call: dict[str, Any] | None = None
@@ -103,8 +106,17 @@ class MCPState(GameState):
             _logger.debug("MCP server detached (kept running)")
         self._server = None
 
-    def _reset_game(self) -> None:
-        """Reset all game state for a fresh game (called via ``start_game`` tool)."""
+    def _reset_game(self, seed: int | None = None) -> None:
+        """Reset all game state for a fresh game (called via ``start_game`` tool).
+
+        If ``seed`` is provided, it overrides the current seed. If no seed
+        is set (``None``), a random one is auto-generated.
+        """
+        if seed is not None:
+            self.seed = seed
+        if self.seed is None:
+            self.seed = random.randint(0, 999_999_999)
+        rng = random.Random(self.seed)
         self.game_over = False
         self.paused = False
         self.drop_time = 0.0
@@ -114,9 +126,10 @@ class MCPState(GameState):
         self._grounded = False
         self._last_level = 0
         self._pending_level_up = False
-        self.pieces.reset()
+        gen_name = self.pieces.generator
+        self.pieces = PieceProvider(generator=gen_name, seed=self.seed)
         self.board = Board()
-        self.board.apply_handicap(self._handicap)
+        self.board.apply_handicap(self._handicap, rng)
         self.current_piece = Tetromino(self.pieces.next_type())
         self.next_piece = Tetromino(self.pieces.next_type())
         self.preview_pieces = [Tetromino(self.pieces.next_type()) for _ in range(max(0, self.preview_count - 1))]
@@ -141,6 +154,7 @@ class MCPState(GameState):
             "lines": self.stats.total_lines,
             "level": self.stats.level,
             "game_over": self.game_over,
+            "seed": self.seed,
             "holes": holes,
             "overhangs": overhangs,
             **_board_feature_dict(repr_grid, lines_cleared, holes, overhangs),
@@ -174,6 +188,10 @@ class MCPState(GameState):
                 self._last_tool_call = {"actions": actions, "frames": frames, "simulate": True}
                 self._last_snapshot = snapshot
                 result_queue.put(snapshot)
+                continue
+            if "start_game" in actions:
+                self._reset_game(req.seed)
+                result_queue.put(self._board_snapshot(["ok"]))
                 continue
             if "quit" in actions:
                 quit_requested = True

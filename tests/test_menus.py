@@ -1031,9 +1031,10 @@ def test_human_menu_value_labels():
     menu = _make_menu()
     state = _make_state(HumanMenuState, menu)
     assert state._value_label(0) == "Normal"  # mode default
-    assert state._value_label(1) == ""  # Touches
-    assert state._value_label(2) == ""  # Statistiques
-    assert state._value_label(3) == ""  # Retour
+    assert state._value_label(1) == "Aléatoire"  # Graine (seed default: None)
+    assert state._value_label(2) == ""  # Touches
+    assert state._value_label(3) == ""  # Statistiques
+    assert state._value_label(4) == ""  # Retour
 
 
 def test_human_menu_toggle_mode():
@@ -1044,7 +1045,7 @@ def test_human_menu_toggle_mode():
     assert menu.mode == "Replay"
 
 
-def test_human_menu_select_keybind_navigates():
+def test_human_menu_select_seed_navigates():
     menu = _make_menu()
     state = _make_state(HumanMenuState, menu)
     state.selection = 1
@@ -1053,7 +1054,7 @@ def test_human_menu_select_keybind_navigates():
     assert result is not state
 
 
-def test_human_menu_select_stats_navigates():
+def test_human_menu_select_keybind_navigates():
     menu = _make_menu()
     state = _make_state(HumanMenuState, menu)
     state.selection = 2
@@ -1062,10 +1063,19 @@ def test_human_menu_select_stats_navigates():
     assert result is not state
 
 
-def test_human_menu_select_retour_returns_menu():
+def test_human_menu_select_stats_navigates():
     menu = _make_menu()
     state = _make_state(HumanMenuState, menu)
     state.selection = 3
+    result = state._on_select()
+    assert result is not None
+    assert result is not state
+
+
+def test_human_menu_select_retour_returns_menu():
+    menu = _make_menu()
+    state = _make_state(HumanMenuState, menu)
+    state.selection = 4
     result = state._on_select()
     assert result is menu
 

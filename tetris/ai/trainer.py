@@ -27,6 +27,7 @@ class EpisodeRecord(TypedDict):
     epsilon: float
     loss: float
     timestamp: str
+    seed: int
 
 
 class TrainingLog:
@@ -63,6 +64,7 @@ class TrainingLog:
         steps: int,
         epsilon: float,
         loss: float,
+        seed: int,
     ) -> None:
         """Append an episode record and persist to disk."""
         entry: EpisodeRecord = {
@@ -74,6 +76,7 @@ class TrainingLog:
             "epsilon": epsilon,
             "loss": loss,
             "timestamp": datetime.now(timezone.utc).isoformat(),
+            "seed": seed,
         }
         self.episodes.append(dict(entry))
         if len(self.episodes) % self._SAVE_INTERVAL == 0:

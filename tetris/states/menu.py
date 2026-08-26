@@ -67,6 +67,7 @@ class MenuState(MenuBase):
         self.speed_mode = DEFAULT_SPEED_MODE
 
         self.holes_overhangs_help = "none"
+        self.seed: int | None = None
         self.ai_epsilon_decay = 0.999
         self.ai_epsilon_end = 0.1
         self.ai_lr = 1e-4
@@ -122,6 +123,7 @@ class MenuState(MenuBase):
         "speed_mode": "speed_mode",
         "holes_overhangs_help": "holes_overhangs_help",
         "mcp_port": "mcp_port",
+        "seed": "seed",
     }
 
     def _load_settings(self) -> None:
@@ -201,6 +203,7 @@ class MenuState(MenuBase):
             preview_count=self.preview_count,
             speed_mode=self.speed_mode,
             holes_overhangs_help=self.holes_overhangs_help,
+            seed=self.seed,
         )
 
     def _on_select(self) -> State | None:
@@ -211,6 +214,7 @@ class MenuState(MenuBase):
                 provider = PieceProvider(
                     mode="replay" if self.mode == "Replay" else "normal",
                     generator=self.piece_generator,
+                    seed=self.seed,
                 )
                 if self.player == "IA":
                     return self._build_ai_state()
@@ -259,7 +263,7 @@ class MenuState(MenuBase):
         from tetris.game.piece_provider import PieceProvider
         from tetris.states.ai import AIState
 
-        ai_provider = PieceProvider(mode="normal", generator=self.piece_generator)
+        ai_provider = PieceProvider(mode="normal", generator=self.piece_generator, seed=self.seed)
         return AIState(
             self.screen,
             self.font,
@@ -285,13 +289,14 @@ class MenuState(MenuBase):
             ai_provider,
             self.ai_speed,
             self,
+            seed=self.seed,
         )
 
     def _build_mcp_state(self) -> State:
         from tetris.game.piece_provider import PieceProvider
         from tetris.states.mcp import MCPConfig, MCPState
 
-        mcp_provider = PieceProvider(mode="normal", generator=self.piece_generator)
+        mcp_provider = PieceProvider(mode="normal", generator=self.piece_generator, seed=self.seed)
         return MCPState(
             self.screen,
             self.font,

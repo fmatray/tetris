@@ -81,12 +81,15 @@ class PieceGenerator(ABC):
 class RandomGenerator(PieceGenerator):
     """Uniform random spawns with first-piece safety filter."""
 
+    def __init__(self, seed: int | None = None) -> None:
+        self._rng = random.Random(seed) if seed is not None else random
+
     def next(self, pool: list[str], is_first: bool) -> str:
         if is_first:
             safe = [t for t in pool if t in FIRST_PIECE_TYPES]
             if safe:
-                return random.choice(safe)
-        return random.choice(pool)
+                return self._rng.choice(safe)
+        return self._rng.choice(pool)
 
     def reset(self) -> None:
         pass
@@ -99,14 +102,15 @@ class BagGenerator(PieceGenerator):
     not in the safe set, swap it with an eligible piece still in the bag.
     """
 
-    def __init__(self, copies: int) -> None:
+    def __init__(self, copies: int, seed: int | None = None) -> None:
         self._copies = copies
         self._bag: list[str] = []
+        self._rng = random.Random(seed) if seed is not None else random
 
     def next(self, pool: list[str], is_first: bool) -> str:
         if not self._bag:
             self._bag = pool * self._copies
-            random.shuffle(self._bag)
+            self._rng.shuffle(self._bag)
         piece = self._bag.pop()
         if is_first and piece not in FIRST_PIECE_TYPES:
             for i, t in enumerate(self._bag):
@@ -127,15 +131,15 @@ class BagGenerator(PieceGenerator):
 class SevenBagGenerator(BagGenerator):
     """7-bag: each tetromino appears once per bag."""
 
-    def __init__(self) -> None:
-        super().__init__(copies=1)
+    def __init__(self, seed: int | None = None) -> None:
+        super().__init__(copies=1, seed=seed)
 
 
 class ThirtyFiveBagGenerator(BagGenerator):
     """35-bag: each tetromino appears 5 times per bag."""
 
-    def __init__(self) -> None:
-        super().__init__(copies=5)
+    def __init__(self, seed: int | None = None) -> None:
+        super().__init__(copies=5, seed=seed)
 
 
 class WeightedGenerator(PieceGenerator):
@@ -149,8 +153,9 @@ class WeightedGenerator(PieceGenerator):
     likely.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, seed: int | None = None) -> None:
         self._weights: dict[str, float] = {}
+        self._rng = random.Random(seed) if seed is not None else random
 
     def next(self, pool: list[str], is_first: bool) -> str:
         if not self._weights:
@@ -159,13 +164,13 @@ class WeightedGenerator(PieceGenerator):
             safe = [t for t in pool if t in FIRST_PIECE_TYPES]
             if safe:
                 weights = [self._weights[t] for t in safe]
-                piece = random.choices(safe, weights=weights)[0]
+                piece = self._rng.choices(safe, weights=weights)[0]
             else:
                 weights = [self._weights[t] for t in pool]
-                piece = random.choices(pool, weights=weights)[0]
+                piece = self._rng.choices(pool, weights=weights)[0]
         else:
             weights = [self._weights[t] for t in pool]
-            piece = random.choices(pool, weights=weights)[0]
+            piece = self._rng.choices(pool, weights=weights)[0]
         self._rebalance(piece)
         return piece
 
@@ -223,17 +228,17 @@ class ReplayGenerator(PieceGenerator):
             return []
 
 
-def _make_generator(name: str) -> PieceGenerator:
+def _make_generator(name: str, seed: int | None = None) -> PieceGenerator:
     """Factory: map a settings string to a concrete generator."""
     match name:
         case "7bag":
-            return SevenBagGenerator()
+            return SevenBagGenerator(seed)
         case "35bag":
-            return ThirtyFiveBagGenerator()
+            return ThirtyFiveBagGenerator(seed)
         case "weighted":
-            return WeightedGenerator()
+            return WeightedGenerator(seed)
         case _:
-            return RandomGenerator()
+            return RandomGenerator(seed)
 
 
 # ---------------------------------------------------------------------------
@@ -269,24 +274,34 @@ class PieceProvider:
         path: Path | str = REPLAY_PATH,
         allowed_types: list[str] | None = None,
         generator: str = "random",
+        seed: int | None = None,
     ) -> None:
         self.mode = mode
         self.path = Path(path)
         self.allowed_types: list[str] | None = allowed_types
         self._generator_name = generator
+        self._seed = seed
         self._recorded: list[str] = []
         self._first_piece = True
-        self._fallback = _make_generator(generator)
+        self._fallback = _make_generator(generator, seed)
         self._generator: PieceGenerator = ReplayGenerator(path) if mode == "replay" else self._fallback
 
     def reset(self) -> None:
         """Re-arm the first-piece restriction and clear the active generator.
 
         Called by AIState between episodes so each game starts with a
-        safe piece (I, J, L, or T).
+        safe piece (I, J, L, or T). When a seed is set, the fallback
+        generator is recreated so each game gets the same sequence.
         """
         self._first_piece = True
-        self._generator.reset()
+        if self._seed is not None:
+            self._fallback = _make_generator(self._generator_name, self._seed)
+            if self.mode != "replay":
+                self._generator = self._fallback
+            else:
+                self._generator.reset()
+        else:
+            self._generator.reset()
 
     def next_type(self) -> str:
         """Return the next piece type, applying generator and first-piece rules."""
@@ -326,6 +341,11 @@ class PieceProvider:
     def generator(self) -> str:
         """Configured generator name (``"random"``, ``"7bag"``, ``"35bag"``, ``"weighted"``)."""
         return self._generator_name
+
+    @property
+    def seed(self) -> int | None:
+        """Configured seed (``None`` = random)."""
+        return self._seed
 
     @property
     def weights(self) -> dict[str, float]:

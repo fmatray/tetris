@@ -161,6 +161,7 @@ def test_human_menu_no_handicap_option():
 def test_human_menu_options():
     assert HumanMenuState._OPTIONS == (
         "Mode",
+        "Graine",
         "Touches",
         "Statistiques",
         "Retour",
@@ -173,18 +174,18 @@ def test_human_menu_toggle_indices():
 
 
 def test_human_menu_keybind_index():
-    """Keybinds is at index 1."""
-    assert HumanMenuState._OPTIONS.index("Touches") == 1
+    """Keybinds is at index 2."""
+    assert HumanMenuState._OPTIONS.index("Touches") == 2
 
 
 def test_human_menu_stats_index():
-    """Stats is at index 2."""
-    assert HumanMenuState._OPTIONS.index("Statistiques") == 2
+    """Stats is at index 3."""
+    assert HumanMenuState._OPTIONS.index("Statistiques") == 3
 
 
 def test_human_menu_retour_index():
-    """Retour is at index 3."""
-    assert HumanMenuState._OPTIONS.index("Retour") == 3
+    """Retour is at index 4."""
+    assert HumanMenuState._OPTIONS.index("Retour") == 4
 
 
 def test_human_menu_keybind_navigates():

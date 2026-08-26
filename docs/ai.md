@@ -170,7 +170,7 @@ Output (1, Linear) → V(board) = board value
 - **Discount factor (γ)**: 0.97
 - **Polyak τ**: 0.005 (soft target update every step)
 - **Device**: `auto` (CUDA if available, else CPU). No MPS — transfer overhead negates gains on this small network.
-- **Seed**: `None` by default (non-deterministic). Set `seed=N` for reproducible weight init + sampling.
+- **Seed**: `None` by default (random). Set `seed=N` for reproducible weight init + sampling + piece generation + handicap. Per-episode seed derived as `seed + episode` for varied but reproducible training. Logged in `TrainingLog`.
 - **Mode toggling**: `online_net.eval()` during inference, `online_net.train()` during learning.
 
 The V-network evaluates board quality. Per-candidate action selection:
@@ -229,7 +229,7 @@ Constructor-only parameters (not in menu, for `verify_training` / programmatic u
 
 | Parameter | Default | Description |
 | --------- | ------- | ----------- |
-| `seed` | `None` | Random seed for reproducible training (`torch` + `numpy` + `random`) |
+| `seed` | `None` | Random seed for reproducible training (torch + numpy + random + piece generation + handicap). Per-episode seed = `seed + episode` |
 | `device` | `auto` | Torch device: `auto` (CUDA if available), `cpu`, or `cuda` |
 
 

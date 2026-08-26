@@ -13,7 +13,7 @@ class HumanMenuState(MenuBase):
     Keybindings and statistics are future features.
     """
 
-    _OPTIONS = ("Mode", "Touches", "Statistiques", "Retour")
+    _OPTIONS = ("Mode", "Graine", "Touches", "Statistiques", "Retour")
     _toggle_indices = frozenset({0})
     _title = "Humain"
 
@@ -27,6 +27,8 @@ class HumanMenuState(MenuBase):
         match i:
             case 0:
                 return self.menu.mode
+            case 1:
+                return str(self.menu.seed) if self.menu.seed is not None else "Aléatoire"
             case _:
                 return ""
 
@@ -43,14 +45,18 @@ class HumanMenuState(MenuBase):
 
     def _on_select(self) -> State | None:
         match self.selection:
-            case 1:  # Touches
+            case 1:  # Graine
+                from tetris.states.seed_entry import SeedEntryState
+
+                return SeedEntryState(self.screen, self.font, self.audio, self.menu)
+            case 2:  # Touches
                 from tetris.states.keybind import KeybindState
 
                 return KeybindState(self.screen, self.font, self.audio, self)
-            case 2:  # Statistiques
+            case 3:  # Statistiques
                 from tetris.states.human_stats import HumanStatsState
 
                 return HumanStatsState(self.screen, self.font, self.audio, self)
-            case 3:  # Retour
+            case 4:  # Retour
                 return self.menu
         return None

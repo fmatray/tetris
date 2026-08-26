@@ -13,6 +13,7 @@ the HUD for real-time learning feedback.
 from __future__ import annotations
 
 import os
+import random
 
 
 from dataclasses import dataclass
@@ -151,6 +152,8 @@ class AIState(GameState):
             menu,
         )
         self._handicap = config.handicap
+        self.seed: int | None = seed
+        self._episode_seed: int = seed if seed is not None else random.randint(0, 999_999_999)
         self.agent = DQNAgent(
             epsilon_decay=ai_config.epsilon_decay,
             epsilon_end=ai_config.epsilon_end,
@@ -400,6 +403,7 @@ class AIState(GameState):
             steps=self.episode_steps,
             epsilon=self.agent.epsilon,
             loss=self.agent.last_loss,
+            seed=self._episode_seed,
         )
         logger.debug("Episode %d ended | score=%d, eps=%.4f", self.episode, self.stats.score, self.agent.epsilon)
         # Decay epsilon once per episode (not per transition)
@@ -435,10 +439,18 @@ class AIState(GameState):
         self._pending_level_up = False
         self.audio.set_music_speed(1.0)
 
-        # Reset pieces (re-arm first-piece restriction) and board
-        self.pieces.reset()
+        # Derive per-episode seed for reproducible training
+        if self.seed is not None:
+            self._episode_seed = self.seed + self.episode
+        else:
+            self._episode_seed = random.randint(0, 999_999_999)
+        rng = random.Random(self._episode_seed)
+
+        # Reset pieces (re-seed for reproducible sequence) and board
+        gen_name = self.pieces.generator
+        self.pieces = PieceProvider(generator=gen_name, seed=self._episode_seed)
         self.board = Board()
-        self.board.apply_handicap(self._handicap)
+        self.board.apply_handicap(self._handicap, rng)
         self.current_piece = Tetromino(self.pieces.next_type())
         self.next_piece = Tetromino(self.pieces.next_type())
         self.preview_pieces = [Tetromino(self.pieces.next_type()) for _ in range(max(0, self.preview_count - 1))]

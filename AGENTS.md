@@ -31,7 +31,7 @@ Returning a new `State` from `handle_event`/`update` transitions the app; `None`
 ```
 MenuState (root, owns settings)
 ├── GameRulesMenuState (generator, preview, handicap, speed, ghost piece)
-├── HumanMenuState → { KeybindState, HumanStatsState }
+├── HumanMenuState → { SeedEntryState, KeybindState, HumanStatsState }
 ├── AIMenuState → { TrainingMenuState → { HyperparamMenuState, PlaceholderState }, AIStatsState }
 ├── MCPMenuState (port, retour)
 ├── AudioMenuState
@@ -116,7 +116,7 @@ python -m tetris.verify_training
 | `tetris/states/game.py` | `GameState` abstract base: board, pieces, gravity, lock delay, movement primitives; `GameConfig` dataclass (shared gameplay settings) |
 | `tetris/states/human.py` | `HumanState` — human gameplay: keyboard, DAS, pause, keybind setup |
 | `tetris/states/ai.py` | AI gameplay state + RL training integration (candidate generation and HUD rendering extracted to `tetris/ai/candidates.py` and `tetris/ai/hud.py`); `AIConfig` dataclass (DQN hyperparameters) |
-| `tetris/states/mcp.py` | `MCPState` — MCP gameplay (inherits `GameState`); `MCPConfig` dataclass (port); `draw_mcp_hud()` debug HUD. Game frozen between `play()` calls |
+| `tetris/states/seed_entry.py` | `SeedEntryState` — numeric text input for game seed (empty = random) |
 | `tetris/states/mcp_menu.py` | `MCPMenuState` — MCP sub-menu: port selection, back |
 | `tetris/mcp_server.py` | `TetrisMCPServer` — MCP HTTP server (FastMCP streamable-http): `play` + `start_game` tools, `board://state` + `tetris://rules` resources. Daemon thread, queue-based communication with `MCPState` |
 | `tetris/ai/agent.py` | `DQNAgent` — `select_action`, `store`, `learn`, `save`, `load` |
@@ -125,7 +125,7 @@ python -m tetris.verify_training
 | `tetris/game/rules.py` | Grid-agnostic pure game-rule functions (`shape_fits`, `try_rotation`, `hard_drop_y`, `place_cells`, `find_full_rows`), SRS wall-kick data (`SRS_KICKS_JLSTZ`, `SRS_KICKS_I`) — shared by `Board` (list grid) and AI simulation (numpy grid) |
 | `tetris/game/shapes.py` | Tetromino shape data (`SHAPES` dict — SRS rotation states), `SHAPES_TYPES` constant, shape-rotation helpers (`num_shape_rot`, `get_shape_rot`) |
 | `tetris/game/tetromino.py` | `Tetromino` class — stateful piece model (type, color, rotation, position) |
-| `tetris/game/piece_provider.py` | `PieceProvider` facade + `PieceGenerator` hierarchy (`RandomGenerator`, `BagGenerator`→`SevenBagGenerator`/`ThirtyFiveBagGenerator`, `WeightedGenerator`, `ReplayGenerator`) — tetromino spawning with record/replay, curriculum, first-piece safety |
+| `tetris/game/piece_provider.py` | `PieceProvider` facade + `PieceGenerator` hierarchy (`RandomGenerator`, `BagGenerator`→`SevenBagGenerator`/`ThirtyFiveBagGenerator`, `WeightedGenerator`, `ReplayGenerator`) — tetromino spawning with record/replay, curriculum, first-piece safety, seed support for reproducible sequences |
 | `tetris/ai/network.py` | `DQNetwork` — 17→128→64→1 V-network MLP |
 | `tetris/verify_training.py` | Headless training validation script |
 | `data/settings.json` | Persisted menu settings + keybinds |
@@ -281,7 +281,7 @@ All in `data/` (gitignored via blanket `data/` rule):
 | `media/korobeiniki.mid` | `MUSIC_SONG_PATHS["korobeiniki"]` | MIDI | Korobeiniki music (melody + bass) |
 | `media/kalinka.mid` | `MUSIC_SONG_PATHS["kalinka"]` | MIDI | Kalinka music (melody + bass) |
 
-**`settings.json` schema**: `player` ("Humain"/"IA"/"MCP"), `mode` ("Normal"/"Replay"), `handicap` (0-5), `sound` (int 0-3), `music` (int 0-3), `song` ("korobeiniki"/"kalinka"), `debug` (bool), `ghost_piece` (bool), `preview_count` (int 0/1/3), `piece_generator` ("random"/"7bag"/"35bag"/"weighted"), `speed_mode` ("none"/"easy"/"normal"/"medium"/"hard"/"crazy"/"insane"), `ai_speed` ("normal"/"fast"), `ai_epsilon_decay` (float), `ai_epsilon_end` (float), `ai_lr` (float), `ai_gamma` (float), `ai_batch_size` (int), `ai_buffer_size` (int), `ai_mode` ("learning"/"playing"), `ai_curriculum` (bool), `ai_curriculum_freq` (int), `ai_curriculum_epsilon` (str), `ai_warm_start` (bool), `ai_learn_per_action` (int), `ai_lookahead` (bool), `ai_lookahead_depth` (int 1-3), `ai_soft_drop` (bool), `mcp_port` (int), `keybinds` (dict: action→pygame keycode, includes `mute` and `hold`)
+**`settings.json` schema**: `player` ("Humain"/"IA"/"MCP"), `mode` ("Normal"/"Replay"), `handicap` (0-5), `sound` (int 0-3), `music` (int 0-3), `song` ("korobeiniki"/"kalinka"), `debug` (bool), `ghost_piece` (bool), `preview_count` (int 0/1/3), `piece_generator` ("random"/"7bag"/"35bag"/"weighted"), `speed_mode` ("none"/"easy"/"normal"/"medium"/"hard"/"crazy"/"insane"), `ai_speed` ("normal"/"fast"), `ai_epsilon_decay` (float), `ai_epsilon_end` (float), `ai_lr` (float), `ai_gamma` (float), `ai_batch_size` (int), `ai_buffer_size` (int), `ai_mode` ("learning"/"playing"), `ai_curriculum` (bool), `ai_curriculum_freq` (int), `ai_curriculum_epsilon` (str), `ai_warm_start` (bool), `ai_learn_per_action` (int), `ai_lookahead` (bool), `ai_lookahead_depth` (int 1-3), `ai_soft_drop` (bool), `mcp_port` (int), `seed` (int|null), `keybinds` (dict: action→pygame keycode, includes `mute` and `hold`)
 
 ## DQN AI Specifics
 

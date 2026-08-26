@@ -166,6 +166,7 @@ def simulate_actions(state: GameState, actions: list[str], frames: int, dt: floa
             "lines": state.stats.total_lines,
             "level": state.stats.level,
             "game_over": state.game_over,
+            "seed": state.seed,
             "holes": holes,
             "overhangs": overhangs,
             **_board_feature_dict(repr_grid, lines_cleared, holes, overhangs),
