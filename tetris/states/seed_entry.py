@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING
 
 import pygame
 
-from tetris.settings import GRAY, SCREEN_WIDTH, WHITE
+from tetris.settings import BLACK, GRAY, SCREEN_WIDTH, WHITE
 from tetris.states.base import State
 from tetris.visuals.fonts import LINE_HEIGHT_SMALL, get_large_font, get_small_font
 
@@ -54,6 +54,7 @@ class SeedEntryState(State):
         return None
 
     def draw(self, screen: pygame.Surface, *, particles: ParticleSystem | None = None) -> None:
+        screen.fill(BLACK)
         large = get_large_font()
         small = get_small_font()
 
