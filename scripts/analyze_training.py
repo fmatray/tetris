@@ -387,6 +387,76 @@ def analyze_training_log(episodes: list[dict]) -> dict:
 
 
 # ──────────────────────────────────────────────────────────────
+#  Analyse du log de jeu (mode playing)
+# ──────────────────────────────────────────────────────────────
+
+
+def analyze_playing_log(episodes: list[dict]) -> dict:
+    n = len(episodes)
+    last = episodes[-1]
+    last100 = episodes[-100:] if n >= 100 else episodes
+    prev100 = episodes[-200:-100] if n >= 200 else []
+
+    # Vue d'ensemble
+    scores = [e["score"] for e in episodes]
+    lines_list = [e["lines"] for e in episodes]
+    steps_list = [e["steps"] for e in episodes]
+    overview = {
+        "episodes": n,
+        "score_min": min(scores),
+        "score_mean": statistics.fmean(scores),
+        "score_median": statistics.median(scores),
+        "score_max": max(scores),
+        "lines_total": sum(lines_list),
+        "lines_mean": statistics.fmean(lines_list),
+        "steps_total": sum(steps_list),
+        "steps_mean": statistics.fmean(steps_list),
+        "first_ts": episodes[0].get("timestamp", "?"),
+        "last_ts": last.get("timestamp", "?"),
+    }
+
+    # Tendances (pas de loss/epsilon — mode greedy)
+    trend_keys = ["score", "lines", "steps", "avg_reward"]
+    trends = {}
+    for k in trend_keys:
+        trends[k] = {
+            "direction": _trend(last100, prev100, k),
+            "pct": _trend_pct(last100, prev100, k),
+        }
+
+    # Distribution des clears
+    clear_keys = ["clear_single", "clear_double", "clear_triple", "clear_tetris"]
+    clear_labels = ["Simple", "Double", "Triple", "Tetris"]
+    clear_totals = {k: sum(e.get(k, 0) for e in episodes) for k in clear_keys}
+    total_clears = sum(clear_totals.values()) or 1
+    clear_dist = {k: clear_totals[k] / total_clears for k in clear_keys}
+
+    # Signaux comportementaux
+    hold100 = [e.get("n_hold", 0) for e in last100]
+    hold_rate = statistics.fmean(hold100) if hold100 else 0
+
+    behavior_signals = {
+        "hold_rate": hold_rate,
+        "avg_candidates": statistics.fmean([e.get("avg_candidates", 0) for e in last100]) if last100 else 0,
+        "avg_move_len": statistics.fmean([e.get("avg_move_len", 0) for e in last100]) if last100 else 0,
+        "avg_reward": statistics.fmean([e.get("avg_reward", 0) for e in last100]) if last100 else 0,
+        "candidates_trend": _trend(last100, prev100, "avg_candidates"),
+        "move_len_trend": _trend(last100, prev100, "avg_move_len"),
+    }
+
+    return {
+        "overview": overview,
+        "trends": trends,
+        "clear_totals": clear_totals,
+        "clear_labels": clear_labels,
+        "clear_dist": clear_dist,
+        "behavior_signals": behavior_signals,
+        "last100": last100,
+        "prev100": prev100,
+    }
+
+
+# ──────────────────────────────────────────────────────────────
 #  Analyse du log de pas
 # ──────────────────────────────────────────────────────────────
 
@@ -711,9 +781,79 @@ def print_report(analysis: dict) -> None:
             f"  Taux de succès: moy={b['success_mean']:.1%}  min={b['success_min']:.1%}  tendance={b['success_trend']}  {success_flag}"
         )
 
-        p = b["pearson_score_success"]
-        corr_label = "positive" if p > 0.1 else ("négative" if p < -0.1 else "négligeable")
-        print(f"  Corrélation score↔succès: r={p:.3f} ({corr_label})")
+        p_corr = b["pearson_score_success"]
+        corr_label = "positive" if p_corr > 0.1 else ("négative" if p_corr < -0.1 else "négligeable")
+        print(f"  Corrélation score↔succès: r={p_corr:.3f} ({corr_label})")
+
+    # Log de jeu (mode playing)
+    if "playing" in analysis:
+        p = analysis["playing"]
+        pov = p["overview"]
+        print("\n=== Parties en mode jeu ===")
+        print(f"  Épisodes: {pov['episodes']}")
+        print(
+            f"  Score:  min={pov['score_min']}  moy={pov['score_mean']:.0f}  méd={pov['score_median']:.0f}  max={pov['score_max']}"
+        )
+        print(f"  Lignes: total={pov['lines_total']}  moy={pov['lines_mean']:.1f}/ép")
+        print(f"  Pas:    total={pov['steps_total']}  moy={pov['steps_mean']:.1f}/ép")
+        print(f"  Période: {pov['first_ts']} → {pov['last_ts']}")
+
+        # Tendances
+        print("\n=== Tendances (100 derniers vs 100 précédents) ===")
+        ptr = p["trends"]
+        playing_trend_labels = {
+            "score": "Score",
+            "lines": "Lignes",
+            "steps": "Pas/ép",
+            "avg_reward": "Récompense",
+        }
+        for k, label in playing_trend_labels.items():
+            if k in ptr:
+                d = ptr[k]
+                print(f"  {label:12s} {d['pct']:>8s} {_arrow(d['direction'])} {d['direction']}")
+
+        print("\n=== Distribution des clears ===")
+        ct = p["clear_totals"]
+        cd = p["clear_dist"]
+        for k, label in zip(ct.keys(), p["clear_labels"], strict=False):
+            print(f"  {label:8s} {ct[k]:>6d}  ({cd[k]:.1%})")
+
+        print("\n=== Signaux comportementaux (100 derniers) ===")
+        pbs = p["behavior_signals"]
+        print(f"  Taux de hold: {pbs['hold_rate']:.1f}/ép")
+        print(f"  Candidats moyens: {pbs['avg_candidates']:.1f} {_arrow(pbs['candidates_trend'])}")
+        print(f"  Longueur moyenne des mouvements: {pbs['avg_move_len']:.1f} {_arrow(pbs['move_len_trend'])}")
+        print(f"  Récompense moyenne: {pbs['avg_reward']:.1f}")
+
+    # Log comportemental (mode playing)
+    if "playing_behavior" in analysis:
+        pb = analysis["playing_behavior"]
+        print("\n=== Comportement en mode jeu ===")
+        print(f"  Entrées: {pb['count']}")
+
+        col_flag = WARN if pb["is_skewed"] else OK
+        print(f"  Distribution des colonnes (col la plus utilisée: {pb['dominant_col']})  {col_flag}")
+        col_bar = "  "
+        for i, d in enumerate(pb["col_dist"]):
+            bar_len = int(d * 40)
+            col_bar += f"  c{i}: [{'#' * bar_len}{' ' * (40 - bar_len)}] {d:.1%}\n  "
+        print(col_bar.rstrip())
+
+        print("  Rotations:")
+        for i, (label, d) in enumerate(zip(pb["rot_labels"], pb["rot_dist"], strict=False)):
+            rot_flag = WARN if d < 0.05 else OK
+            print(f"    {label}: {d:.1%}  {rot_flag}")
+        if pb["avoided_rot"]:
+            print(f"  → Rotations évitées: {', '.join(pb['avoided_rot'])}  {WARN}")
+
+        success_flag = _flag(pb["success_mean"], SUCCESS_WARN, higher_is_bad=False)
+        print(
+            f"  Taux de succès: moy={pb['success_mean']:.1%}  min={pb['success_min']:.1%}  tendance={pb['success_trend']}  {success_flag}"
+        )
+
+        p_corr = pb["pearson_score_success"]
+        corr_label = "positive" if p_corr > 0.1 else ("négative" if p_corr < -0.1 else "négligeable")
+        print(f"  Corrélation score↔succès: r={p_corr:.3f} ({corr_label})")
 
     # Recommandations
     print("\n=== Recommandations ===")
@@ -776,6 +916,37 @@ def _print_recommendations(analysis: dict) -> None:
         if b["avoided_rot"]:
             recs.append(
                 f"• Rotations évitées: {', '.join(b['avoided_rot'])} — la politique n'explore pas toutes les orientations"
+            )
+    if "playing" in analysis:
+        p = analysis["playing"]
+        pov = p["overview"]
+        pbs = p["behavior_signals"]
+
+        if pov["episodes"] < 3:
+            recs.append("• Peu de parties en mode jeu — collecter plus de données pour évaluer la politique apprise")
+
+        if pbs["avg_reward"] < -50:
+            recs.append(
+                f"• Récompense moyenne négative élevée ({pbs['avg_reward']:.0f}) — la politique prend des positions défavorables en jeu"
+            )
+
+        score_trend = p["trends"].get("score", {}).get("direction", "stable")
+        if score_trend == "down":
+            recs.append("• Score de jeu en baisse — possible régression de la politique ou surapprentissage")
+
+    if "playing_behavior" in analysis:
+        pb = analysis["playing_behavior"]
+        if pb["is_skewed"]:
+            recs.append(
+                f"• Placement de jeu déséquilibré (col {pb['dominant_col']} surutilisé) — la politique évite une partie du plateau en jeu"
+            )
+        if pb["success_mean"] < SUCCESS_WARN:
+            recs.append(
+                f"• Taux de succès en jeu faible ({pb['success_mean']:.0%}) — problème d'exécution des placements"
+            )
+        if pb["avoided_rot"]:
+            recs.append(
+                f"• Rotations évitées en jeu: {', '.join(pb['avoided_rot'])} — la politique n'utilise pas toutes les orientations"
             )
 
     if not recs:
@@ -942,6 +1113,8 @@ def main() -> None:
         BEHAVIOR_LOG_PATH,
         DATA_DIR,
         LOG_PATH,
+        PLAYING_BEHAVIOR_LOG_PATH,
+        PLAYING_LOG_PATH,
         STEP_LOG_PATH,
     )
 
@@ -950,7 +1123,8 @@ def main() -> None:
     training = load_training_log(LOG_PATH)
     steps = load_step_log(STEP_LOG_PATH)
     behavior = load_behavior_log(BEHAVIOR_LOG_PATH)
-
+    playing = load_training_log(PLAYING_LOG_PATH)
+    playing_behavior = load_behavior_log(PLAYING_BEHAVIOR_LOG_PATH)
     # Analyser
     analysis: dict = {}
     if training:
@@ -960,7 +1134,10 @@ def main() -> None:
         analysis["steps"] = analyze_step_log(steps)
     if behavior:
         analysis["behavior"] = analyze_behavior_log(behavior)
-
+    if playing:
+        analysis["playing"] = analyze_playing_log(playing)
+    if playing_behavior:
+        analysis["playing_behavior"] = analyze_behavior_log(playing_behavior)
     # Rapport
     print_report(analysis)
 
