@@ -376,10 +376,12 @@ class TestOnEpisodeEnd:
 
     def test_playing_mode_resets_without_logging(self):
         ai = _make_ai(learning=False)
+        before = len(ai.log.episodes)
         ai.game_over = True
         ai._on_episode_end()
         assert ai.game_over is False
-        assert len(ai.log.episodes) == 0  # type: ignore[unreachable]
+        # Playing mode writes exactly one entry to the playing log.
+        assert len(ai.log.episodes) == before + 1
 
 
 class TestLogAndLearn:
@@ -794,11 +796,8 @@ class TestObservabilityCounters:
         log_path = tempfile.mktemp(suffix=".jsonl")
         ai = _make_ai(learning=True, speed="fast")
         ai.log.path = _unique_path()
-        # Monkey-patch BEHAVIOR_LOG_PATH for this test
-        import tetris.states.ai as ai_mod
-
-        orig = ai_mod.BEHAVIOR_LOG_PATH
-        ai_mod.BEHAVIOR_LOG_PATH = log_path  # type: ignore[misc]
+        # Set instance attribute — _write_behavior_log uses self._behavior_log_path
+        ai._behavior_log_path = log_path
         try:
             particles = ParticleSystem()
             for _ in range(300):
@@ -817,7 +816,6 @@ class TestObservabilityCounters:
             assert len(entry["col_hist"]) == 10
             assert len(entry["rot_hist"]) == 4
         finally:
-            ai_mod.BEHAVIOR_LOG_PATH = orig
             if os.path.exists(log_path):
                 os.unlink(log_path)
 

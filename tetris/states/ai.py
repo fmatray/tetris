@@ -74,6 +74,8 @@ from tetris.settings import (
     LOCK_DELAY_MS,
     LOG_PATH,
     MODEL_PATH,
+    PLAYING_BEHAVIOR_LOG_PATH,
+    PLAYING_LOG_PATH,
     STEP_LOG_PATH,
     TB_LOG_DIR,
 )
@@ -174,7 +176,12 @@ class AIState(GameState):
             step_log_path=STEP_LOG_PATH if ai_config.ai_mode == "learning" else None,
             tb_log_dir=TB_LOG_DIR if ai_config.ai_mode == "learning" else None,
         )
-        self.log = TrainingLog(LOG_PATH)
+        if ai_config.ai_mode == "learning":
+            self.log = TrainingLog(LOG_PATH)
+            self._behavior_log_path = BEHAVIOR_LOG_PATH
+        else:
+            self.log = TrainingLog(PLAYING_LOG_PATH)
+            self._behavior_log_path = PLAYING_BEHAVIOR_LOG_PATH
         self.episode = self.log.total_episodes
         self.speed = speed
         self.ai_mode = ai_config.ai_mode
@@ -422,6 +429,8 @@ class AIState(GameState):
             return None
         if self.ai_mode == "learning":
             self._log_and_learn()
+        else:
+            self._log_playing()
         self._reset_episode()
         return None
 
@@ -486,6 +495,31 @@ class AIState(GameState):
                 logger.error("Failed to save AI model: %s", e)
         # Flush remaining n-step transitions before new episode
         self.agent.flush_n_step()
+
+    def _log_playing(self) -> None:
+        """Record playing-mode episode stats (no learning, no model save)."""
+        self.log.record(
+            episode=self.episode,
+            score=self.stats.score,
+            lines=self.stats.total_lines,
+            level=self.stats.level,
+            steps=self.episode_steps,
+            epsilon=0.0,
+            loss=0.0,
+            seed=self._episode_seed,
+            piece_count=self.stats.piece_count,
+            clear_single=self.stats.clear_counts.single,
+            clear_double=self.stats.clear_counts.double,
+            clear_triple=self.stats.clear_counts.triple,
+            clear_tetris=self.stats.clear_counts.tetris,
+            n_greedy=self._ep_n_greedy,
+            n_hold=self._ep_n_hold,
+            avg_candidates=self._ep_avg([float(c) for c in self._ep_candidates]),
+            avg_move_len=self._ep_avg([float(m) for m in self._ep_move_lens]),
+            avg_reward=self._ep_avg(self._ep_rewards),
+        )
+        self._write_behavior_log()
+        logger.debug("Playing episode %d | score=%d", self.episode, self.stats.score)
 
     def _reset_episode(self) -> None:
         """Reset game state for a new episode."""
@@ -584,7 +618,7 @@ class AIState(GameState):
             "rot_hist": rot_dist,
         }
         try:
-            path = Path(BEHAVIOR_LOG_PATH)
+            path = Path(self._behavior_log_path)
             path.parent.mkdir(parents=True, exist_ok=True)
             with open(path, "a") as f:
                 f.write(json.dumps(entry) + "\n")
@@ -592,10 +626,18 @@ class AIState(GameState):
             pass  # ponytail: behavior log is best-effort
 
     def _on_exit(self) -> None:
-        """Save model and flush log before returning to menu on ESC."""
-        self.log.flush()
-        self.agent.flush_logs()
-        try:
-            self.agent.save(MODEL_PATH)
-        except (OSError, RuntimeError) as e:
-            logger.error("Failed to save AI model: %s", e)
+        """Save model and flush log before returning to menu on ESC.
+
+        Playing mode never writes training artifacts — the model, training
+        log, and TB writer stay untouched so the trained checkpoint is not
+        polluted (e.g. epsilon=0 overwriting the training epsilon).
+        """
+        if self.ai_mode == "learning":
+            self.log.flush()
+            self.agent.flush_logs()
+            try:
+                self.agent.save(MODEL_PATH)
+            except (OSError, RuntimeError) as e:
+                logger.error("Failed to save AI model: %s", e)
+        elif self.ai_mode == "playing":
+            self.log.flush()

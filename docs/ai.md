@@ -447,6 +447,9 @@ Five-tier instrumentation for training diagnostics:
 - ✅ **2-piece look-ahead** — Simulate best next-piece placement before evaluation.
 - ✅ **Feature normalization** — Standardize DT-20 features (mean/std) before network input.
 - ✅ **Observability infrastructure** — 5-tier instrumentation: enriched episode log (26 new fields), JSONL step log with rotation, behavioral JSONL, reward decomposition (`compute_reward_components`), TensorBoard integration.
+- ✅ **Playing-mode logging** — Mode Jeu writes to separate log files (`PLAYING_LOG_PATH` / `PLAYING_BEHAVIOR_LOG_PATH`) to avoid polluting training artifacts. Training files (`ai_training_log.json`, `ai_behavior_log.jsonl`, `ai_model.pt`, `ai_step_log.jsonl`, `runs/`) are never written in playing mode. `AIStatsState` reads training logs only; playing stats shown in-game HUD only.
+- ✅ **Cooking-state indicator** — HUD indicator (apprentissage mode only) classifies training health as undercooked (blue) / good (green) / overcooked (red) using episode count, epsilon, score trend, and V-value spread. Includes a thermometer bar showing training progress (epsilon decay + episode maturity).
+- ✅ **Training analysis script** — `scripts/analyze_training.py`: standalone read-only tool that reads all AI logs and produces a health report with `[OK]`/`[ATTN]`/`[CRIT]` flags. Optional `--charts` generates PNGs to `data/analysis/`. Replicates game logic (`_trend`, `_moving_average`, `_cooking_status`) for consistency.
 - **Self-Play Tournament** — run multiple AI agents in parallel, keep the
   best-performing model.
 - **Human Replay** — let a human play, record the session, and pre-train

@@ -10,7 +10,7 @@ Le projet repose sur une architecture modulaire et extensible :
 - **Rendu Isolé** : Classe `Renderer` dédiée pour séparer la logique de mise à jour du moteur graphique.
 - **Détection partagée des trous/surplombs** : fonctions pures dans `tetris/game/rules.py` (`find_holes`, `find_overhangs`, `count_overhangs`) — un *trou* est une case vide isolée du haut (inaccessible), un *surplomb* une case vide atteignable depuis le haut mais recouverte par une case pleine. Partagées par le rendu (marqueurs X/O blancs selon le menu « Trous et surplombs ») et la récompense IA (pénalité sur les surplombs créés).
 - **Persistance JSON** : Leaderboard stocké dans `leaderboard.json`, trié par score décroissant, incluant le nom, le score, le niveau, les lignes effacées, le générateur de pièces, le mode de jeu et la date.
-- **Apprentissage par Renforcement (V-network DQN)** : Agent V-network DQN implémenté avec PyTorch. L'IA apprend en jouant de manière autonome : évaluation par candidat (V-function, features DT-20 17-dim normalisées), exploration ε-greedy (decay et fin configurables), Prioritized Experience Replay (PER Schaul et al. 2015, avec importance sampling), n-step returns (3-step), target network (hard sync toutes les 500 étapes, Bellman), LR scheduler (ReduceLROnPlateau). La récompense pénalise les nouveaux trous (delta), la hauteur, l'irrégularité et les puits, avec PBRS (Dellacherie, scale 0.1). Soft-drop BFS avec SRS wall kicks pour les surplombs et T-Spins, move-sequence planner (Placement.moves). Look-ahead 2 pièces. Le modèle, les statistiques et les paramètres sont sauvegardés entre les sessions (`ai_model.pt`, `ai_training_log.json`, `settings.json`).
+- **Apprentissage par Renforcement (V-network DQN)** : Agent V-network DQN implémenté avec PyTorch. L'IA apprend en jouant de manière autonome : évaluation par candidat (V-function, features DT-20 17-dim normalisées), exploration ε-greedy (decay et fin configurables), Prioritized Experience Replay (PER Schaul et al. 2015, avec importance sampling), n-step returns (3-step), target network (hard sync toutes les 500 étapes, Bellman), LR scheduler (ReduceLROnPlateau). La récompense pénalise les nouveaux trous (delta), la hauteur, l'irrégularité et les puits, avec PBRS (Dellacherie, scale 0.1). Soft-drop BFS avec SRS wall kicks pour les surplombs et T-Spins, move-sequence planner (Placement.moves). Look-ahead 2 pièces. Le modèle, les statistiques et les paramètres sont sauvegardés entre les sessions (`ai_model.pt`, `ai_training_log.json`, `settings.json`). **Mode Jeu** (greedy, sans apprentissage) écrit dans des fichiers séparés (`ai_playing_log.json`, `ai_playing_behavior_log.jsonl`) — les artefacts d'entraînement ne sont jamais modifiés. **Indicateur de cuisson** : le HUD d'apprentissage affiche un indicateur undercooked/good/overcooked (bleu/vert/rouge) avec thermomètre de progression. **Script d'analyse** (`scripts/analyze_training.py`) : lecture read-only des logs IA, rapport de santé avec flags `[OK]`/`[ATTN]`/`[CRIT]`, charts optionnels (`--charts`).
 
 ## Structure du projet
 
@@ -68,6 +68,8 @@ tetris/
 │   │   └── mcp_menu.py          # MCPMenuState (port)
 │   └── storage/                 # Persistance JSON
 ├── mcp_server.py            # TetrisMCPServer (serveur MCP HTTP, outils play + simulate + start_game + enumerate_drops + resources)
+├── scripts/                    # Scripts utilitaires
+│   └── analyze_training.py     # Analyse read-only des logs IA (rapport de santé + charts optionnels)
 ├── tests/                       # Tests unitaires
 │   ├── __init__.py
 │   ├── conftest.py              # Fixtures partagées
@@ -85,7 +87,11 @@ tetris/
 │   ├── leaderboard.json         # Scores top 10
 │   ├── human_stats.json         # Historique des parties humaines
 │   ├── ai_model.pt              # Poids du modèle DQN
-│   ├── ai_training_log.json     # Journal d'entraînement
+│   ├── ai_training_log.json     # Journal d'entraînement (mode apprentissage)
+│   ├── ai_playing_log.json      # Journal du mode jeu (séparé du mode apprentissage)
+│   ├── ai_step_log.jsonl        # Journal par learn() (perte, TD, grad, LR)
+│   ├── ai_behavior_log.jsonl    # Analytics comportementales (mode apprentissage)
+│   ├── ai_playing_behavior_log.jsonl  # Analytics comportementales (mode jeu)
 │   ├── debug.log                # Journal de débogage (mode débogage ON)
 │   └── replay_pieces.json       # Séquences de pièces (mode replay)
 ├── requirements.txt             # Dépendances (pygame, numpy, torch)

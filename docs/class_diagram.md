@@ -396,6 +396,7 @@ classDiagram
             +ghost_piece: bool
             +agent: DQNAgent
             +log: TrainingLog
+            - _behavior_log_path: str
             +episode: int
             +speed: str
             +ai_mode: str
@@ -425,6 +426,7 @@ classDiagram
             - _on_episode_end() State | None
             - _ep_avg(values: list~float~) float
             - _log_and_learn() None
+            - _log_playing() None
             - _write_behavior_log() None
             - _reset_episode() None
             - _apply_epsilon_policy() None
@@ -439,7 +441,8 @@ classDiagram
         %% Module-level function: get_candidate_states(...) -> tuple
         %% Module-level function: draw_ai_hud(ai_state) -> None
         %% Module-level function: _hud_table_rows(log, stats, episode_steps: int) -> list
-        %% Module-level function: _trend_arrow(trend: str) -> str
+        %% Module-level function: _cooking_status(ai_state) -> tuple[str, tuple[int, int, int], float]
+        %% Module-level function: _draw_thermometer(screen, x: int, y: int, level: float, color: tuple) -> None
 
         class GameOverState {
             +screen: pygame.Surface

@@ -60,6 +60,7 @@ MenuState (root, owns settings)
 | `tests/` | Pytest suite for game logic and AI components |
 | `docs/` | Technical documentation (AI design, Architecture, etc.) |
 | `data/` | All runtime-generated files (gitignored) |
+| `scripts/` | Standalone analysis utilities (`analyze_training.py` — read-only training health report from AI logs) |
 
 ## Development Commands
 
@@ -120,8 +121,7 @@ python -m tetris.verify_training
 | `tetris/states/mcp_menu.py` | `MCPMenuState` — MCP sub-menu: port selection, back |
 | `tetris/mcp_server.py` | `TetrisMCPServer` — MCP HTTP server (FastMCP streamable-http): `play` + `start_game` tools, `board://state` + `tetris://rules` resources. Daemon thread, queue-based communication with `MCPState` |
 | `tetris/ai/agent.py` | `DQNAgent` — `select_action`, `store`, `learn`, `save`, `load` |
-| `tetris/ai/candidates.py` | Candidate placement generation — `iter_column_positions`, `best_next_placement`, `gen_placements`, `get_candidate_states`, `soft_drop_placements`, `hard_drop_y_batch` (moved from `tetris/game/rules.py`). `Placement` NamedTuple. Pure functions, no instance state |
-| `tetris/ai/hud.py` | AI training HUD rendering — training params table, stats table, last-5-moves. Pure presentation |
+| `tetris/ai/hud.py` | AI training HUD rendering — training params table, stats table, last-5-moves, cooking-state indicator (undercooked/good/overcooked label + thermometer bar). Pure presentation |
 | `tetris/game/rules.py` | Grid-agnostic pure game-rule functions (`shape_fits`, `try_rotation`, `hard_drop_y`, `place_cells`, `find_full_rows`), SRS wall-kick data (`SRS_KICKS_JLSTZ`, `SRS_KICKS_I`) — shared by `Board` (list grid) and AI simulation (numpy grid) |
 | `tetris/game/shapes.py` | Tetromino shape data (`SHAPES` dict — SRS rotation states), `SHAPES_TYPES` constant, shape-rotation helpers (`num_shape_rot`, `get_shape_rot`) |
 | `tetris/game/tetromino.py` | `Tetromino` class — stateful piece model (type, color, rotation, position) |
@@ -129,6 +129,7 @@ python -m tetris.verify_training
 | `tetris/game/piece_provider.py` | `PieceProvider` facade + `PieceGenerator` hierarchy (`RandomGenerator`, `BagGenerator`→`SevenBagGenerator`/`ThirtyFiveBagGenerator`, `WeightedGenerator`, `ReplayGenerator`) — tetromino spawning with record/replay, curriculum, first-piece safety, seed support for reproducible sequences |
 | `tetris/ai/network.py` | `DQNetwork` — 17→256→128→1 V-network MLP |
 | `tetris/verify_training.py` | Headless training validation script |
+| `scripts/analyze_training.py` | Standalone read-only training analysis — reads all AI logs, produces health report with `[OK]`/`[ATTN]`/`[CRIT]` flags + optional `--charts` PNG output to `data/analysis/` |
 | `data/settings.json` | Persisted menu settings + keybinds |
 | `tetris/logger.py` | Central logging — `configure_logging(debug)`, `get_logger(name)` |
 | `tetris/audio/midi_gen.py` | MIDI file generation — `ensure_midi_files()`, Korobeiniki/Kalinka note data |
@@ -274,6 +275,8 @@ All in `data/` (gitignored via blanket `data/` rule):
 | `ai_training_log.json` | `LOG_PATH` | JSON | Per-episode training metrics (35 fields: 9 original + 26 observability) |
 | `ai_step_log.jsonl` | `STEP_LOG_PATH` | JSONL | Per-`learn()`-call metrics (loss, TD error, grad norm, LR, buffer fill); rotates at 100K lines |
 | `ai_behavior_log.jsonl` | `BEHAVIOR_LOG_PATH` | JSONL | Per-episode behavioral analytics (column/rotation histograms, placement success rate) |
+| `ai_playing_log.json` | `PLAYING_LOG_PATH` | JSON | Per-episode playing-mode metrics (separate from training log; mode implicit by filename) |
+| `ai_playing_behavior_log.jsonl` | `PLAYING_BEHAVIOR_LOG_PATH` | JSONL | Per-episode playing-mode behavioral analytics (separate from training behavior log) |
 | `runs/` | `TB_LOG_DIR` | TensorBoard | TensorBoard event files for live dashboards (`tensorboard --logdir data/runs`) |
 | `replay_pieces.json` | `REPLAY_PATH` | JSON | Stored piece sequences for Replay mode |
 
@@ -297,5 +300,7 @@ All in `data/` (gitignored via blanket `data/` rule):
 - **PER beta annealing**: `beta` anneals from 0.4 → 1.0 over 10,000 learn steps (fixed, not buffer-size-based).
 - **Curriculum**: Curriculum state (`curriculum_level`, `curriculum_episode_count`) lives in `DQNAgent`, persisted in checkpoint. `advance_curriculum(max_level, freq)` advances level every `freq` episodes. `_reset_episode` re-applies `set_allowed_types` on the new `PieceProvider`.
 - **Seed reproducibility**: `_reset_episode` derives `_episode_seed = seed + episode` and re-seeds `random`, `np.random`, `torch.manual_seed`, and `PieceProvider` for reproducible training.
-- **Modes**: `ai_mode="learning"` (epsilon-greedy + training updates + logging, fast-forwards lock delay) vs `"playing"` (greedy, epsilon=0, no learning, full lock delay). Set in `AIState.__init__` after `agent.load(MODEL_PATH)`. Training uses `lookahead_depth=1` + `preview_count=1` in `verify_training.py` for speed (6.9× faster); playing uses `lookahead_depth=3` + `preview_count=3` for best move quality. `online_net.eval()` during `select_action`, `online_net.train()` during `learn` (future-proofs for dropout/BN).
+- **Modes**: `ai_mode="learning"` (epsilon-greedy + training updates + logging, fast-forwards lock delay) vs `"playing"` (greedy, epsilon=0, no learning, full lock delay). Set in `AIState.__init__` after `agent.load(MODEL_PATH)`. Training uses `lookahead_depth=1` + `preview_count=1` in `verify_training.py` for speed (6.9× faster); playing uses `lookahead_depth=3` + `preview_count=3` for best move quality. `online_net.eval()` during `select_action`, `online_net.train()` during `learn` (future-proofs for dropout/BN). **Playing-mode logging**: playing mode writes to `PLAYING_LOG_PATH` / `PLAYING_BEHAVIOR_LOG_PATH` (separate files, mode implicit by filename — no `mode` field in entries). Training files (`ai_training_log.json`, `ai_behavior_log.jsonl`, `ai_model.pt`, `ai_step_log.jsonl`, `runs/`) are never written by playing mode. `_on_exit()` saves model + flushes TB only in learning mode; playing mode flushes playing log only. `AIStatsState` reads from `LOG_PATH` (training) only; playing stats shown in-game HUD only. `_log_playing()` records episode metrics to the playing log via `_on_episode_end()`.
 - **Observability** (5 tiers): Tier 1 enriches per-episode JSON log with 26 new fields (LR, TD errors, grad norm, buffer fill, target syncs, PER beta, V-value spread/margin, candidate count, random/greedy ratio, hold rate, move-sequence length, avg reward, curriculum level, 9 reward components). Tier 2 writes per-`learn()`-call JSONL to `STEP_LOG_PATH` (rotates at 100K lines). Tier 3 writes per-episode behavioral JSONL to `BEHAVIOR_LOG_PATH` (column histogram 10 bins, rotation histogram 4 bins, placement success rate). Tier 4 decomposes reward via `compute_reward_components()` in `rewards.py` (9 components: lines, holes_delta, overhangs, height, bumpiness, wells, survival, pbrs, game_over — sum equals `compute_reward()`). Tier 5 writes TensorBoard scalars via `SummaryWriter` in `DQNAgent.learn()` to `TB_LOG_DIR` (runtime-guarded by `ImportError`). `DQNAgent.training_metrics()` snapshots dynamics; `flush_logs()` flushes TB writer; `AIState._write_behavior_log()` writes behavioral JSONL. `last_action_was_random` flag tracks actual exploration rate. `target_syncs` persisted in checkpoint. All logs are best-effort (I/O errors never crash training). Playing mode disables step log and TB writer.
+- **Cooking-state indicator** (`tetris/ai/hud.py`): `_cooking_status()` classifies training as undercooked (blue, `(100,180,255)`), good (green), or overcooked (red) using episode count, epsilon, score trend (`log._trend("score")`), and `agent.last_v_spread`. `_draw_thermometer()` renders a 12×20px vertical bar with fill proportional to training progress (`max(eps_progress, ep_maturity)` clamped 0..1). Shown in `draw_ai_hud()` only in learning mode. Color + label encode cooking health; thermometer level encodes training progress.
+- **Training analysis** (`scripts/analyze_training.py`): Standalone read-only script that reads `ai_training_log.json`, `ai_step_log.jsonl`, and `ai_behavior_log.jsonl`, and produces a health report with `[OK]`/`[ATTN]`/`[CRIT]` flags. Replicates `_trend`, `_moving_average`, and `_cooking_status` logic from game code for consistency. Optional `--charts` flag saves PNGs to `data/analysis/` (score curve, column heatmap, dynamics 4-panel, reward decomposition). TensorBoard loading disabled (event files too large for quick analysis; step log JSONL covers same metrics). No game code modified; lazy imports of `tetris.settings` inside `main()` to avoid pygame init at import time.

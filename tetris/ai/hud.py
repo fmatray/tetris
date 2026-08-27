@@ -5,12 +5,14 @@ Pure presentation: reads AI state, draws text. No game logic.
 
 from __future__ import annotations
 
+import pygame
+
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from tetris.states.ai import AIState
 
-from tetris.settings import HUD_POSITIONS, RED, SCREEN_WIDTH
+from tetris.settings import HUD_POSITIONS, RED, GREEN, SCREEN_WIDTH
 from tetris.visuals.fonts import LINE_HEIGHT_SMALL
 
 
@@ -47,6 +49,15 @@ def draw_ai_hud(ai_state: AIState) -> None:
     y += (len(training_items) // 3 + (1 if len(training_items) % 3 else 0)) * lh
 
     y += 10  # gap between sections
+
+    # --- Cooking indicator (training mode only) ---
+    if ai_state.ai_mode == "learning":
+        status, color, level = _cooking_status(ai_state)
+        _draw_thermometer(ai_state.screen, x0, y, level, color)
+        label_x = x0 + 30
+        surf = ai_state.font.render(f"Cuisson: {status}", True, color)
+        ai_state.screen.blit(surf, (label_x, y))
+        y += max(lh, 20) + 5
 
     # --- Statistics table ---
     # Columns: [Tetromino, Lines, Score, Level] — right-aligned
@@ -118,3 +129,59 @@ def _hud_table_rows(log, stats, episode_steps: int) -> list[list]:
 def _trend_arrow(trend: str) -> str:
     """Convert a trend string to an arrow symbol."""
     return {"up": "↑", "down": "↓", "stable": "→"}.get(trend, "→")
+
+
+def _cooking_status(ai_state: AIState) -> tuple[str, tuple[int, int, int], float]:
+    """Classify training as undercooked, good, or overcooked.
+
+    Returns (label, color, level) where level is 0..1 progress:
+      - 0 = just started (high epsilon, few episodes)
+      - 1 = fully converged (low epsilon, stable trend)
+    The level is clamped and does NOT reflect overcooking —
+    overcooking is shown by the color (red) + label only.
+
+    Signals (all from live agent + log state):
+      - Undercooked: <200 episodes, epsilon > 0.3, or score trending up.
+      - Overcooked: score trending down, or stable + v_spread collapsed.
+      - Good: stable trend + healthy v_spread + low epsilon.
+    """
+    log = ai_state.log
+    agent = ai_state.agent
+    n = log.total_episodes
+    eps = agent.epsilon
+    v_spread = agent.last_v_spread
+    score_trend = log._trend("score")
+
+    # Progress: epsilon decay from 1.0 → epsilon_end, plus episode maturity
+    eps_range = 1.0 - agent.epsilon_end
+    eps_progress = 1.0 - (eps - agent.epsilon_end) / eps_range if eps_range > 0 else 1.0
+    ep_maturity = min(n / 500.0, 1.0)
+    level = max(eps_progress, ep_maturity)
+    level = max(0.0, min(1.0, level))
+
+    if n < 200 or eps > 0.3 or score_trend == "up":
+        return "Pas assez cuit", (100, 180, 255), level
+    if score_trend == "down":
+        return "Trop cuit", RED, level
+    # stable: check v_spread health
+    if v_spread < 0.01:
+        return "Trop cuit", RED, level
+    return "Bien cuit", GREEN, level
+
+
+def _draw_thermometer(screen, x: int, y: int, level: float, color: tuple[int, int, int]) -> None:
+    """Draw a vertical thermometer bar: outline + filled portion proportional to level.
+
+    Height 20px, width 12px. Fill rises from bottom to top.
+    Color reflects cooking state (blue/green/red).
+    """
+    h, w = 20, 12
+    # Outline
+    pygame.draw.rect(screen, (80, 80, 80), (x, y, w, h), 1)
+    # Fill
+    fill_h = int(h * level)
+    if fill_h > 0:
+        fill_y = y + h - fill_h
+        pygame.draw.rect(screen, color, (x + 1, fill_y, w - 2, fill_h))
+    # Bulb at bottom
+    pygame.draw.circle(screen, color, (x + w // 2, y + h + 4), 5)

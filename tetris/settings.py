@@ -21,6 +21,8 @@ BLACK = (0, 0, 0)
 WHITE = (255, 255, 255)
 GRAY = (128, 128, 128)
 RED = (255, 0, 0)
+GREEN = (0, 200, 0)
+ORANGE = (255, 165, 0)
 
 # Piece generator labels (French UI)
 GENERATOR_LABELS = {
@@ -124,7 +126,7 @@ HUD_POSITIONS = {
     "mode": (20, 680),
     "generator": (20, 720),
     "speed_mode": (20, 760),
-    "ai_moves": (800, 100),
+    "ai_moves": (800, 120),
     "debug_bag": (800, 50),  # bag/weights debug panel
     "mcp_hud": (570, 450),
     "pause": (400, 350),
@@ -214,6 +216,8 @@ REPLAY_PATH = os.path.join(DATA_DIR, "replay_pieces.json")
 DEBUG_LOG_PATH = os.path.join(DATA_DIR, "debug.log")
 STEP_LOG_PATH = os.path.join(DATA_DIR, "ai_step_log.jsonl")
 BEHAVIOR_LOG_PATH = os.path.join(DATA_DIR, "ai_behavior_log.jsonl")
+PLAYING_LOG_PATH = os.path.join(DATA_DIR, "ai_playing_log.json")
+PLAYING_BEHAVIOR_LOG_PATH = os.path.join(DATA_DIR, "ai_playing_behavior_log.jsonl")
 TB_LOG_DIR = os.path.join(DATA_DIR, "runs")
 
 # --- MCP ---------------------------------------------------------------
