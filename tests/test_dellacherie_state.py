@@ -16,6 +16,7 @@ from pathlib import Path
 
 from tetris.audio import AudioManager
 from tetris.bots.dellacherie import dellacherie_pick
+from tetris.bots.moves import BotMovesMixin
 from tetris.game.piece_provider import PieceProvider
 from tetris.states.bot_menu import BotMenuState
 from tetris.states.dellacherie import BotConfig, DellacherieState
@@ -137,6 +138,33 @@ class TestDellacherieGameplay:
         for _ in range(200):
             bot.update(16, parts)
         assert bot.episode_steps >= 3
+
+    def test_replay_lands_exactly_on_evaluated_placement(self):
+        """BFS paths start from spawn; replay must land on the exact (px, py, rot)
+        the evaluation saw, even when gravity pre-falls the piece during the
+        80ms decision delay (the replay snaps the piece back to spawn)."""
+        bot = _make_bot()
+        parts = ParticleSystem()
+        placements: list = []
+        orig = DellacherieState._execute_move_sequence
+
+        def spy(self: BotMovesMixin, action: int) -> None:
+            # Simulate one frame of gravity pre-fall before replay.
+            if self.board.is_valid_move(self.current_piece, dy=1):
+                self.current_piece.move(0, 1)
+            p = self._candidate_placements[action]
+            orig(self, action)
+            placements.append((p, (self.current_piece.x, self.current_piece.y, self.current_piece.rotation % 4)))
+
+        DellacherieState._execute_move_sequence = spy  # type: ignore[method-assign]
+        try:
+            for _ in range(120):
+                bot.update(16, parts)
+        finally:
+            DellacherieState._execute_move_sequence = orig  # type: ignore[method-assign]
+        assert placements, "bot never executed a move"
+        for p, (x, y, rot) in placements:
+            assert (x, y, rot) == (p.px, p.py, p.rot % 4)
 
     def test_pick_values_match_candidates(self):
         """_pick_values is the El-Tetris array matching the candidate list."""

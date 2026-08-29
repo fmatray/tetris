@@ -317,11 +317,15 @@ class AIState(BotMovesMixin, GameState):
         if self.paused or self.game_over:
             return self._on_episode_end()
 
-        # Normal mode: throttle decisions to ~80ms for human-like reaction speed.
-        # Fast mode: act immediately — no artificial delay for faster training.
+        # Normal mode: throttle decisions to ~80ms for human-like reaction
+        # speed, capped so pre-fall (and the snap-back in
+        # _execute_move_sequence) stays small. Replay is exact regardless
+        # because the mixin re-anchors the piece to spawn before replaying.
+        # Fast mode: act immediately — no artificial delay.
         if self.speed == "normal" and self._prev_action is None and not self.game_over:
             self._action_timer += dt
-            if self._action_timer < AI_ACTION_DELAY_MS:
+            delay = min(AI_ACTION_DELAY_MS, self.current_speed * 4000)
+            if self._action_timer < delay:
                 new_state = super().update(dt, particles)
                 return self._on_episode_end() if new_state is not None else None
             self._action_timer = 0.0

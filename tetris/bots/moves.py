@@ -13,8 +13,10 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
+from tetris.settings import BOARD_WIDTH
 from tetris.ai.candidates import Placement, get_candidate_states
 from tetris.ai.rewards import board_to_grid
+
 
 if TYPE_CHECKING:
     from tetris.game.board import Board
@@ -86,6 +88,14 @@ class BotMovesMixin:
             self._hold()
 
         piece = self.current_piece
+
+        # BFS paths start from spawn (x=3, y=0, rot=0). Gravity may have
+        # pre-fallen the piece during the decision delay — snap it back to
+        # the BFS start state so the recorded path replays exactly. The
+        # board is unchanged since enumeration (same frame), so every
+        # BFS-accepted move is still valid.
+        piece.x, piece.y, piece.rotation = BOARD_WIDTH // 2 - 2, 0, 0
+        piece.shape = piece.get_current_shape()
 
         for move in p.moves:
             if move == "left":

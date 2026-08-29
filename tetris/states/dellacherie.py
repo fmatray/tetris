@@ -84,10 +84,14 @@ class DellacherieState(BotMovesMixin, GameState):
         if self.paused or self.game_over:
             return super().update(dt, particles)
 
-        # Human-watchable pace: throttle decisions to ~80ms.
+        # Human-watchable pace: throttle decisions to ~80ms, capped so
+        # pre-fall (and the snap-back in _execute_move_sequence) stays
+        # small. Replay is exact regardless because the mixin re-anchors
+        # the piece to spawn before replaying.
         if self._prev_action is None:
             self._action_timer += dt
-            if self._action_timer < AI_ACTION_DELAY_MS:
+            delay = min(AI_ACTION_DELAY_MS, self.current_speed * 4000)
+            if self._action_timer < delay:
                 return super().update(dt, particles)
             self._action_timer = 0.0
 
