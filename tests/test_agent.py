@@ -584,13 +584,13 @@ def test_step_log_writes_jsonl():
     assert "epsilon" in line
 
 
-def test_step_log_rotation():
+def test_step_log_rotation(monkeypatch):
     """Step log rotates to keep only STEP_LOG_MAX_LINES lines."""
     import tempfile
 
     log_path = tempfile.mktemp(suffix=".jsonl")
+    monkeypatch.setattr("tetris.ai.agent.STEP_LOG_MAX_LINES", 3)
     agent = DQNAgent(batch_size=4, seed=42, step_log_path=log_path)
-    agent.STEP_LOG_MAX_LINES = 3
     for batch_start in range(5):
         for i in range(8):
             agent.store(_state(batch_start * 10 + i), 0, float(i), _state(batch_start * 10 + i + 1), done=False)
@@ -599,7 +599,7 @@ def test_step_log_rotation():
         agent._write_step_log()
     with open(log_path) as f:
         lines = f.readlines()
-    assert len(lines) <= agent.STEP_LOG_MAX_LINES
+    assert len(lines) <= 3
 
 
 def test_save_load_persists_target_syncs():

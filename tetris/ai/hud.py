@@ -132,40 +132,55 @@ def _trend_arrow(trend: str) -> str:
 
 
 def _cooking_status(ai_state: AIState) -> tuple[str, tuple[int, int, int], float]:
-    """Classify training as undercooked, good, or overcooked.
+    """Classify training health using 4 signals: score trend, TD error trend,
+    V-margin discrimination, and epsilon decay.
 
-    Returns (label, color, level) where level is 0..1 progress:
-      - 0 = just started (high epsilon, few episodes)
-      - 1 = fully converged (low epsilon, stable trend)
-    The level is clamped and does NOT reflect overcooking —
-    overcooking is shown by the color (red) + label only.
-
-    Signals (all from live agent + log state):
-      - Undercooked: <200 episodes, epsilon > 0.3, or score trending up.
-      - Overcooked: score trending down, or stable + v_spread collapsed.
-      - Good: stable trend + healthy v_spread + low epsilon.
+    Returns (label, color, level) where level is 0..1 training progress.
     """
     log = ai_state.log
     agent = ai_state.agent
     n = log.total_episodes
     eps = agent.epsilon
-    v_spread = agent.last_v_spread
+    v_margin = agent.last_v_margin
     score_trend = log._trend("score")
 
-    # Progress: epsilon decay from 1.0 → epsilon_end, plus episode maturity
     eps_range = 1.0 - agent.epsilon_end
     eps_progress = 1.0 - (eps - agent.epsilon_end) / eps_range if eps_range > 0 else 1.0
     ep_maturity = min(n / 500.0, 1.0)
-    level = max(eps_progress, ep_maturity)
-    level = max(0.0, min(1.0, level))
-
-    if n < 200 or eps > 0.3 or score_trend == "up":
+    level = max(0.0, min(1.0, max(eps_progress, ep_maturity)))
+    # ponytail: n<100 → undercooked by definition; TD window unavailable and early
+    # score dips are normal learning churn, not divergence.
+    if n < 100:
         return "Pas assez cuit", (100, 180, 255), level
-    if score_trend == "down":
+    health = 0
+    # Signal 1: score trend
+    if score_trend == "up":
+        health += 1
+    elif score_trend == "down":
+        health -= 1
+    # Signal 2: TD error trend (50-ep window)
+    if n >= 100:
+        recent_td = [e.get("avg_td_error", 0) for e in log.episodes[-50:]]
+        prev_td = [e.get("avg_td_error", 0) for e in log.episodes[-100:-50]]
+        recent_avg = sum(recent_td) / len(recent_td) if recent_td else 0
+        prev_avg = sum(prev_td) / len(prev_td) if prev_td else 0
+        if prev_avg > 0:
+            td_ratio = recent_avg / prev_avg
+            if td_ratio < 0.9:
+                health += 1
+            elif td_ratio > 1.5:
+                health -= 1
+    # Signal 3: V-margin (network discriminates top-2 candidates)
+    if v_margin > 0.01:
+        health += 1
+    # Signal 4: epsilon winding down
+    if eps < 0.2:
+        health += 1
+
+    if health <= 0:
         return "Trop cuit", RED, level
-    # stable: check v_spread health
-    if v_spread < 0.01:
-        return "Trop cuit", RED, level
+    if health <= 1:
+        return "Pas assez cuit", (100, 180, 255), level
     return "Bien cuit", GREEN, level
 
 

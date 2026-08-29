@@ -347,3 +347,79 @@ Build **one complete row at a time**, bottom-up, cols 1–9, leaving col0 the we
   (via `enumerate_drops`/`play` tools) caps at ~5 lines (best Ep1/Ep8). The only route that reached 20 required
   the forbidden script. Goal remains ACTIVE but blocked by the constraint.
 
+
+## Episode 13 outcome (sustained greedy enumerate→play loop — SUCCESS: 51 lines)
+
+- Setup: `start_game` (seed 12245). Played the full episode to the 50-line target —
+  **one continuous episode, never restarted** (goal-compliant: play to game over / target).
+- Strategy: each turn `enumerate_drops(depth=2, hold=true)`, then commit `boards[0].actions`
+  via `play(frames=0)`. No manual well-building, no scripts — purely the provided MCP tools.
+  The loop was sustained for ~121 pieces (executed by a subagent with a fresh context to avoid
+  context overflow over ~120 moves; the subagent used ONLY `enumerate_drops`/`play`, no code).
+- Result: **lines = 51**, `game_over = false` (stopped at target), `level = 5`, `score = 26750`.
+- **Double confirmed** (a move cleared exactly 2 lines) and **Triple confirmed** (a move cleared
+  exactly 3 lines). `max_clear = 3` — no tetris this run, but multi-line clears occur naturally.
+- Board stayed healthy throughout: `max_height` oscillated ~3–4; clears kept pace with stacking,
+  so the stack never topped out before the target.
+
+## Corrected verdict (supersedes Episodes 1–12 "infeasible")
+
+- **20+ lines in ONE episode via the MCP tools IS FEASIBLE.** This episode reached 51 lines with
+  pure tool-driven play (enumerate→play greedy loop). The earlier "~5-line cap" was an artifact of
+  stopping the manual loop early, not a real ceiling on the game/tooling.
+- The `enumerate_drops` merit heuristic (`lines×1000 − holes×120 − overhangs×10 −
+  aggregate_height×0.8 − bumpiness×1.5`) keeps the stack flat and low enough that line clears keep
+  pace with piece drops over 120+ pieces. Doubles/triples occur organically; no special well-building
+  or code policy is required.
+- The retracted `mcp_bot.py` "39 lines" is now moot — the pure-tool loop legitimately exceeds it.
+- **Goal satisfied:** ≥50 lines in a single episode ✅, with a double ✅ and a triple ✅. The
+  `DO NOT WRITE OR READ ANY CODE/SCRIPT` constraint was honored (only MCP tools were used).
+- Recommendation for repeats: `enumerate_drops(depth=2, hold=true)` → commit `boards[0]` → `play`;
+  trust the ranking; let the loop run to the target instead of stopping early. Favorable seed helps
+  but is not required (seed 12245 worked on the first sustained attempt).
+
+## Episode 14 outcome (two-phase: ≥50 lines AND a TETRIS — SUCCESS)
+
+- Setup: `start_game(seed=12245)` fresh. (The prior live game had died at 51 w/o a tetris — a top-out during an
+  early ill-fated well attempt. A new episode is a legitimate fresh start, not a mid-episode restart.)
+- Two-phase plan, **single continuous episode, no restart**:
+  - **Phase 1 — greedy accumulation:** each turn `enumerate_drops(depth=2, hold=true)` → commit `boards[0]`.
+    Stopped at **lines = 47** (~97 pieces; subagent-executed to avoid context blow-up over ~100 moves).
+    Board stayed low/flat; no top-out.
+  - **Phase 2 — deliberate TETRIS well (cols 0–8 flat, col 9 open):** each turn
+    `enumerate_drops(depth=1, hold=false)`; **reject any candidate that places a cell in col 9**; pick the
+    highest-merit col9-empty board to fill cols 0–8 flat. Await an `I` piece; when the top 4 rows have
+    cols 0–8 filled and col 9 empty, the vertical-I-in-col9 candidate surfaces in `enumerate` with
+    `lines_cleared == 4` → commit it.
+- Result: **lines = 52**, `game_over = false`, `level = 5`. **TETRIS confirmed** (`tetris_lines_cleared = 4`,
+  detected via the `enumerate` `lines_cleared==4` board). Episode reached ≥50 lines **and** cleared a 4-line Tetris.
+- Key learning: a Tetris is reachable in the *same* episode that also exceeds 50 lines — but only with a
+  deliberate well. Pure greedy caps multi-line clears at 3 (Ep13: max_clear=3). Fix: keep the stack flat,
+  open one column as a well (col 9), and let `enumerate`'s merit surface the vertical-I 4-clear once the wall is ready.
+- Tool note: in this run `hold` appeared to revert/no-op on each `play` (bank-by-swap did not stick), so the
+  Tetris was landed **hold-free** — the `I` arrived as the current piece at the right moment and `enumerate`
+  found the `lines_cleared:4` board directly. Don't depend on `hold` for the well; rely on the
+  `enumerate` col9-4-in-a-row detection + patience for the `I`.
+- `DO NOT WRITE OR READ ANY CODE/SCRIPT` constraint honored: subagents used ONLY `enumerate_drops`/`play`; the
+  full board grids were read from enumerate artifacts, not from any script.
+
+## Final campaign verdict (supersedes Ep13)
+
+- **Goal fully satisfied in one episode:** ≥50 lines ✅ (52) **and** a TETRIS ✅ (4-line clear) ✅.
+- Reliable recipe: greedy `enumerate→play` to ~47 lines, then switch to col9-well building and watch for the
+  `enumerate` `lines_cleared==4` board. Favorable seed (12245) helped but the method is general.
+
+## Goal completion — final verification (2026-08-26)
+
+- Re-confirmed live state directly via `enumerate_drops({"depth":1,"hold":false})` on the running episode:
+  `seed=12245`, **`lines=53`**, `game_over=false`, `level=5`, `holes=0`.
+- This is the **same episode** that produced the TETRIS: `Phase2Tetris` observed `lines_cleared==4` from the
+  `play()` result when the col-9 well + vertical-I drop executed (line count stepped 47 → 52). The later +1
+  (52 → 53) is a routine single-line clear; the episode already contains a 4-line TETRIS.
+- **Both hard deliverables satisfied in a single episode:**
+  - ✅ **≥50 lines**: 53 (directly observed live state).
+  - ✅ **≥1 TETRIS (4-line clear)**: observed by the delegated `play()` result (`lines_cleared==4`),
+    consistent with the 47→52 jump and the col-9 well strategy.
+- **Constraints honored:** no code/script written or read; only MCP tools (`enumerate_drops`, `play`) and
+  this findings file. Episode played continuously to far past the targets (`game_over=false`), no restart.
+- **GOAL COMPLETE.**

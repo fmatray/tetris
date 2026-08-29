@@ -316,18 +316,45 @@ def analyze_training_log(episodes: list[dict]) -> dict:
         "beta_progress": (last.get("beta", 0.4) - 0.4) / 0.6,
     }
 
-    # Cuisson (réplique de _cooking_status de hud.py)
     score_trend = _trend(last100, prev100, "score")
-    v_spread = last.get("avg_v_spread", 0.0)
+    v_margin = last.get("avg_v_margin", 0.0)
     ep_maturity = min(n / 500.0, 1.0)
     level = max(0.0, min(1.0, max(eps_progress, ep_maturity)))
 
-    if n < 200 or eps > 0.3 or score_trend == "up":
+    health = 0
+    # Signal 1: score trend
+    if score_trend == "up":
+        health += 1
+    elif score_trend == "down":
+        health -= 1
+    # Signal 2: TD error trend (50-ep window)
+    if n >= 100:
+        recent_td = [e.get("avg_td_error", 0) for e in episodes[-50:]]
+        prev_td = [e.get("avg_td_error", 0) for e in episodes[-100:-50]]
+        recent_avg = statistics.fmean(recent_td) if recent_td else 0
+        prev_avg = statistics.fmean(prev_td) if prev_td else 0
+        if prev_avg > 0:
+            td_ratio = recent_avg / prev_avg
+            if td_ratio < 0.9:
+                health += 1
+            elif td_ratio > 1.5:
+                health -= 1
+    # Signal 3: V-margin (network discriminates top-2 candidates)
+    if v_margin > 0.01:
+        health += 1
+    # Signal 4: epsilon winding down
+    if eps < 0.2:
+        health += 1
+
+    if n < 100:  # pas assez cuit par définition : fenêtre TD indisponible
         cooking_label = "Pas assez cuit"
         cooking_color = "blue"
-    elif score_trend == "down" or v_spread < 0.01:
+    elif health <= 0:
         cooking_label = "Trop cuit"
         cooking_color = "red"
+    elif health <= 1:
+        cooking_label = "Pas assez cuit"
+        cooking_color = "blue"
     else:
         cooking_label = "Bien cuit"
         cooking_color = "green"

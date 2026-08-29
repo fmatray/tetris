@@ -21,6 +21,7 @@ from torch import nn, optim
 from tetris.ai.network import DQNetwork
 from tetris.ai.replay_buffer import N_STEP, PrioritizedReplayBuffer
 from tetris.ai.rewards import FEATURE_SIZE
+from tetris.settings import STEP_LOG_MAX_LINES
 
 
 # Temperature for Dellacherie-weighted softmax during exploration (warm-start).
@@ -319,8 +320,6 @@ class DQNAgent:
             "v_margin": self.last_v_margin,
         }
 
-    STEP_LOG_MAX_LINES = 100_000
-
     def _write_step_log(self) -> None:
         """Append one JSONL line of step-level metrics. Rotate at max lines."""
         entry = {
@@ -343,8 +342,8 @@ class DQNAgent:
             # Rotate: keep last STEP_LOG_MAX_LINES
             if self.steps % 1000 == 0 and path.exists():
                 lines = path.read_text().splitlines()
-                if len(lines) > self.STEP_LOG_MAX_LINES:
-                    path.write_text("\n".join(lines[-self.STEP_LOG_MAX_LINES :]) + "\n")
+                if len(lines) > STEP_LOG_MAX_LINES:
+                    path.write_text("\n".join(lines[-STEP_LOG_MAX_LINES:]) + "\n")
         except OSError:
             pass  # ponytail: step log is best-effort, training must not crash
 

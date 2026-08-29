@@ -218,6 +218,7 @@ STEP_LOG_PATH = os.path.join(DATA_DIR, "ai_step_log.jsonl")
 BEHAVIOR_LOG_PATH = os.path.join(DATA_DIR, "ai_behavior_log.jsonl")
 PLAYING_LOG_PATH = os.path.join(DATA_DIR, "ai_playing_log.json")
 PLAYING_BEHAVIOR_LOG_PATH = os.path.join(DATA_DIR, "ai_playing_behavior_log.jsonl")
+STEP_LOG_MAX_LINES = 1_000_000  # rotate ai_step_log.jsonl at this many lines
 TB_LOG_DIR = os.path.join(DATA_DIR, "runs")
 
 # --- MCP ---------------------------------------------------------------

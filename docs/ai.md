@@ -249,7 +249,7 @@ An episode runs from game start to game over. One placement per piece:
 4. Observe reward `r` (delta holes + line bonus + board quality + PBRS shaping)
 5. Store `(s, 0, r, s', done)` in n-step buffer → PER (delayed: s = board after prev placement, s' = board after this placement)
 6. Run `learn_per_action` V-function Bellman gradient updates via prioritized mini-batch (IS-weighted)
-7. LR scheduler step: `scheduler.step(last_loss)` — reduces LR on plateau
+7. LR scheduler step: `scheduler.step(last_loss)` — reduces LR on plateau (patience=50)
 8. Hard target sync every `target_sync_freq` learn steps
 9. Decay ε once per episode
 10. Advance curriculum if enabled (`agent.advance_curriculum`)
@@ -411,7 +411,7 @@ first draw. Any key returns to the AI submenu.
 | **Sparse rewards** (few lines cleared early) | Shape reward with height/bumpiness penalties + PBRS (Dellacherie potential) |
 | **Catastrophic forgetting** | Experience replay + target network |
 | **Overhang execution mismatch** | Move-sequence planner: BFS records full atomic action path; `_execute_move_sequence` replays it exactly, guaranteeing the piece reaches the evaluated position |
-| **Training plateau** | Wider network (256→128), hard target sync (500 steps), LR scheduler (ReduceLROnPlateau) |
+| **Training plateau** | Wider network (256→128), hard target sync (500 steps), LR scheduler (ReduceLROnPlateau, patience=50) |
 | **PER beta never reaches 1.0** | Beta annealed over fixed 10K samples (not buffer_size-based) |
 
 ---
@@ -448,7 +448,7 @@ Five-tier instrumentation for training diagnostics:
 - ✅ **Feature normalization** — Standardize DT-20 features (mean/std) before network input.
 - ✅ **Observability infrastructure** — 5-tier instrumentation: enriched episode log (26 new fields), JSONL step log with rotation, behavioral JSONL, reward decomposition (`compute_reward_components`), TensorBoard integration.
 - ✅ **Playing-mode logging** — Mode Jeu writes to separate log files (`PLAYING_LOG_PATH` / `PLAYING_BEHAVIOR_LOG_PATH`) to avoid polluting training artifacts. Training files (`ai_training_log.json`, `ai_behavior_log.jsonl`, `ai_model.pt`, `ai_step_log.jsonl`, `runs/`) are never written in playing mode. `AIStatsState` reads training logs only; playing stats shown in-game HUD only.
-- ✅ **Cooking-state indicator** — HUD indicator (apprentissage mode only) classifies training health as undercooked (blue) / good (green) / overcooked (red) using episode count, epsilon, score trend, and V-value spread. Includes a thermometer bar showing training progress (epsilon decay + episode maturity).
+- ✅ **Cooking-state indicator** — HUD indicator (apprentissage mode only) uses 4-signal health scoring: (1) score trend, (2) TD error trend (50-ep window ratio), (3) V-margin discrimination, (4) epsilon decay. Maps health score (-1 to +3) to undercooked (blue) / good (green) / overcooked (red). Includes a thermometer bar showing training progress (epsilon decay + episode maturity).
 - ✅ **Training analysis script** — `scripts/analyze_training.py`: standalone read-only tool that reads all AI logs and produces a health report with `[OK]`/`[ATTN]`/`[CRIT]` flags. Optional `--charts` generates PNGs to `data/analysis/`. Replicates game logic (`_trend`, `_moving_average`, `_cooking_status`) for consistency.
 - **Self-Play Tournament** — run multiple AI agents in parallel, keep the
   best-performing model.
