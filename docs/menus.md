@@ -4,8 +4,8 @@
 
 ```
 Menu principal
-├── Démarrer le jeu               [ENTER]          → lance la partie (Humain, IA ou MCP selon Joueur)
-├── Joueur                        [toggle ◄ ►]     Humain ↔ IA ↔ MCP
+├── Démarrer le jeu               [ENTER]          → lance la partie (Humain, IA, Bot ou MCP selon Joueur)
+├── Joueur                        [toggle ◄ ►]     Humain ↔ IA ↔ Bot ↔ MCP
 ├── Humain                        [ENTER]          (grisé si Joueur≠Humain)
 │   └── Mode                      [toggle ◄ ►]     Normal ↔ Replay
 │       Touches                   [ENTER]          → keybinding config
@@ -32,6 +32,9 @@ Menu principal
 │       │       Retour            [ENTER | ESC]
 │       Statistiques              [ENTER]          → stats + graph (une page)
 │       Réinitialiser IA          [ENTER ×2]       supprime modèle + log
+│       Retour                    [ENTER | ESC]
+├── Bot                            [ENTER]          (grisé si Joueur≠Bot)
+│   └── Anticipation               [toggle ◄ ►]     Non ↔ Comme aperçu
 │       Retour                    [ENTER | ESC]
 ├── MCP                            [ENTER]          (grisé si Joueur≠MCP)
 │   └── Port                       [toggle ◄ ►]     8765 ↔ 8766 ↔ 8767 ↔ 8768

@@ -33,7 +33,7 @@ Un jeu Tetris complet développé en Python avec Pygame, incluant des effets vis
 - ✅ **Mode Débogage** : Option activable dans le menu principal (Débogage ON/OFF). Journalise les événements de jeu (apparition de pièces, verrouillage, fin de partie, épisodes IA, curriculum) dans `data/debug.log` via Python `logging`. Visualise le contenu restant du sac 7-bag (pièces colorées avec lettres) à droite de l'aperçu de la prochaine pièce. Pendant le jeu, la touche **`d`** active/désactive l'overlay visuel de débogage (Humain, IA, MCP).
 
 ### Expérience utilisateur
-- ✅ Menu de démarrage avec sélection du joueur (Humain/IA), du son, du générateur (Aléatoire/7-bag), du débogage (ON/OFF), et sous-menus dédiés.
+- ✅ Menu de démarrage avec sélection du joueur (Humain/IA/Bot/MCP), du son, du générateur (Aléatoire/7-bag), du débogage (ON/OFF), et sous-menus dédiés.
 - ✅ **Sous-menu Humain** : Mode (Normal/Replay), Handicap (0-5), Touches (touches configurables), Statistiques (page de statistiques du joueur humain).
 - ✅ **Sous-menu IA** : Mode (Apprentissage/Jeu), Vitesse (normal/rapide), Apprentissage (13 hyperparamètres DQN : Epsilon decay, Epsilon fin, Learning rate, Gamma, Batch size, Buffer size, Curriculum, Fréq. curriculum, Epsilon curr., Warm-start, Maj. par pièce, Look-ahead, Soft-drop — configurables via ◄ ►, persistés dans `settings.json`, reset aux valeurs par défaut), Statistiques (tableau + graphique score/épisode), Réinitialiser IA, Retour.
 - ✅ **Touches configurables** : 7 actions (gauche, droite, rotation horaire/anti-horaire, chute douce, chute rapide, pause) reconfigurables via le menu. Détection de conflits et touches réservées. Persistance dans `settings.json`.
@@ -41,6 +41,7 @@ Un jeu Tetris complet développé en Python avec Pygame, incluant des effets vis
 - ✅ Leaderboard top 10 persistant (JSON).
 - ✅ Retour automatique au menu principal après le leaderboard.
 - ✅ **Joueur IA (V-network DQN)** : Mode apprentissage par renforcement (Deep Q-Learning). L'IA apprend à jouer de manière autonome, à vitesse humaine, et affiche ses statistiques d'apprentissage en temps réel : paramètres d'entraînement (mode, vitesse, épisode, epsilon, decay, perte, look-ahead, soft-drop, maj/pièce) et tableau de statistiques (pièces, lignes, score, niveau — courant, total, meilleur, moyenne, 100 derniers, tendance ↑/↓/→). Évaluation par candidat (V-function) avec features DT-20 normalisées, PBRS (Dellacherie, scale 0.1), Prioritized Experience Replay, n-step returns (3-step), soft-drop BFS avec SRS wall kicks, 2-piece look-ahead. Paramètres ε configurables (decay, fin) persistés dans `settings.json`. Mode Jeu (greedy, sans apprentissage) ou Apprentissage (exploration ε-greedy). **Indicateur de cuisson** : le HUD d'apprentissage affiche un indicateur visuel undercooked/good/overcooked (bleu/vert/rouge) avec thermomètre de progression. **Logs séparés** : le mode Jeu écrit dans `ai_playing_log.json` / `ai_playing_behavior_log.jsonl` (séparés du mode apprentissage). **Script d'analyse** : `scripts/analyze_training.py` produit un rapport de santé read-only des logs IA avec flags `[OK]`/`[ATTN]`/`[CRIT]` et charts optionnels (`--charts`).
+- ✅ **Joueur Bot Dellacherie** : joueur déterministe par heuristique Dellacherie. Évalue chaque placement possible (soft-drop BFS + hold) et joue le meilleur. Sous-menu dédié avec un réglage d'anticipation (Non / Comme aperçu). Aucun apprentissage, aucune persistance ; sert de référence de score et d'oracle pour la génération de candidats.
 
 ## Installation
 
@@ -87,6 +88,7 @@ La documentation détaillée se trouve dans le dossier `docs/` :
 | Document | Description |
 | -------- | -------- |
 | [Architecture](docs/architecture.md) | Architecture technique, structure du projet et principes de conception |
+| [Bot Dellacherie](docs/bot.md) | Design document du joueur bot Dellacherie |
 | [IA](docs/ai.md) | Design document du mode joueur IA (V-network DQN) |
 | [Menus](docs/menus.md) | Arborescence complète des menus |
 | [Personnalisation](docs/customization.md) | Paramètres configurables |

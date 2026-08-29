@@ -50,7 +50,7 @@ import numpy as np
 import pygame
 import torch
 
-from tetris.ai.candidates import NUM_ROTATIONS, Placement, get_candidate_states  # noqa: F401
+from tetris.ai.candidates import NUM_ROTATIONS, Placement  # noqa: F401
 from tetris.ai.hud import draw_ai_hud
 from tetris.ai.agent import DQNAgent
 from tetris.ai.rewards import (
@@ -60,6 +60,7 @@ from tetris.ai.rewards import (
     extract_features,
 )
 from tetris.ai.trainer import TrainingLog
+from tetris.bots.moves import BotMovesMixin
 from tetris.audio import AudioManager
 from tetris.game.board import Board, LineClearResult
 from tetris.game.piece_provider import PieceProvider
@@ -107,10 +108,12 @@ class MoveRecord(NamedTuple):
     hold: bool
 
 
-class AIState(GameState):
+class AIState(BotMovesMixin, GameState):
     """Autonomous DQN agent playing Tetris with continuous learning.
 
     Inherits board, pieces, stats, and rendering from ``GameState``.
+    Candidate enumeration and BFS move replay come from
+    :class:`~tetris.bots.moves.BotMovesMixin`.
     Overrides ``update`` to place pieces via per-candidate V-function
     evaluation, ``_lock_and_spawn`` to capture state transitions for
     reward computation (delayed storage), and ``render`` to draw the
@@ -235,62 +238,6 @@ class AIState(GameState):
         if ai_config.curriculum and self.ai_mode == "learning":
             self._curriculum_types = CURRICULUM_ORDER[: 1 + self.agent.curriculum_level]
             self.pieces.set_allowed_types(self._curriculum_types)
-
-    # --- Candidate generation -------------------------------------------
-    def _get_candidate_states(self) -> tuple[np.ndarray, list[int], np.ndarray]:
-        """Enumerate valid placements, simulate, extract features.
-
-        Delegates to :func:`tetris.ai.candidates.get_candidate_states`.
-        Stores placements in ``self._candidate_placements``.
-        """
-        hold_type = self.hold_piece.type if self.hold_piece is not None else None
-        preview_types = [p.type for p in self.preview_pieces]
-        candidates, actions, dellvals, placements = get_candidate_states(
-            base_grid=board_to_grid(self.board),
-            current_piece_type=self.current_piece.type,
-            hold_piece_type=hold_type,
-            next_piece_type=self.next_piece.type,
-            preview_piece_types=preview_types,
-            can_hold=self._can_hold,
-            lookahead=self.lookahead,
-            lookahead_depth=self.lookahead_depth,
-        )
-        self._candidate_placements = placements
-        return candidates, actions, dellvals
-
-    # --- Move-sequence execution ----------------------------------------
-
-    def _execute_move_sequence(self, action: int) -> None:
-        """Replay the placement's recorded move sequence (from BFS path).
-
-        Guarantees the piece reaches the exact (px, py, rot) that the
-        V-network evaluated — no execution mismatch.
-        """
-        p = self._candidate_placements[action]
-
-        if p.hold:
-            self._hold()
-
-        piece = self.current_piece
-
-        for move in p.moves:
-            if move == "left":
-                if self.board.is_valid_move(piece, dx=-1):
-                    piece.move(-1, 0)
-            elif move == "right":
-                if self.board.is_valid_move(piece, dx=1):
-                    piece.move(1, 0)
-            elif move == "soft_drop":
-                if self.board.is_valid_move(piece, dy=1):
-                    piece.move(0, 1)
-            elif move == "rot_cw":
-                self.board.try_rotate(piece, 1)
-            elif move == "rot_ccw":
-                self.board.try_rotate(piece, -1)
-
-        # Lock delay: super().update() detects grounded piece and starts
-        # the lock timer (LOCK_DELAY_MS). In learning mode, lock delay is
-        # fast-forwarded in update().
 
     # --- Override _lock_and_spawn to capture RL transitions --------------
 

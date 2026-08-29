@@ -96,6 +96,7 @@ classDiagram
             +ai_lookahead: bool
             +ai_lookahead_depth: int
             +mcp_port: int
+            +bot_lookahead: str
             +speed_mode: str
             +seed: int | None
             +__init__(screen, font, audio) None
@@ -109,6 +110,7 @@ classDiagram
             # _on_select() State | None
             - _build_ai_state() State
             - _build_mcp_state() State
+            - _build_dellacherie_state() State
             - _game_config() GameConfig
             +holes_overhangs_help: str
         }
@@ -392,6 +394,12 @@ classDiagram
             +lookahead: bool
             +lookahead_depth: int
         }
+
+        class BotMovesMixin {
+            - _get_candidate_states() tuple~np.ndarray, list~int~, np.ndarray~
+            - _execute_move_sequence(action: int) None
+        }
+        BotMovesMixin <|-- AIState
         class AIState {
             +ghost_piece: bool
             +agent: DQNAgent
@@ -419,8 +427,6 @@ classDiagram
             +curriculum_epsilon: str
             - _curriculum_types: list~str~ | None
             +__init__(screen, font, audio, config, ai_config, piece_provider, speed, menu, seed, device) None
-            - _get_candidate_states() tuple~np.ndarray, list~int~, np.ndarray~
-            - _execute_move_sequence(action: int) None
             - _lock_and_spawn(hard_drop: bool) tuple~int, list~
             +update(dt: float, particles: ParticleSystem) State | None
             - _on_episode_end() State | None
@@ -442,7 +448,38 @@ classDiagram
         %% Module-level function: draw_ai_hud(ai_state) -> None
         %% Module-level function: _hud_table_rows(log, stats, episode_steps: int) -> list
         %% Module-level function: _cooking_status(ai_state) -> tuple[str, tuple[int, int, int], float]
-        %% Module-level function: _draw_thermometer(screen, x: int, y: int, level: float, color: tuple) -> None
+        %% Module-level function: dellacherie_pick(dellvals: np.ndarray) -> int
+
+        class BotConfig {
+            +lookahead: bool
+            +lookahead_depth: int
+        }
+
+        class BotMenuState {
+            +menu: MenuState
+            +__init__(screen, font, audio, menu) None
+            - _value_label(i: int) str
+            - _toggle(direction: int) None
+            - _save() None
+            - _on_back() State | None
+            - _on_select() State | None
+        }
+
+        class DellacherieState {
+            +lookahead: bool
+            +lookahead_depth: int
+            +player_type: str
+            - _handicap: int
+            - _candidate_placements: list~Placement~
+            +_lock_and_spawn(hard_drop: bool) LineClearResult
+            - _action_timer: float
+            +episode_steps: int
+            +__init__(screen, font, audio, config, piece_provider, menu, bot_config) None
+            +update(dt: float, particles: ParticleSystem) State | None
+        }
+        MenuBase <|-- BotMenuState
+        BotMovesMixin <|-- DellacherieState
+        GameState <|-- DellacherieState
 
         class GameOverState {
             +screen: pygame.Surface

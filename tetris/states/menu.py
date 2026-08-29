@@ -29,15 +29,16 @@ class MenuState(MenuBase):
 
     _OPTIONS = (
         "Démarrer le jeu",  # 0
-        "Joueur",  # 1 — toggle ◄ ► Humain ↔ IA ↔ MCP
+        "Joueur",  # 1 — toggle ◄ ► Humain ↔ IA ↔ Bot ↔ MCP
         "Humain",  # 2  (grisé si Joueur != Humain)
         "IA",  # 3  (grisé si Joueur != IA)
-        "MCP",  # 4  (grisé si Joueur != MCP)
-        "Règles du jeu",  # 5
-        "Leaderboard",  # 6
-        "Audio",  # 7
-        "Débogage",  # 8 — toggle ◄ ► ON ↔ OFF
-        "Quitter",  # 9
+        "Bot",  # 4  (grisé si Joueur != Bot)
+        "MCP",  # 5  (grisé si Joueur != MCP)
+        "Règles du jeu",  # 6
+        "Leaderboard",  # 7
+        "Audio",  # 8
+        "Débogage",  # 9 — toggle ◄ ► ON ↔ OFF
+        "Quitter",  # 10
     )
     _GENERATOR_CYCLE: ClassVar[tuple[str, ...]] = ("random", "7bag", "35bag", "weighted")
     _toggle_indices = frozenset({1, 8})  # Joueur, Débogage
@@ -83,7 +84,7 @@ class MenuState(MenuBase):
         self.ai_lookahead = True
         self.ai_lookahead_depth = 1
         self.mcp_port = MCP_SERVER_PORT
-
+        self.bot_lookahead = "preview"  # "none" or "preview"
         # DEFAULT_KEYBINDS imported locally to avoid circular import at module load.
         from tetris.settings import DEFAULT_KEYBINDS
 
@@ -120,6 +121,7 @@ class MenuState(MenuBase):
         "speed_mode": "speed_mode",
         "holes_overhangs_help": "holes_overhangs_help",
         "mcp_port": "mcp_port",
+        "bot_lookahead": "bot_lookahead",
         "seed": "seed",
     }
 
@@ -160,7 +162,7 @@ class MenuState(MenuBase):
         match i:
             case 1:  # Joueur
                 return self.player
-            case 8:  # Débogage
+            case 9:  # Débogage
                 return "ON" if self.debug else "OFF"
             case _:
                 return ""
@@ -169,15 +171,16 @@ class MenuState(MenuBase):
         return bool(
             (i == 2 and self.player != "Humain")
             or (i == 3 and self.player != "IA")
-            or (i == 4 and self.player != "MCP")
+            or (i == 4 and self.player != "Bot")
+            or (i == 5 and self.player != "MCP")
         )
 
     def _toggle(self, direction: int) -> None:
         match self.selection:
-            case 1:  # Joueur — 3-way cycle
-                cycle = {"Humain": "IA", "IA": "MCP", "MCP": "Humain"}
+            case 1:  # Joueur — 4-way cycle
+                cycle = {"Humain": "IA", "IA": "Bot", "Bot": "MCP", "MCP": "Humain"}
                 self.player = cycle[self.player]
-            case 8:  # Débogage
+            case 9:  # Débogage
                 self.debug = not self.debug
                 configure_logging(self.debug)
 
@@ -215,6 +218,8 @@ class MenuState(MenuBase):
                 )
                 if self.player == "IA":
                     return self._build_ai_state()
+                if self.player == "Bot":
+                    return self._build_dellacherie_state()
                 if self.player == "MCP":
                     return self._build_mcp_state()
                 from tetris.states.human import HumanState
@@ -235,26 +240,49 @@ class MenuState(MenuBase):
                 from tetris.states.ai_menu import AIMenuState
 
                 return AIMenuState(self.screen, self.font, self.audio, self)
-            case 4:  # MCP sub-menu
+            case 4:  # Bot sub-menu
+                from tetris.states.bot_menu import BotMenuState
+
+                return BotMenuState(self.screen, self.font, self.audio, self)
+            case 5:  # MCP sub-menu
                 from tetris.states.mcp_menu import MCPMenuState
 
                 return MCPMenuState(self.screen, self.font, self.audio, self)
-            case 5:  # Règles du jeu submenu
+            case 6:  # Règles du jeu submenu
                 from tetris.states.game_rules_menu import GameRulesMenuState
 
                 return GameRulesMenuState(self.screen, self.font, self.audio, self)
-            case 6:  # Leaderboard
+            case 7:  # Leaderboard
                 from tetris.states.leaderboard import LeaderboardState
 
                 return LeaderboardState(self.screen, self.font, self.audio, self)
-            case 7:  # Audio submenu
+            case 8:  # Audio submenu
                 from tetris.states.audio_menu import AudioMenuState
 
                 return AudioMenuState(self.screen, self.font, self.audio, self)
-            case 9:  # Quit
+            case 10:  # Quit
                 pygame.quit()
                 sys.exit()
         return None
+
+    def _build_dellacherie_state(self) -> State:
+        from tetris.game.piece_provider import PieceProvider
+        from tetris.states.dellacherie import BotConfig, DellacherieState
+
+        bot_provider = PieceProvider(mode="normal", generator=self.piece_generator, seed=self.seed)
+        lookahead = self.bot_lookahead == "preview"
+        return DellacherieState(
+            self.screen,
+            self.font,
+            self.audio,
+            self._game_config(),
+            bot_provider,
+            self,
+            BotConfig(
+                lookahead=lookahead,
+                lookahead_depth=self.preview_count if lookahead else 1,
+            ),
+        )
 
     def _build_ai_state(self) -> State:
         from tetris.game.piece_provider import PieceProvider

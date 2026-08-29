@@ -24,8 +24,10 @@ Returning a new `State` from `handle_event`/`update` transitions the app; `None`
 - `tetris/audio/` — procedural SFX synthesis + MIDI-based polyphonic music
 - `tetris/storage/` — JSON persistence (leaderboard, human stats)
 - `tetris/states/` — FSM states binding input → game logic → rendering
+- `tetris/bots/` — shared bot-algorithm library (`BotMovesMixin` candidate enumeration + BFS move replay, `dellacherie_pick`), reused by `AIState` and `DellacherieState`
 - `tetris/ai/` — V-network DQN agent, DT-20 features, PBRS reward shaping, PER, n-step returns, soft-drop BFS, training log
 - `tetris/mcp_server.py` — MCP HTTP server (FastMCP): exposes `play` + `start_game` tools and board/rules resources to external agents
+
 ### State Machine Tree
 
 ```
@@ -33,11 +35,13 @@ MenuState (root, owns settings)
 ├── GameRulesMenuState (generator, preview, handicap, speed, ghost piece)
 ├── HumanMenuState → { SeedEntryState, KeybindState, HumanStatsState }
 ├── AIMenuState → { TrainingMenuState → { HyperparamMenuState, PlaceholderState }, AIStatsState }
+├── BotMenuState (Dellacherie lookahead)
 ├── MCPMenuState (port, retour)
 ├── AudioMenuState
 ├── GameState   (abstract base: board, pieces, gravity, lock delay)
 │   ├── HumanState (human gameplay: keyboard, DAS, pause)
-│   ├── AIState   (AI gameplay, inherits GameState)
+│   ├── AIState   (AI gameplay, inherits BotMovesMixin + GameState)
+│   ├── DellacherieState (Dellacherie bot, inherits BotMovesMixin + GameState)
 │   └── MCPState  (MCP gameplay, inherits GameState — external agent via HTTP)
 ├── LeaderboardState
 └── Quit
@@ -52,6 +56,7 @@ MenuState (root, owns settings)
 |---|---|
 | `tetris/game/` | Pure domain: `Board`, `Tetromino`, `shapes` (`SHAPES` rotation data + `SHAPES_TYPES` + helpers), `PieceProvider` facade + `PieceGenerator` hierarchy (`RandomGenerator`, `BagGenerator`→`SevenBagGenerator`/`ThirtyFiveBagGenerator`, `WeightedGenerator`, `ReplayGenerator`), `ScoreEngine`, `GameStats`, `rules` (grid-agnostic game-rule functions + SRS kick data) |
 | `tetris/states/` | FSM states (`State` base + 15 concrete states) |
+| `tetris/bots/` | Shared bot-algorithm library: `BotMovesMixin` (candidate enumeration + BFS move replay, in `moves.py`), `dellacherie_pick` (in `dellacherie.py`). Reused by `AIState` and `DellacherieState` |
 | `tetris/ai/` | V-network DQN: `DQNetwork` (V-function), `DQNAgent` (per-candidate eval), `PrioritizedReplayBuffer`, DT-20 features + PBRS reward, `TrainingLog`, `candidates.py` (placement generation + soft-drop BFS), `hud.py` (AI HUD rendering). Game-rule functions (SRS kicks) extracted to `tetris/game/rules.py` |
 | `tetris/visuals/` | `Renderer`, `ParticleSystem`, leaderboard/graph views |
 | `tetris/audio/` | `AudioManager` — NumPy SFX synthesis + MIDI parsing for polyphonic music; `midi_gen` generates `.mid` files |
@@ -118,6 +123,10 @@ python -m tetris.verify_training
 | `tetris/states/human.py` | `HumanState` — human gameplay: keyboard, DAS, pause, keybind setup |
 | `tetris/states/ai.py` | AI gameplay state + RL training integration (candidate generation and HUD rendering extracted to `tetris/ai/candidates.py` and `tetris/ai/hud.py`); `AIConfig` dataclass (DQN hyperparameters) |
 | `tetris/states/seed_entry.py` | `SeedEntryState` — numeric text input for game seed (empty = random) |
+| `tetris/states/bot_menu.py` | `BotMenuState` — Dellacherie bot sub-menu: lookahead toggle (Non / Comme aperçu) |
+| `tetris/states/dellacherie.py` | `DellacherieState` — Dellacherie bot gameplay state (`BotMovesMixin` + `GameState`); `BotConfig` dataclass. No learning, no logs, game over returns to menu |
+| `tetris/bots/moves.py` | `BotMovesMixin` — shared candidate enumeration (`_get_candidate_states`) + BFS move replay (`_execute_move_sequence`), reused by `AIState` and `DellacherieState` |
+| `tetris/bots/dellacherie.py` | `dellacherie_pick(dellvals)` — pure argmax selection for the Dellacherie bot |
 | `tetris/states/mcp_menu.py` | `MCPMenuState` — MCP sub-menu: port selection, back |
 | `tetris/mcp_server.py` | `TetrisMCPServer` — MCP HTTP server (FastMCP streamable-http): `play` + `start_game` tools, `board://state` + `tetris://rules` resources. Daemon thread, queue-based communication with `MCPState` |
 | `tetris/ai/agent.py` | `DQNAgent` — `select_action`, `store`, `learn`, `save`, `load` |
@@ -287,7 +296,7 @@ All in `data/` (gitignored via blanket `data/` rule):
 | `media/korobeiniki.mid` | `MUSIC_SONG_PATHS["korobeiniki"]` | MIDI | Korobeiniki music (melody + bass) |
 | `media/kalinka.mid` | `MUSIC_SONG_PATHS["kalinka"]` | MIDI | Kalinka music (melody + bass) |
 
-**`settings.json` schema**: `player` ("Humain"/"IA"/"MCP"), `mode` ("Normal"/"Replay"), `handicap` (0-5), `sound` (int 0-3), `music` (int 0-3), `song` ("korobeiniki"/"kalinka"), `debug` (bool), `ghost_piece` (bool), `preview_count` (int 0/1/3), `piece_generator` ("random"/"7bag"/"35bag"/"weighted"), `speed_mode` ("none"/"easy"/"normal"/"medium"/"hard"/"crazy"/"insane"), `ai_speed` ("normal"/"fast"), `ai_epsilon_decay` (float), `ai_epsilon_end` (float), `ai_lr` (float), `ai_gamma` (float), `ai_batch_size` (int), `ai_buffer_size` (int), `ai_mode` ("learning"/"playing"), `ai_curriculum` (bool), `ai_curriculum_freq` (int), `ai_curriculum_epsilon` (str), `ai_warm_start` (bool), `ai_learn_per_action` (int), `ai_lookahead` (bool), `ai_lookahead_depth` (int 1-3), `mcp_port` (int), `seed` (int|null), `keybinds` (dict: action→pygame keycode, includes `mute` and `hold`)
+**`settings.json` schema**: `player` ("Humain"/"IA"/"Bot"/"MCP"), `mode` ("Normal"/"Replay"), `handicap` (0-5), `sound` (int 0-3), `music` (int 0-3), `song` ("korobeiniki"/"kalinka"), `debug` (bool), `ghost_piece` (bool), `preview_count` (int 0/1/3), `piece_generator` ("random"/"7bag"/"35bag"/"weighted"), `speed_mode` ("none"/"easy"/"normal"/"medium"/"hard"/"crazy"/"insane"), `ai_speed` ("normal"/"fast"), `ai_epsilon_decay` (float), `ai_epsilon_end` (float), `ai_lr` (float), `ai_gamma` (float), `ai_batch_size` (int), `ai_buffer_size` (int), `ai_mode` ("learning"/"playing"), `ai_curriculum` (bool), `ai_curriculum_freq` (int), `ai_curriculum_epsilon` (str), `ai_warm_start` (bool), `ai_learn_per_action` (int), `ai_lookahead` (bool), `ai_lookahead_depth` (int 1-3), `mcp_port` (int), `bot_lookahead` ("none"/"preview"), `seed` (int|null), `keybinds` (dict: action→pygame keycode, includes `mute` and `hold`)
 
 ## DQN AI Specifics
 
