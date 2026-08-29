@@ -190,6 +190,17 @@ class TestBestNextPlacement:
         # After clearing, the grid is not all ones
         assert not np.array_equal(result, grid)
 
+    def test_prefers_flat_placement_over_well(self):
+        """Empty grid, I piece: best placement must be flat in bottom row.
+
+        Regression for the argmin bug: the old code picked the worst
+        placement (vertical I in a well)."""
+        grid = np.zeros((BOARD_HEIGHT, BOARD_WIDTH), dtype=np.float32)
+        result = best_next_placement(grid, "I")
+        filled = np.argwhere(result > 0)
+        assert len(filled) == 4
+        assert all(y == BOARD_HEIGHT - 1 for y, _x in filled)
+
 
 class TestGenPlacements:
     def test_yields_placements(self):
@@ -240,6 +251,16 @@ class TestGenPlacements:
         assert len(candidates) >= 1
         assert len(actions) == len(candidates)
         assert len(dellvals) == len(candidates)
+
+    def test_warm_start_prior_uses_el_tetris_values(self):
+        """Warm-start exploration prior is the El-Tetris values array:
+        same length as candidates, picks a valid index through select_action."""
+        ai = _make_ai()
+        ai.warm_start = True
+        candidates, _actions, eval_values = ai._get_candidate_states()
+        assert len(eval_values) == len(candidates)
+        chosen = ai.agent.select_action(candidates, eval_values)
+        assert 0 <= chosen < len(candidates)
 
 
 # ---------------------------------------------------------------------------

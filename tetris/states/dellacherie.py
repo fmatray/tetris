@@ -1,6 +1,6 @@
 """Dellacherie bot game state: deterministic heuristic player.
 
-Picks the candidate placement maximizing the Dellacherie evaluation
+Picks the candidate placement maximizing the El-Tetris evaluation
 (:func:`tetris.ai.candidates.get_candidate_states` returns the values).
 No learning, no logging, no persistence — a watch/benchmark player.
 
@@ -91,9 +91,9 @@ class DellacherieState(BotMovesMixin, GameState):
                 return super().update(dt, particles)
             self._action_timer = 0.0
 
-            candidates, actions, dellvals = self._get_candidate_states()
+            candidates, actions, _ = self._get_candidate_states()
             if len(candidates) > 0:
-                chosen_idx = dellacherie_pick(dellvals)
+                chosen_idx = dellacherie_pick(self._pick_values)
                 self._prev_action = actions[chosen_idx]
                 self.episode_steps += 1
                 self._execute_move_sequence(actions[chosen_idx])

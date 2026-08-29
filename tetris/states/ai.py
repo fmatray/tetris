@@ -327,9 +327,9 @@ class AIState(BotMovesMixin, GameState):
             self._action_timer = 0.0
 
         if self._prev_action is None and not self.game_over:
-            candidates, actions, dellacherie_values = self._get_candidate_states()
+            candidates, actions, eval_values = self._get_candidate_states()
             if len(candidates) > 0:
-                dellvals = dellacherie_values if self.warm_start else None
+                dellvals = eval_values if self.warm_start else None
                 chosen_idx = self.agent.select_action(candidates, dellvals)
                 self._prev_action = actions[chosen_idx]
                 self.episode_steps += 1

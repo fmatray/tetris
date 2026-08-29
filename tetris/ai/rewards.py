@@ -95,6 +95,19 @@ DELLACHERIE_WEIGHTS: dict[str, float] = {
     "rows_with_holes": -0.106548,
 }
 
+# El-Tetris evaluation (Yiyuan Lee, 2011, PSO-tuned weights) — used for bot
+# placement selection. Adds the two placement-specific terms (landing_height,
+# rows_eliminated) that DELLACHERIE_WEIGHTS excludes for PBRS.
+# https://imake.ninja/el-tetris-an-improvement-on-pierre-dellacheries-algorithm/
+EL_TETRIS_WEIGHTS: dict[str, float] = {
+    "landing_height": -4.500158825082766,
+    "rows_eliminated": 3.4181268101392694,
+    "row_transitions": -3.2178882868487753,
+    "column_transitions": -9.348695305445199,
+    "holes": -7.899265427351652,
+    "wells": -3.3855972247263626,
+}
+
 
 def board_to_grid(board) -> np.ndarray:
     """Convert a ``Board`` instance into a 0/1 numpy array (H×W)."""
@@ -392,6 +405,31 @@ def dellacherie_value_batch(grids: np.ndarray) -> np.ndarray:
         + DELLACHERIE_WEIGHTS["rows_with_holes"] * m["rows_with_holes_count"]
     )
     return vals * m["non_empty"]
+
+
+def el_tetris_value_batch(
+    grids: np.ndarray,
+    landing_heights: np.ndarray,
+    rows_eliminated: np.ndarray,
+) -> np.ndarray:
+    """Batch El-Tetris evaluation: 6 features, higher = better board.
+
+    Board part (transitions, holes, wells) reuses the same vectorized
+    metrics as dellacherie_value_batch (walls counted as filled — matches
+    the El-Tetris reference implementation). landing_heights is the
+    distance from the board floor to the piece centroid; rows_eliminated
+    is the number of lines cleared by the placement. Callers pass grids
+    that contain the just-placed piece, so no empty-grid masking.
+    """
+    m = _compute_board_metrics_batch(grids)
+    return (
+        EL_TETRIS_WEIGHTS["landing_height"] * np.asarray(landing_heights, dtype=np.float64)
+        + EL_TETRIS_WEIGHTS["rows_eliminated"] * np.asarray(rows_eliminated, dtype=np.float64)
+        + EL_TETRIS_WEIGHTS["row_transitions"] * m["row_trans"]
+        + EL_TETRIS_WEIGHTS["column_transitions"] * m["col_trans"]
+        + EL_TETRIS_WEIGHTS["holes"] * m["holes_count"]
+        + EL_TETRIS_WEIGHTS["wells"] * m["wells_score"]
+    )
 
 
 def extract_features_batch(

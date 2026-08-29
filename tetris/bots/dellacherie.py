@@ -6,5 +6,5 @@ import numpy as np
 
 
 def dellacherie_pick(dellvals: np.ndarray) -> int:
-    """Index of the best Dellacherie placement (ties resolved to lowest index)."""
+    """Index of the best placement by El-Tetris evaluation (ties → lowest index)."""
     return int(np.argmax(dellvals))

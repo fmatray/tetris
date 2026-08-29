@@ -91,9 +91,10 @@ replays these actions atom-by-atom using `Board.is_valid_move` /
 
 **2-piece look-ahead** (when enabled): after simulating the current
 piece placement, simulate the best placement of the NEXT piece on
-the resulting board (Dellacherie-optimal). The V-network evaluates
-the board after both pieces are placed. Look-ahead uses hard-drop
-internally for speed (board-quality evaluation only, not executed).
+the resulting board (El-Tetris-optimal, argmax — the same evaluation
+the Dellacherie bot selects with). The V-network evaluates the board
+after both pieces are placed. Look-ahead uses hard-drop internally
+for speed (board-quality evaluation only, not executed).
 
 For each candidate:
 1. Simulate placement via soft-drop BFS (records move sequence)
@@ -151,6 +152,11 @@ Where Φ uses Dellacherie weights:
 PBRS is **policy-preserving** (Ng et al. 1999): it speeds convergence
 without changing the optimal policy. For empty grids Φ=0 so PBRS=0.
 Excludes landing_height/eroded_cells (placement-specific, not board-state).
+
+Selection values (bot pick + the AI warm-start exploration prior) are a
+**separate El-Tetris evaluation** (`el_tetris_value_batch`) that adds the
+two placement-specific terms `landing_height` and `rows_eliminated`;
+the PBRS potential (`DELLACHERIE_WEIGHTS`) is unchanged.
 
 `PBRS_SCALE = 0.1` caps the PBRS contribution to ±20, keeping it
 meaningful without dominating the base reward (±130).

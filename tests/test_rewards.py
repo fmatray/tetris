@@ -3,16 +3,19 @@
 import numpy as np
 
 from tetris.ai.rewards import (
+    EL_TETRIS_WEIGHTS,
     aggregate_height,
     bumpiness,
     column_heights,
     column_transitions,
+    compute_height_metrics,
     compute_reward,
     OVERHANG_CREATED_PENALTY,
     OVERHANG_TOTAL_PENALTY,
     count_holes,
     dellacherie_value,
     dellacherie_value_batch,
+    el_tetris_value_batch,
     extract_features,
     extract_features_batch,
     hole_depth,
@@ -503,6 +506,51 @@ def test_dellacherie_value_batch_preserves_input():
     dellacherie_value_batch(stacked)
     grids2 = np.stack(grids)
     assert np.array_equal(stacked, grids2)
+
+
+# --- el_tetris_value_batch ---------------------------------------------
+
+
+def test_el_tetris_value_batch_matches_manual():
+    """Batch value equals scalar feature functions + weights + placement terms."""
+    g = _grid_with_row(18)
+    g2 = _grid_with_row(19)
+    stacked = np.stack([g, g2])
+    vals = el_tetris_value_batch(stacked, np.array([2.0, 3.5]), np.array([1.0, 0.0]))
+    for i, grid in enumerate((g, g2)):
+        mask, first_row, heights = compute_height_metrics(grid)
+        expected = (
+            EL_TETRIS_WEIGHTS["landing_height"] * [2.0, 3.5][i]
+            + EL_TETRIS_WEIGHTS["rows_eliminated"] * [1.0, 0.0][i]
+            + EL_TETRIS_WEIGHTS["row_transitions"] * row_transitions(grid)
+            + EL_TETRIS_WEIGHTS["column_transitions"] * column_transitions(grid)
+            + EL_TETRIS_WEIGHTS["holes"] * count_holes(grid, mask, first_row)
+            + EL_TETRIS_WEIGHTS["wells"] * wells(grid, heights)
+        )
+        assert np.isclose(vals[i], expected)
+
+
+def test_el_tetris_value_batch_landing_height():
+    """Higher landing → lower value by exactly landing weight × Δh."""
+    g = np.stack([_grid_with_row(18)])
+    v_low = el_tetris_value_batch(g, np.array([2.0]), np.array([0.0]))
+    v_high = el_tetris_value_batch(g, np.array([10.0]), np.array([0.0]))
+    assert np.isclose(v_low[0] - v_high[0], -EL_TETRIS_WEIGHTS["landing_height"] * 8)
+
+
+def test_el_tetris_value_batch_rows_eliminated():
+    """One cleared row adds exactly the rows_eliminated weight."""
+    g = np.stack([_grid_with_row(18)])
+    v0 = el_tetris_value_batch(g, np.array([2.0]), np.array([0.0]))
+    v1 = el_tetris_value_batch(g, np.array([2.0]), np.array([1.0]))
+    assert np.isclose(v1[0] - v0[0], EL_TETRIS_WEIGHTS["rows_eliminated"])
+
+
+def test_el_tetris_value_batch_shape():
+    """Returns (N,) matching batch size."""
+    g = np.stack([_grid_with_row(18)] * 3)
+    vals = el_tetris_value_batch(g, np.zeros(3), np.zeros(3))
+    assert vals.shape == (3,)
 
 
 # --- slice-based transition equivalence -----------------------------

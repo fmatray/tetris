@@ -32,6 +32,8 @@ class BotMovesMixin:
     - ``lookahead``: bool, ``lookahead_depth``: int (planning horizon)
     - ``_hold()``: hold-swap method from ``GameState``
     - ``_candidate_placements: list[Placement]``: initialized by the host
+    - ``_pick_values: np.ndarray``: per-candidate El-Tetris values, set by
+      ``_get_candidate_states`` — hosts use it to pick a placement
     """
 
     if TYPE_CHECKING:
@@ -45,6 +47,7 @@ class BotMovesMixin:
         lookahead: bool
         lookahead_depth: int
         _candidate_placements: list[Placement]
+        _pick_values: np.ndarray
 
         def _hold(self) -> None: ...
 
@@ -52,11 +55,12 @@ class BotMovesMixin:
         """Enumerate valid placements, simulate, extract features.
 
         Delegates to :func:`tetris.ai.candidates.get_candidate_states`.
-        Stores placements in ``self._candidate_placements``.
+        Stores placements in ``self._candidate_placements`` and per-candidate
+        El-Tetris values in ``self._pick_values``.
         """
         hold_type = self.hold_piece.type if self.hold_piece is not None else None
         preview_types = [p.type for p in self.preview_pieces]
-        candidates, actions, dellvals, placements = get_candidate_states(
+        candidates, actions, pick_values, placements = get_candidate_states(
             base_grid=board_to_grid(self.board),
             current_piece_type=self.current_piece.type,
             hold_piece_type=hold_type,
@@ -67,7 +71,8 @@ class BotMovesMixin:
             lookahead_depth=self.lookahead_depth,
         )
         self._candidate_placements = placements
-        return candidates, actions, dellvals
+        self._pick_values = pick_values
+        return candidates, actions, pick_values
 
     def _execute_move_sequence(self, action: int) -> None:
         """Replay the placement's recorded move sequence (from BFS path).

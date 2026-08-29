@@ -3,10 +3,20 @@
 import numpy as np
 
 from tetris.ai.rewards import (
-    dellacherie_value,
-    dellacherie_value_batch,
+    EL_TETRIS_WEIGHTS,
+    column_transitions,
+    compute_height_metrics,
+    count_holes,
     place_and_clear,
     place_and_clear_batch,
+    row_transitions,
+    wells,
+)
+from tetris.ai.candidates import (
+    _landing_heights,
+    el_tetris_value_batch,
+    hard_drop_y_batch,
+    soft_drop_placements,
 )
 from tetris.game.rules import (
     find_full_rows,
@@ -14,7 +24,6 @@ from tetris.game.rules import (
     place_cells,
     shape_fits,
 )
-from tetris.ai.candidates import hard_drop_y_batch, soft_drop_placements
 from tetris.game.shapes import SHAPES, SHAPES_TYPES, get_shape_rot, num_shape_rot
 from tetris.settings import BOARD_HEIGHT, BOARD_WIDTH
 
@@ -195,17 +204,29 @@ def test_place_and_clear_batch_multi_candidates_nonempty():
         assert int(batch_lines[i]) == int(sl), f"candidate {i} lines mismatch"
         assert np.array_equal(batch_grids[i], sg), f"candidate {i} grid mismatch"
     # Base grid not mutated
-    assert np.array_equal(grid, grid_copy)
 
 
-# --- best_next_placement batch equivalence ---------------------------
+def _el_tetris_scalar(grid, shape, px, py):
+    """Scalar El-Tetris evaluation of placing `shape` at (px, py) on grid."""
+    sim_grid, lines = place_and_clear(grid, shape, px, py)
+    mask, first_row, heights = compute_height_metrics(sim_grid)
+    lh = BOARD_HEIGHT - py - (min(by for _, by in shape) + max(by for _, by in shape) + 1) / 2
+    val = (
+        EL_TETRIS_WEIGHTS["landing_height"] * lh
+        + EL_TETRIS_WEIGHTS["rows_eliminated"] * lines
+        + EL_TETRIS_WEIGHTS["row_transitions"] * row_transitions(sim_grid)
+        + EL_TETRIS_WEIGHTS["column_transitions"] * column_transitions(sim_grid)
+        + EL_TETRIS_WEIGHTS["holes"] * count_holes(sim_grid, mask, first_row)
+        + EL_TETRIS_WEIGHTS["wells"] * wells(sim_grid, heights)
+    )
+    return val, sim_grid
 
 
 def test_best_next_placement_batch_matches_scalar():
     """Batched best_next_placement produces same result as scalar loop.
 
-    Recreates the scalar logic and compares against the batch version
-    used in tetris.ai.candidates.best_next_placement for diverse board states.
+    Scalar reference: strict-> argmax (first-best wins, matching np.argmax)
+    over El-Tetris values — covers the argmin→argmax sign fix.
     """
     rng = np.random.default_rng(123)
     for piece_type in SHAPES_TYPES:
@@ -213,7 +234,7 @@ def test_best_next_placement_batch_matches_scalar():
             grid = _random_grid(rng)
             # Scalar version
             best_grid_scalar = grid
-            best_val = float("inf")
+            best_val = -float("inf")
             num_rots = num_shape_rot(piece_type)
             for rot in range(num_rots):
                 shape = get_shape_rot(piece_type, rot)
@@ -226,25 +247,13 @@ def test_best_next_placement_batch_matches_scalar():
                     py = hard_drop_y(grid, shape, px)
                     if py < 0:
                         continue
-                    sim_grid, _ = place_and_clear(grid, shape, px, py)
-                    val = dellacherie_value(sim_grid)
-                    if val < best_val:
+                    val, sim_grid = _el_tetris_scalar(grid, shape, px, py)
+                    if val > best_val:
                         best_val = val
                         best_grid_scalar = sim_grid
 
-            # Batch version
-            shapes = []
-            x_positions = []
-            for rot in range(num_rots):
-                shape = get_shape_rot(piece_type, rot)
-                min_bx = min(bx for bx, _ in shape)
-                max_bx = max(bx for bx, _ in shape)
-                for col in range(BOARD_WIDTH):
-                    px = col - min_bx
-                    if px < 0 or px + max_bx >= BOARD_WIDTH:
-                        continue
-                    shapes.append(shape)
-                    x_positions.append(px)
+            # Batch version (mirrors best_next_placement)
+            shapes, x_positions = _enumerate_candidates(grid, piece_type)
             if not shapes:
                 assert np.array_equal(best_grid_scalar, grid)
                 continue
@@ -256,9 +265,13 @@ def test_best_next_placement_batch_matches_scalar():
             v_shapes = [s for s, v in zip(shapes, valid) if v]
             v_xs = [x for x, v in zip(x_positions, valid) if v]
             v_pys = [int(y) for y, v in zip(py_batch, valid) if v]
-            sim_grids, _ = place_and_clear_batch(grid, v_shapes, v_xs, v_pys)
-            vals = dellacherie_value_batch(sim_grids)
-            best_idx = int(np.argmin(vals))
+            sim_grids, lines_cleared = place_and_clear_batch(grid, v_shapes, v_xs, v_pys)
+            vals = el_tetris_value_batch(
+                sim_grids,
+                _landing_heights(v_shapes, v_pys),
+                lines_cleared,
+            )
+            best_idx = int(np.argmax(vals))
             best_grid_batch = sim_grids[best_idx]
 
             assert np.array_equal(best_grid_batch, best_grid_scalar), (

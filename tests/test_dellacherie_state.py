@@ -138,6 +138,13 @@ class TestDellacherieGameplay:
             bot.update(16, parts)
         assert bot.episode_steps >= 3
 
+    def test_pick_values_match_candidates(self):
+        """_pick_values is the El-Tetris array matching the candidate list."""
+        bot = _make_bot()
+        candidates, _actions, returned = bot._get_candidate_states()
+        assert len(bot._pick_values) == len(candidates)
+        assert returned is bot._pick_values
+
 
 class TestBotMenu:
     def _make_menu(self) -> MenuState:

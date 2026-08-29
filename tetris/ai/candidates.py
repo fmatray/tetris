@@ -11,7 +11,7 @@ from collections.abc import Iterator
 import numpy as np
 
 from tetris.ai.rewards import (
-    dellacherie_value_batch,
+    el_tetris_value_batch,
     extract_features_batch,
     place_and_clear_batch,
 )
@@ -113,12 +113,28 @@ def hard_drop_y_batch(
     return results
 
 
+def _landing_heights(
+    shapes: list[list[tuple[int, int]]],
+    pys: list[int],
+) -> np.ndarray:
+    """El-Tetris landing height: distance from floor to piece centroid.
+
+    BOARD_HEIGHT - py - centroid_offset, where centroid_offset is the
+    mean row of the piece's own cells (min_by + max_by + 1) / 2.
+    """
+    centroids = np.array(
+        [(min(by for _, by in s) + max(by for _, by in s) + 1) / 2 for s in shapes],
+        dtype=np.float64,
+    )
+    return BOARD_HEIGHT - np.asarray(pys, dtype=np.float64) - centroids
+
+
 def best_next_placement(grid: np.ndarray, piece_type: str) -> np.ndarray:
     """Simulate best placement of next piece on grid (2-piece look-ahead).
 
     Uses hard-drop for speed — look-ahead only needs approximate board quality.
-    Batches all (rotation, column) candidates and evaluates Dellacherie
-    in one vectorized pass.
+    Batches all (rotation, column) candidates and evaluates El-Tetris
+    (higher = better) in one vectorized pass.
     """
     shapes: list[list[tuple[int, int]]] = []
     x_positions: list[int] = []
@@ -134,9 +150,9 @@ def best_next_placement(grid: np.ndarray, piece_type: str) -> np.ndarray:
     v_shapes = [s for s, v in zip(shapes, valid) if v]
     v_xs = [x for x, v in zip(x_positions, valid) if v]
     v_pys = [int(y) for y, v in zip(py_batch, valid) if v]
-    sim_grids, _ = place_and_clear_batch(grid, v_shapes, v_xs, v_pys)
-    vals = dellacherie_value_batch(sim_grids)
-    best_idx = int(np.argmin(vals))
+    sim_grids, lines_cleared = place_and_clear_batch(grid, v_shapes, v_xs, v_pys)
+    vals = el_tetris_value_batch(sim_grids, _landing_heights(v_shapes, v_pys), lines_cleared)
+    best_idx = int(np.argmax(vals))
     return sim_grids[best_idx]
 
 
@@ -230,12 +246,13 @@ def get_candidate_states(
 ) -> tuple[np.ndarray, list[int], np.ndarray, list[Placement]]:
     """Enumerate valid placements, simulate drop + line clear, extract features.
 
-    Returns (candidate_states[N,17], action_ids[N], dellacherie_values[N],
-    placements). action_id = placement index (0..N-1). Includes hold
-    candidates when ``can_hold`` is True.
+    Returns (candidate_states[N,17], action_ids[N], el_tetris_values[N],
+    placements). action_id = placement index (0..N-1). el_tetris_values
+    are per-candidate El-Tetris evaluation values (bot pick + AI warm-start
+    prior). Includes hold candidates when ``can_hold`` is True.
 
     Batched: collects all placements first, then runs place_and_clear_batch,
-    lookahead, extract_features_batch, and dellacherie_value_batch in two
+    lookahead, extract_features_batch, and el_tetris_value_batch in two
     vectorized passes instead of per-candidate scalar calls.
     """
     upcoming_types = [next_piece_type] + preview_piece_types
@@ -282,9 +299,9 @@ def get_candidate_states(
             for pt in upcoming_types[:lookahead_depth]:
                 sim_grids[i] = best_next_placement(sim_grids[i], pt)
 
-    # Batch feature extraction + Dellacherie
+    # Batch feature extraction + El-Tetris selection values
     candidates = extract_features_batch(sim_grids, lines_cleared, all_next_piece_types)
-    dellacherie_values = dellacherie_value_batch(sim_grids)
+    pick_values = el_tetris_value_batch(sim_grids, _landing_heights(all_shapes, all_pys), lines_cleared)
 
     actions = list(range(len(all_placements)))
-    return candidates, actions, dellacherie_values, all_placements
+    return candidates, actions, pick_values, all_placements

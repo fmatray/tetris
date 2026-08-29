@@ -24,8 +24,8 @@ from tetris.ai.rewards import FEATURE_SIZE
 from tetris.settings import STEP_LOG_MAX_LINES
 
 
-# Temperature for Dellacherie-weighted softmax during exploration (warm-start).
-# Calibrated to typical Dellacherie value range (-200 to -10).
+# Temperature for El-Tetris-weighted softmax during exploration (warm-start).
+# Calibrated to typical El-Tetris value range (-200 to -10).
 WARM_START_TEMP: float = 30.0
 
 
@@ -150,12 +150,12 @@ class DQNAgent:
     def select_action(self, candidate_states: np.ndarray, dellacherie_values: np.ndarray | None = None) -> int:
         """ε-greedy: random candidate with prob ε, greedy (max V) otherwise.
 
-        During exploration, uses Dellacherie-weighted softmax (warm-start)
+        During exploration, uses El-Tetris-weighted softmax (warm-start)
         instead of uniform random when ``dellacherie_values`` is provided.
 
         Args:
             candidate_states: (N, 17) array of feature vectors for valid placements.
-            dellacherie_values: (N,) array of Dellacherie board values for warm-start.
+            dellacherie_values: (N,) array of El-Tetris evaluation values for warm-start.
         Returns:
             Index of the chosen candidate (0..N-1).
         """
@@ -165,7 +165,7 @@ class DQNAgent:
             self.last_v_spread = 0.0
             self.last_v_margin = 0.0
             if dellacherie_values is not None and len(dellacherie_values) == n:
-                # Warm-start: softmax over Dellacherie values (directed exploration)
+                # Warm-start: softmax over El-Tetris values (directed exploration)
                 probs = _softmax(dellacherie_values / WARM_START_TEMP)
                 return int(np.random.choice(n, p=probs))
             return random.randint(0, n - 1)
