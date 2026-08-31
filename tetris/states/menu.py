@@ -18,8 +18,12 @@ from tetris.settings import (
     MODEL_PATH,
     SETTINGS_PATH,
 )
+from tetris.i18n import set_language, tr
 from tetris.states.base import State
 from tetris.states.menu_base import MenuBase
+
+# Maps internal French player values to English display keys.
+FR_PLAYER_KEY: dict[str, str] = {"Humain": "Human", "IA": "AI", "Bot": "Bot", "MCP": "MCP"}
 
 
 class MenuState(MenuBase):
@@ -30,23 +34,23 @@ class MenuState(MenuBase):
     """
 
     _OPTIONS = (
-        "Démarrer le jeu",  # 0
-        "Joueur",  # 1 — toggle ◄ ► Humain ↔ IA ↔ Bot ↔ MCP
-        "Humain",  # 2  (grisé si Joueur != Humain)
-        "IA",  # 3  (grisé si Joueur != IA)
-        "Bot",  # 4  (grisé si Joueur != Bot)
-        "MCP",  # 5  (grisé si Joueur != MCP)
-        "Règles du jeu",  # 6
+        "Start game",  # 0
+        "Player",  # 1 — toggle ◄ ► Human ↔ AI ↔ Bot ↔ MCP
+        "Human",  # 2  (grayed if Player != Human)
+        "AI",  # 3  (grayed if Player != AI)
+        "Bot",  # 4  (grayed if Player != Bot)
+        "MCP",  # 5  (grayed if Player != MCP)
+        "Game rules",  # 6
         "Leaderboard",  # 7
         "Audio",  # 8
-        "Débogage",  # 9 — toggle ◄ ► ON ↔ OFF
-        "Quitter",  # 10
+        "Debug",  # 9 — toggle ◄ ► ON ↔ OFF
+        "Language",  # 10
+        "Quit",  # 11
     )
     _GENERATOR_CYCLE: ClassVar[tuple[str, ...]] = ("random", "7bag", "35bag", "weighted")
-    _toggle_indices = frozenset({1, 8})  # Joueur, Débogage
+    _toggle_indices = frozenset({1, 8})  # Player, Debug
     _title = "TETRIS"
-
-    _instructions = "Flèches: Navigation | Entrée: Valider | Échap: Quitter"
+    _instructions = "Arrows: Navigate | Enter: Select | Esc: Back"
 
     def __init__(self, screen, font, audio) -> None:
         """Initialize the root menu and load persisted settings.
@@ -68,6 +72,7 @@ class MenuState(MenuBase):
         self.preview_count = 3
         self.debug = False
         self.speed_mode = DEFAULT_SPEED_MODE
+        self.language = "en"
 
         self.holes_overhangs_help = "none"
         self.seed: int | None = None
@@ -92,6 +97,7 @@ class MenuState(MenuBase):
 
         self.keybinds: dict[str, int] = dict(DEFAULT_KEYBINDS)
         self._load_settings()
+        set_language(self.language)
         configure_logging(self.debug)
 
     def training_in_progress(self) -> bool:
@@ -129,6 +135,7 @@ class MenuState(MenuBase):
         "mcp_port": "mcp_port",
         "bot_lookahead": "bot_lookahead",
         "seed": "seed",
+        "language": "language",
     }
 
     def _load_settings(self) -> None:
@@ -166,9 +173,9 @@ class MenuState(MenuBase):
 
     def _value_label(self, i: int) -> str:
         match i:
-            case 1:  # Joueur
-                return self.player
-            case 9:  # Débogage
+            case 1:  # Player
+                return tr(FR_PLAYER_KEY[self.player])
+            case 9:  # Debug
                 return "ON" if self.debug else "OFF"
             case _:
                 return ""
@@ -238,11 +245,11 @@ class MenuState(MenuBase):
                     provider,
                     self,
                 )
-            case 2:  # Humain sub-menu
+            case 2:  # Human sub-menu
                 from tetris.states.human_menu import HumanMenuState
 
                 return HumanMenuState(self.screen, self.font, self.audio, self)
-            case 3:  # IA sub-menu
+            case 3:  # AI sub-menu
                 from tetris.states.ai_menu import AIMenuState
 
                 return AIMenuState(self.screen, self.font, self.audio, self)
@@ -254,7 +261,7 @@ class MenuState(MenuBase):
                 from tetris.states.mcp_menu import MCPMenuState
 
                 return MCPMenuState(self.screen, self.font, self.audio, self)
-            case 6:  # Règles du jeu submenu
+            case 6:  # Game rules submenu
                 from tetris.states.game_rules_menu import GameRulesMenuState
 
                 return GameRulesMenuState(self.screen, self.font, self.audio, self)
@@ -266,7 +273,11 @@ class MenuState(MenuBase):
                 from tetris.states.audio_menu import AudioMenuState
 
                 return AudioMenuState(self.screen, self.font, self.audio, self)
-            case 10:  # Quit
+            case 10:  # Language submenu
+                from tetris.states.language_menu import LanguageMenuState
+
+                return LanguageMenuState(self.screen, self.font, self.audio, self)
+            case 11:  # Quit
                 pygame.quit()
                 sys.exit()
         return None

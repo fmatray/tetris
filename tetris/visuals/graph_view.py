@@ -14,6 +14,8 @@ matplotlib.use("Agg")  # headless renderer — no GUI window
 import matplotlib.pyplot as plt
 import pygame
 
+from tetris.i18n import tr
+
 # Matplotlib colors (normalized 0-1 floats) and matching pygame color.
 _BG = (0.0, 0.0, 0.0)
 _FG = (1.0, 1.0, 1.0)
@@ -47,15 +49,15 @@ def render_score_graph(episodes: list[int], scores: list[int]) -> pygame.Surface
     ax.set_facecolor(_BG)
 
     if episodes:
-        ax.plot(episodes, scores, color="cyan", linewidth=0.8, alpha=0.6, label="Score")
+        ax.plot(episodes, scores, color="cyan", linewidth=0.8, alpha=0.6, label=tr("Score"))
         ma_window = min(20, len(scores))
         avg = _moving_average(scores, ma_window)
-        ax.plot(episodes, avg, color="yellow", linewidth=1.8, label=f"Moy. {ma_window}")
+        ax.plot(episodes, avg, color="yellow", linewidth=1.8, label=tr("Avg. {}").format(ma_window))
         ax.legend(facecolor=_BG, edgecolor=_FG, labelcolor=_FG)
 
-    ax.set_xlabel("Épisode", color=_FG, fontsize=12)
-    ax.set_ylabel("Score", color=_FG, fontsize=12)
-    ax.set_title("Score par épisode", color=_FG, fontsize=16)
+    ax.set_xlabel(tr("Episode"), color=_FG, fontsize=12)
+    ax.set_ylabel(tr("Score"), color=_FG, fontsize=12)
+    ax.set_title(tr("Score per episode"), color=_FG, fontsize=16)
     ax.tick_params(colors=_FG)
     ax.grid(True, color=_GRID, alpha=0.5)
     for spine in ax.spines.values():

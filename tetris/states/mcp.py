@@ -18,6 +18,7 @@ from tetris.game.board import Board
 from tetris.game.piece_provider import PieceProvider
 from tetris.game.stats import GameStats
 from tetris.game.tetromino import Tetromino
+from tetris.i18n import tr
 from tetris.logger import get_logger
 from tetris.settings import HUD_POSITIONS, SPEED_MODES
 from tetris.states.game import GameConfig, GameState, _drop_interval
@@ -260,26 +261,26 @@ def draw_mcp_hud(screen: pygame.Surface, font: pygame.font.Font, state: MCPState
     """Render MCP debug info: server status, port, last tool call, last snapshot."""
     x, y = HUD_POSITIONS["mcp_hud"]
     lines: list[str] = []
-    server_status = "Actif" if state._server is not None else "Arrêté"
+    server_status = tr("Running") if state._server is not None else tr("Stopped")
     lines.append(f"MCP (127.0.0.1:{state.mcp_config.port}) — {server_status}")
     if state._last_tool_call is not None:
         tc = state._last_tool_call
-        lines.append(f"Actions: {', '.join(tc['actions']) or '(aucune)'}")
-        lines.append(f"Frames: {tc['frames']}")
+        lines.append(tr("Actions: {}").format(", ".join(tc["actions"]) or tr("(none)")))
+        lines.append(tr("Frames: {}").format(tc["frames"]))
         results = tc.get("results")
         if results:
-            lines.append(f"Résultats: {', '.join(results)}")
+            lines.append(tr("Results: {}").format(", ".join(results)))
         else:
-            lines.append(f"Résultats: {'(simulation)' if tc.get('simulate') else '(aucune)'}")
+            lines.append(tr("Results: {}").format(tr("(simulation)") if tc.get("simulate") else tr("(none)")))
     if state._last_snapshot is not None:
         snap = state._last_snapshot
         if "error" in snap:
-            lines.append(f"Erreur: {snap['error']}")
+            lines.append(tr("Error: {}").format(snap["error"]))
         elif "boards" in snap:
-            lines.append(f"Pièce: {snap['piece_type']}  Placements: {len(snap['boards'])}")
+            lines.append(tr("Piece: {}  Placements: {}").format(snap["piece_type"], len(snap["boards"])))
         else:
-            lines.append(f"Score: {snap['score']}  Lignes: {snap['lines']}  Niveau: {snap['level']}")
-            lines.append(f"Game Over: {'Oui' if snap['game_over'] else 'Non'}")
+            lines.append(tr("Score: {}  Lines: {}  Level: {}").format(snap["score"], snap["lines"], snap["level"]))
+            lines.append(tr("Game Over: {}").format(tr("Yes") if snap["game_over"] else tr("No")))
     for i, text in enumerate(lines):
         surf = font.render(text, True, (200, 200, 200))
         screen.blit(surf, (x, y + i * 28))

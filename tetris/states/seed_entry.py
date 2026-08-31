@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING
 
 import pygame
 
+from tetris.i18n import tr
 from tetris.settings import BLACK, GRAY, SCREEN_WIDTH, WHITE
 from tetris.states.base import State
 from tetris.visuals.fonts import LINE_HEIGHT_SMALL, get_large_font, get_small_font
@@ -18,9 +19,9 @@ if TYPE_CHECKING:
     from tetris.states.menu import MenuState
     from tetris.visuals.particles import ParticleSystem
 
-_PROMPT = "Graine"
-_HINT = "Chiffres: saisir | Retour: effacer | Entrée: valider | Échap: annuler"
-_EMPTY_LABEL = "Aléatoire"
+_PROMPT = "Seed"
+_HINT = "Digits: type | Backspace: delete | Enter: confirm | Esc: cancel"
+_EMPTY_LABEL = "Random"
 
 
 class SeedEntryState(State):
@@ -58,13 +59,13 @@ class SeedEntryState(State):
         large = get_large_font()
         small = get_small_font()
 
-        title = large.render(_PROMPT, True, WHITE)
+        title = large.render(tr(_PROMPT), True, WHITE)
         screen.blit(title, ((SCREEN_WIDTH - title.get_width()) // 2, 200))
 
-        display = self.text if self.text else _EMPTY_LABEL
+        display = self.text if self.text else tr(_EMPTY_LABEL)
         color = WHITE if self.text else GRAY
         value = large.render(display, True, color)
         screen.blit(value, ((SCREEN_WIDTH - value.get_width()) // 2, 280))
 
-        hint = small.render(_HINT, True, GRAY)
+        hint = small.render(tr(_HINT), True, GRAY)
         screen.blit(hint, ((SCREEN_WIDTH - hint.get_width()) // 2, 280 + LINE_HEIGHT_SMALL * 2))

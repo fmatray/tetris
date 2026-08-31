@@ -14,10 +14,10 @@ if TYPE_CHECKING:
 class MCPMenuState(MenuBase):
     """MCP sub-menu: port configuration and back."""
 
-    _OPTIONS = ("Port", "Retour")
+    _OPTIONS = ("Port", "Back")
     _toggle_indices = frozenset({0})  # only Port toggles
     _title = "MCP"
-    _instructions = "← →: Changer    Entrée: Valider    Échap: Retour"
+    _instructions = "Choose a free TCP port (1024-65535), then press Enter."
 
     _PORTS: ClassVar[list[int]] = [8765, 8766, 8767, 8768]
 
@@ -50,6 +50,6 @@ class MCPMenuState(MenuBase):
         match self.selection:
             case 0:  # Port — toggle only
                 return None
-            case 1:  # Retour
+            case 1:  # Back
                 return self._on_back()
         return None

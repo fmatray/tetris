@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from tetris.i18n import tr
 from tetris.states.base import State
 from tetris.states.menu_base import MenuBase
 
@@ -13,9 +14,9 @@ class HumanMenuState(MenuBase):
     Keybindings and statistics are future features.
     """
 
-    _OPTIONS = ("Mode", "Graine", "Touches", "Statistiques", "Retour")
+    _OPTIONS = ("Mode", "Seed", "Keys", "Statistics", "Back")
     _toggle_indices = frozenset({0})
-    _title = "Humain"
+    _title = "Human"
 
     def __init__(self, screen, font, audio, menu) -> None:
         super().__init__(screen, font, audio)
@@ -26,9 +27,9 @@ class HumanMenuState(MenuBase):
     def _value_label(self, i: int) -> str:
         match i:
             case 0:
-                return self.menu.mode
+                return tr(self.menu.mode)
             case 1:
-                return str(self.menu.seed) if self.menu.seed is not None else "Aléatoire"
+                return str(self.menu.seed) if self.menu.seed is not None else tr("Random")
             case _:
                 return ""
 
@@ -45,18 +46,18 @@ class HumanMenuState(MenuBase):
 
     def _on_select(self) -> State | None:
         match self.selection:
-            case 1:  # Graine
+            case 1:  # Seed
                 from tetris.states.seed_entry import SeedEntryState
 
                 return SeedEntryState(self.screen, self.font, self.audio, self.menu)
-            case 2:  # Touches
+            case 2:  # Keys
                 from tetris.states.keybind import KeybindState
 
                 return KeybindState(self.screen, self.font, self.audio, self)
-            case 3:  # Statistiques
+            case 3:  # Statistics
                 from tetris.states.human_stats import HumanStatsState
 
                 return HumanStatsState(self.screen, self.font, self.audio, self)
-            case 4:  # Retour
+            case 4:  # Back
                 return self.menu
         return None

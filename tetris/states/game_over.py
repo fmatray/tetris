@@ -11,6 +11,7 @@ if TYPE_CHECKING:
 import pygame
 
 from tetris.audio import AudioManager
+from tetris.i18n import tr
 from tetris.settings import BLACK, GRAY, LEADERBOARD_SIZE, MAX_NAME_LENGTH, SCREEN_WIDTH, WHITE
 from tetris.states.base import State
 from tetris.states.game import GameState
@@ -127,9 +128,9 @@ class GameOverState(State):
 
     def _draw_name_entry(self, screen: pygame.Surface) -> None:
         screen.fill(BLACK)
-        prompt = get_large_font().render("GAME OVER!", True, WHITE)
+        prompt = get_large_font().render(tr("GAME OVER!"), True, WHITE)
         screen.blit(prompt, (SCREEN_WIDTH // 2 - prompt.get_width() // 2, TITLE_Y))
-        instr = self.font.render("Enter your name and press ENTER:", True, GRAY)
+        instr = self.font.render(tr("Enter your name and press ENTER:"), True, GRAY)
         screen.blit(instr, (SCREEN_WIDTH // 2 - instr.get_width() // 2, TITLE_Y + LINE_HEIGHT_SMALL + 10))
         rect = pygame.Rect(SCREEN_WIDTH // 2 - 150, CONTENT_Y + LINE_HEIGHT_SMALL * 2 + 10, 300, 50)
         pygame.draw.rect(screen, GRAY, rect, 2)

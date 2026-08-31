@@ -67,22 +67,22 @@ def _key(key):
 
 
 def test_key_name_special_keys():
-    """Special keys map to their French/arrow labels."""
+    """Special keys map to their English/arrow labels."""
     assert key_name(pygame.K_LEFT) == "←"
     assert key_name(pygame.K_RIGHT) == "→"
     assert key_name(pygame.K_UP) == "↑"
     assert key_name(pygame.K_DOWN) == "↓"
-    assert key_name(pygame.K_SPACE) == "Espace"
-    assert key_name(pygame.K_RETURN) == "Entrée"
-    assert key_name(pygame.K_ESCAPE) == "Échap"
+    assert key_name(pygame.K_SPACE) == "Space"
+    assert key_name(pygame.K_RETURN) == "Enter"
+    assert key_name(pygame.K_ESCAPE) == "Esc"
     assert key_name(pygame.K_TAB) == "Tab"
-    assert key_name(pygame.K_BACKSPACE) == "Retour"
-    assert key_name(pygame.K_LSHIFT) == "Maj G"
-    assert key_name(pygame.K_RSHIFT) == "Maj D"
-    assert key_name(pygame.K_LCTRL) == "Ctrl G"
-    assert key_name(pygame.K_RCTRL) == "Ctrl D"
-    assert key_name(pygame.K_LALT) == "Alt G"
-    assert key_name(pygame.K_RALT) == "Alt D"
+    assert key_name(pygame.K_BACKSPACE) == "Backspace"
+    assert key_name(pygame.K_LSHIFT) == "L Shift"
+    assert key_name(pygame.K_RSHIFT) == "R Shift"
+    assert key_name(pygame.K_LCTRL) == "L Ctrl"
+    assert key_name(pygame.K_RCTRL) == "R Ctrl"
+    assert key_name(pygame.K_LALT) == "L Alt"
+    assert key_name(pygame.K_RALT) == "R Alt"
 
 
 def test_key_name_single_char_uppercased():
@@ -176,13 +176,13 @@ def test_listening_clears_conflict_msg():
 
 
 def test_reserved_key_rejected():
-    """Pressing a reserved key while listening shows 'Touche réservée'."""
+    """Pressing a reserved key while listening shows 'Reserved key'."""
     st = _make_state()
     st.handle_event(_key(pygame.K_RETURN))
     assert st._listening
     st.handle_event(_key(pygame.K_UP))
     assert not st._listening
-    assert st._conflict_msg == "Touche réservée"  # type: ignore[unreachable]
+    assert st._conflict_msg == "Reserved key"  # type: ignore[unreachable]
 
 
 def test_reserved_key_left_rejected():
@@ -191,7 +191,7 @@ def test_reserved_key_left_rejected():
     st.handle_event(_key(pygame.K_RETURN))
     st.handle_event(_key(pygame.K_LEFT))
     assert not st._listening
-    assert st._conflict_msg == "Touche réservée"
+    assert st._conflict_msg == "Reserved key"
 
 
 def test_reserved_key_does_not_rebind():
@@ -214,7 +214,7 @@ def test_conflict_detected():
     st.handle_event(_key(pygame.K_RETURN))  # listening for move_left
     st.handle_event(_key(pygame.K_c))  # already used by hold
     assert not st._listening
-    assert "Utilisé par" in st._conflict_msg
+    assert "Used by" in st._conflict_msg
     assert st._keybinds()["move_left"] == pygame.K_LEFT
 
 
@@ -223,7 +223,7 @@ def test_conflict_message_names_the_action():
     st = _make_state()
     st.handle_event(_key(pygame.K_RETURN))
     st.handle_event(_key(pygame.K_c))
-    assert st._conflict_msg == f"Utilisé par: {KEYBIND_LABELS['hold']}"
+    assert st._conflict_msg == f"Used by: {KEYBIND_LABELS['hold']}"
 
 
 def test_conflict_does_not_rebind():
@@ -274,7 +274,7 @@ def test_reset_index_is_last_entry():
 
 
 def test_enter_on_reset_restores_defaults():
-    """Selecting 'Réinitialiser' restores DEFAULT_KEYBINDS."""
+    """Selecting 'Reset' restores DEFAULT_KEYBINDS."""
     st = _make_state()
     st._keybinds()["move_left"] = pygame.K_z
     st._keybinds()["move_right"] = pygame.K_x
@@ -333,7 +333,7 @@ def test_draw_listening_renders_without_error():
 def test_draw_with_conflict_msg_renders():
     """draw() renders the conflict message line without raising."""
     st = _make_state()
-    st._conflict_msg = "Touche réservée"
+    st._conflict_msg = "Reserved key"
     screen = pygame.Surface((640, 480))
     st.draw(screen)
 

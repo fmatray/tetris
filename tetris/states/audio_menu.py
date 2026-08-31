@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from tetris.i18n import tr
 from tetris.settings import (
     MUSIC_SONG_LABELS,
     MUSIC_SONGS,
@@ -14,7 +15,7 @@ from tetris.states.menu_base import MenuBase
 class AudioMenuState(MenuBase):
     """Audio sub-menu: sound volume, music volume, song selection, back."""
 
-    _OPTIONS = ("Son", "Musique", "Morceau", "Retour")
+    _OPTIONS = ("Sound", "Music", "Song", "Back")
     _toggle_indices = frozenset({0, 1, 2})
     _title = "Audio"
 
@@ -27,11 +28,11 @@ class AudioMenuState(MenuBase):
     def _value_label(self, i: int) -> str:
         match i:
             case 0:
-                return VOLUME_LABELS[self.menu.sound_volume]
+                return tr(VOLUME_LABELS[self.menu.sound_volume])
             case 1:
-                return VOLUME_LABELS[self.menu.music_volume]
+                return tr(VOLUME_LABELS[self.menu.music_volume])
             case 2:
-                return MUSIC_SONG_LABELS[self.menu.music_song]
+                return tr(MUSIC_SONG_LABELS[self.menu.music_song])
             case _:
                 return ""
 
@@ -53,7 +54,7 @@ class AudioMenuState(MenuBase):
 
     def _on_select(self) -> State | None:
         sel = self.selection
-        if sel == 3:  # Retour
+        if sel == 3:  # Back
             return self.menu
         self._toggle(1)
         self._save()

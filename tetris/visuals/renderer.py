@@ -17,6 +17,7 @@ import pygame
 from tetris.game.board import Board
 from tetris.game.shapes import SHAPES_TYPES
 from tetris.game.tetromino import Tetromino
+from tetris.i18n import tr
 from tetris.settings import (
     BLACK,
     BLOCK_SIZE,
@@ -64,20 +65,19 @@ class Renderer:
         if game.ghost_piece:
             self.draw_ghost(game.current_piece, game.board)
         self.draw_tetromino(game.current_piece)
-        self._draw_hole_overhang_markers(game)
-        self._draw_text(f"SCORE: {game.stats.score}", HUD_POSITIONS["score"])
-        self._draw_text(f"TETROMINOS: {game.stats.piece_count}", HUD_POSITIONS["tetrominos"])
-        self._draw_text(f"LIGNES: {game.stats.total_lines}", HUD_POSITIONS["lines"])
-        self._draw_text(f"NIVEAU: {game.stats.level}", HUD_POSITIONS["level"])
+        self._draw_text(f"{tr('SCORE')}: {game.stats.score}", HUD_POSITIONS["score"])
+        self._draw_text(f"{tr('TETROMINOS')}: {game.stats.piece_count}", HUD_POSITIONS["tetrominos"])
+        self._draw_text(f"{tr('LINES')}: {game.stats.total_lines}", HUD_POSITIONS["lines"])
+        self._draw_text(f"{tr('LEVEL')}: {game.stats.level}", HUD_POSITIONS["level"])
         cc = game.stats.clear_counts
-        self._draw_text(f"SIMPLES: {cc.single}", HUD_POSITIONS["clear_single"])
-        self._draw_text(f"DOUBLES: {cc.double}", HUD_POSITIONS["clear_double"])
-        self._draw_text(f"TRIPLES: {cc.triple}", HUD_POSITIONS["clear_triple"])
-        self._draw_text(f"TETRIS: {cc.tetris}", HUD_POSITIONS["clear_tetris"])
-        self._draw_text(f"COMBO: x{max(0, game.stats.combo)}", HUD_POSITIONS["combo"])
+        self._draw_text(f"{tr('SINGLES')}: {cc.single}", HUD_POSITIONS["clear_single"])
+        self._draw_text(f"{tr('DOUBLES')}: {cc.double}", HUD_POSITIONS["clear_double"])
+        self._draw_text(f"{tr('TRIPLES')}: {cc.triple}", HUD_POSITIONS["clear_triple"])
+        self._draw_text(f"{tr('TETRIS')}: {cc.tetris}", HUD_POSITIONS["clear_tetris"])
+        self._draw_text(f"{tr('COMBO')}: x{max(0, game.stats.combo)}", HUD_POSITIONS["combo"])
         if game.debug:
-            self._draw_text(f"SPEED: {int(game.current_speed * 1000)}ms", HUD_POSITIONS["speed"])
-        self._draw_text("HOLD:", HUD_POSITIONS["hold"])
+            self._draw_text(f"{tr('SPEED')}: {int(game.current_speed * 1000)}ms", HUD_POSITIONS["speed"])
+        self._draw_text(tr("HOLD:"), HUD_POSITIONS["hold"])
         if game.hold_piece is not None:
             self.draw_panel_pieces(
                 [game.hold_piece],
@@ -85,10 +85,9 @@ class Renderer:
                 HUD_POSITIONS["hold_panel"][1],
                 dim=not game._can_hold,
             )
-        if getattr(game, "preview_count", 3) > 0:
-            self._draw_text("NEXT:", HUD_POSITIONS["next"])
-            next_queue = [game.next_piece] + getattr(game, "preview_pieces", [])
-            self.draw_panel_pieces(next_queue, HUD_POSITIONS["next_panel"][0], HUD_POSITIONS["next_panel"][1])
+        self._draw_text(tr("NEXT:"), HUD_POSITIONS["next"])
+        next_queue = [game.next_piece] + getattr(game, "preview_pieces", [])
+        self.draw_panel_pieces(next_queue, HUD_POSITIONS["next_panel"][0], HUD_POSITIONS["next_panel"][1])
         if game.debug:
             match game.pieces.generator:
                 case "7bag" | "35bag":
@@ -97,13 +96,13 @@ class Renderer:
                     self._draw_debug_weights(game)
             self._draw_hole_overhang_debug(game)
         mode = game.menu.mode if game.menu else "Normal"
-        gen = GENERATOR_LABELS.get(game.pieces.generator, "Aléatoire")
-        self._draw_text(f"MODE: {mode}", HUD_POSITIONS["mode"])
-        self._draw_text(f"GÉNÉRATEUR: {gen}", HUD_POSITIONS["generator"])
-        speed_label = SPEED_MODE_LABELS.get(game.speed_mode, "Normal")
-        self._draw_text(f"VITESSE: {speed_label}", HUD_POSITIONS["speed_mode"])
+        gen = tr(GENERATOR_LABELS.get(game.pieces.generator, "Random"))
+        self._draw_text(f"{tr('MODE')}: {tr(mode)}", HUD_POSITIONS["mode"])
+        self._draw_text(f"{tr('GENERATOR')}: {gen}", HUD_POSITIONS["generator"])
+        speed_label = tr(SPEED_MODE_LABELS.get(game.speed_mode, "Normal"))
+        self._draw_text(f"{tr('SPEED')}: {speed_label}", HUD_POSITIONS["speed_mode"])
         if game.paused:
-            pause_text = get_large_font().render("PAUSE", True, WHITE)
+            pause_text = get_large_font().render(tr("PAUSE"), True, WHITE)
             self.screen.blit(
                 pause_text,
                 (HUD_POSITIONS["pause"][0] - pause_text.get_width() // 2, HUD_POSITIONS["pause"][1]),
@@ -135,15 +134,17 @@ class Renderer:
     def _draw_hole_overhang_debug(self, game: GameState) -> None:
         x, y = HUD_POSITIONS["debug_holes_overhang"]
         if y + self.font.get_height() * 2 <= SCREEN_HEIGHT:
-            self._draw_text(f"Trous: {len(game.board.find_holes())}", (x, y))
-            self._draw_text(f"Surplombs: {len(game.board.find_overhangs())}", (x, y + self.font.get_height()))
+            self._draw_text(tr("Holes: {}").format(len(game.board.find_holes())), (x, y))
+            self._draw_text(
+                tr("Overhangs: {}").format(len(game.board.find_overhangs())), (x, y + self.font.get_height())
+            )
 
     def _draw_debug_bag(self, game: GameState) -> None:
         """Draw remaining bag pieces as colored blocks right of the next-piece panel."""
         bag = game.pieces.bag_remaining
         x = HUD_POSITIONS["debug_bag"][0]
         y = HUD_POSITIONS["debug_bag"][1]
-        self._draw_text(f"SAC ({len(bag)}):", (x, y))
+        self._draw_text(tr("BAG ({}):").format(len(bag)), (x, y))
         y += self.font.get_height() + 4
         start_x = x
         max_per_row = max(1, (SCREEN_WIDTH - x) // (BLOCK_SIZE + 2))
@@ -165,7 +166,7 @@ class Renderer:
         weights = game.pieces.weights
         x = HUD_POSITIONS["debug_bag"][0]
         y = HUD_POSITIONS["debug_bag"][1]
-        self._draw_text("POIDS:", (x, y))
+        self._draw_text(tr("WEIGHTS:"), (x, y))
         y += self.font.get_height() + 4
         for piece_type in SHAPES_TYPES:
             color = SHAPES_COLORS[piece_type]
@@ -293,7 +294,7 @@ class Renderer:
         r = int(127 + 127 * math.sin(elapsed * 0.01))
         g = int(127 + 127 * math.sin(elapsed * 0.01 + 2 * math.pi / 3))
         b = int(127 + 127 * math.sin(elapsed * 0.01 + 4 * math.pi / 3))
-        txt = get_large_font().render("!!! GAME OVER !!!", True, (r, g, b))
+        txt = get_large_font().render(f"!!! {tr('GAME OVER!')} !!!", True, (r, g, b))
         dx, dy = (random.randint(-10, 10), random.randint(-10, 10)) if elapsed < 2000 else (0, 0)
         self.screen.blit(
             txt,

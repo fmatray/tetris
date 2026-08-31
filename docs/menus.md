@@ -78,7 +78,8 @@ flowchart TD
 | 7 | **Leaderboard** | Submenu | Top 10 scores display |
 | 8 | **Audio** | Submenu | Sound/music volume and song selection |
 | 9 | **Debug** | Toggle | Debug mode ON/OFF (persisted) |
-| 10 | **Quit** | Action | Exit application |
+| 10 | **Language** | Submenu | Select UI language: English, Français, Español, Slovenščina (persisted, on-the-fly) |
+| 11 | **Quit** | Action | Exit application |
 
 ---
 

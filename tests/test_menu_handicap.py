@@ -97,25 +97,25 @@ def test_game_rules_handicap_select_does_not_navigate():
     assert menu.handicap == 2
 
 
-def test_game_rules_retour_is_last_option():
-    assert GameRulesMenuState._OPTIONS[-1] == "Retour"
+def test_game_rules_back_is_last_option():
+    assert GameRulesMenuState._OPTIONS[-1] == "Back"
 
 
-def test_game_rules_retour_navigates_back():
+def test_game_rules_back_navigates_back():
     menu = _make_menu()
     state = _make_state(GameRulesMenuState, menu)
-    state.selection = GameRulesMenuState._OPTIONS.index("Retour")
+    state.selection = GameRulesMenuState._OPTIONS.index("Back")
     result = state._on_select()
     assert result is menu
 
 
 def test_game_rules_options_include_ghost():
-    assert "Fantôme" in GameRulesMenuState._OPTIONS
+    assert "Ghost piece" in GameRulesMenuState._OPTIONS
 
 
 def test_game_rules_ghost_toggle_index():
     """Ghost piece is a toggle."""
-    idx = GameRulesMenuState._OPTIONS.index("Fantôme")
+    idx = GameRulesMenuState._OPTIONS.index("Ghost piece")
     assert idx in GameRulesMenuState._toggle_indices
 
 
@@ -123,7 +123,7 @@ def test_game_rules_ghost_value_label():
     menu = _make_menu()
     menu.ghost_piece = True
     state = _make_state(GameRulesMenuState, menu)
-    idx = GameRulesMenuState._OPTIONS.index("Fantôme")
+    idx = GameRulesMenuState._OPTIONS.index("Ghost piece")
     assert state._value_label(idx) == "ON"
     menu.ghost_piece = False
     assert state._value_label(idx) == "OFF"
@@ -133,7 +133,7 @@ def test_game_rules_ghost_toggle_on():
     menu = _make_menu()
     menu.ghost_piece = False
     state = _make_state(GameRulesMenuState, menu)
-    state.selection = GameRulesMenuState._OPTIONS.index("Fantôme")
+    state.selection = GameRulesMenuState._OPTIONS.index("Ghost piece")
     state._toggle(1)
     assert menu.ghost_piece is True
 
@@ -142,13 +142,13 @@ def test_game_rules_ghost_toggle_off():
     menu = _make_menu()
     menu.ghost_piece = True
     state = _make_state(GameRulesMenuState, menu)
-    state.selection = GameRulesMenuState._OPTIONS.index("Fantôme")
+    state.selection = GameRulesMenuState._OPTIONS.index("Ghost piece")
     state._toggle(-1)
     assert menu.ghost_piece is False
 
 
 def test_human_menu_no_ghost_option():
-    assert "Fantôme" not in HumanMenuState._OPTIONS
+    assert "Ghost piece" not in HumanMenuState._OPTIONS
 
 
 # ── HumanMenuState ──────────────────────────────────────────────────
@@ -161,10 +161,10 @@ def test_human_menu_no_handicap_option():
 def test_human_menu_options():
     assert HumanMenuState._OPTIONS == (
         "Mode",
-        "Graine",
-        "Touches",
-        "Statistiques",
-        "Retour",
+        "Seed",
+        "Keys",
+        "Statistics",
+        "Back",
     )
 
 
@@ -175,23 +175,23 @@ def test_human_menu_toggle_indices():
 
 def test_human_menu_keybind_index():
     """Keybinds is at index 2."""
-    assert HumanMenuState._OPTIONS.index("Touches") == 2
+    assert HumanMenuState._OPTIONS.index("Keys") == 2
 
 
 def test_human_menu_stats_index():
     """Stats is at index 3."""
-    assert HumanMenuState._OPTIONS.index("Statistiques") == 3
+    assert HumanMenuState._OPTIONS.index("Statistics") == 3
 
 
 def test_human_menu_retour_index():
-    """Retour is at index 4."""
-    assert HumanMenuState._OPTIONS.index("Retour") == 4
+    """Back is at index 4."""
+    assert HumanMenuState._OPTIONS.index("Back") == 4
 
 
 def test_human_menu_keybind_navigates():
     menu = _make_menu()
     state = _make_state(HumanMenuState, menu)
-    state.selection = HumanMenuState._OPTIONS.index("Touches")
+    state.selection = HumanMenuState._OPTIONS.index("Keys")
     result = state._on_select()
     assert result is not None
     assert result is not state
@@ -200,7 +200,7 @@ def test_human_menu_keybind_navigates():
 def test_human_menu_stats_navigates():
     menu = _make_menu()
     state = _make_state(HumanMenuState, menu)
-    state.selection = HumanMenuState._OPTIONS.index("Statistiques")
+    state.selection = HumanMenuState._OPTIONS.index("Statistics")
     result = state._on_select()
     assert result is not None
     assert result is not state
@@ -209,6 +209,6 @@ def test_human_menu_stats_navigates():
 def test_human_menu_retour_navigates_back():
     menu = _make_menu()
     state = _make_state(HumanMenuState, menu)
-    state.selection = HumanMenuState._OPTIONS.index("Retour")
+    state.selection = HumanMenuState._OPTIONS.index("Back")
     result = state._on_select()
     assert result is menu

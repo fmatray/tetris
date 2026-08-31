@@ -98,6 +98,7 @@ classDiagram
             +mcp_port: int
             +bot_lookahead: str
             +speed_mode: str
+            +language: str
             +seed: int | None
             +__init__(screen, font, audio) None
             - _load_settings() None
@@ -112,7 +113,25 @@ classDiagram
             - _build_mcp_state() State
             - _build_eltetris_state() State
             - _game_config() GameConfig
+            +training_in_progress() bool
             +holes_overhangs_help: str
+        }
+
+        class LanguageMenuState {
+            # _OPTIONS: tuple~str, ...~ ClassVar
+            # _LANG_CODES: tuple~str, ...~ ClassVar
+            # _title: str ClassVar
+            +menu: MenuState
+            +selection: int
+            +__init__(screen, font, audio, menu) None
+            +handle_event(event: pygame.event.Event) State | None
+            +draw(screen: pygame.Surface, particles: ParticleSystem | None) None
+            # _value_label(i: int) str
+            # _toggle(direction: int) None
+            # _on_select() State | None
+            # _on_back() State | None
+            # _on_navigate() None
+            # _save() None
         }
 
         class NullAudio {
@@ -1059,6 +1078,7 @@ classDiagram
     BotMovesMixin <|-- AIState
     BotMovesMixin <|-- ElTetrisState
     MenuBase <|-- BotMenuState
+    MenuBase <|-- LanguageMenuState
 
     PieceGenerator <|-- ReplayGenerator
     PieceGenerator <|-- WeightedGenerator

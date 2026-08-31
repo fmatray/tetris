@@ -15,6 +15,7 @@ if TYPE_CHECKING:
 import pygame
 
 from tetris.ai.trainer import TrainingLog
+from tetris.i18n import get_language, tr
 from tetris.settings import BLACK, GRAY, LOG_PATH, SCREEN_WIDTH, WHITE
 from tetris.states.base import State
 from tetris.visuals.fonts import (
@@ -26,14 +27,14 @@ from tetris.visuals.fonts import (
 from tetris.visuals.graph_view import render_score_graph
 
 _STAT_LABELS = [
-    "Épisodes",
-    "Score moyen",
-    "Meilleur score",
-    "Moyenne (100 derniers)",
-    "Niveau moyen",
-    "Meilleur niveau",
-    "Lignes totales",
-    "Pièces totales",
+    "Episodes",
+    "Average score",
+    "Best score",
+    "Average (last 100)",
+    "Average level",
+    "Best level",
+    "Total lines",
+    "Total pieces",
 ]
 
 
@@ -48,6 +49,7 @@ class AIStatsState(State):
         self.screen, self.font, self.audio = screen, font, audio
         self.ai_menu = ai_menu
         self._surface: pygame.Surface | None = None
+        self._built_lang: str | None = None
         self._episode_count = 0
         self._stats = TrainingLog(LOG_PATH)
 
@@ -72,9 +74,10 @@ class AIStatsState(State):
         scores = [e["score"] for e in self._stats.episodes]
         self._episode_count = len(episodes)
         self._surface = render_score_graph(episodes, scores)
+        self._built_lang = get_language()
 
     def draw(self, screen: pygame.Surface, *, particles: ParticleSystem | None = None) -> None:
-        if self._surface is None:
+        if self._surface is None or self._built_lang != get_language():
             self._build_surface()
 
         screen.fill(BLACK)
@@ -83,13 +86,13 @@ class AIStatsState(State):
         x = 60
         y = TITLE_Y
 
-        header = get_large_font().render("Statistiques", True, WHITE)
+        header = get_large_font().render(tr("Statistics"), True, WHITE)
         screen.blit(header, (x, y))
         y += LINE_HEIGHT_SMALL + 10
 
         values = self._stat_values()
         for label, value in zip(_STAT_LABELS, values):
-            line = f"{label} : {value}"
+            line = f"{tr(label)}: {value}"
             surf = self.font.render(line, True, GRAY)
             screen.blit(surf, (x, y))
             y += LINE_HEIGHT_SMALL
@@ -101,9 +104,8 @@ class AIStatsState(State):
             gy = TITLE_Y
             screen.blit(surf, (gx, gy))
 
-        # --- Navigation instructions ---
         instr = self.font.render(
-            f"{self._episode_count} épisode(s) — Appuyez sur une touche pour revenir",
+            tr("{} episode(s) — Press any key to go back").format(self._episode_count),
             True,
             GRAY,
         )

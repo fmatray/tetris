@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from tetris.states.ai import AIState
 
+from tetris.i18n import tr
 from tetris.settings import HUD_POSITIONS, RED, GREEN, SCREEN_WIDTH
 from tetris.visuals.fonts import LINE_HEIGHT_SMALL
 
@@ -22,11 +23,10 @@ def draw_ai_hud(ai_state: AIState) -> None:
     y = HUD_POSITIONS["ai_stats"][1]
     lh = LINE_HEIGHT_SMALL  # line height
 
-    # --- Training section (3 columns) ---
-    mode_label = "Apprentissage" if ai_state.ai_mode == "learning" else "Jeu"
+    mode_label = tr("Training") if ai_state.ai_mode == "learning" else tr("Game")
     training_items = [
         f"Mode: {mode_label}",
-        f"Vitesse: {'Rapide' if ai_state.speed == 'fast' else 'Normal'}",
+        f"{tr('Speed')}: {tr('Fast') if ai_state.speed == 'fast' else tr('Normal')}",
         f"Episode: {ai_state.episode}",
         f"Epsilon: {ai_state.agent.epsilon:.5f}",
         f"Epsilon decay: {ai_state.agent.epsilon_decay:.4f}",
@@ -38,7 +38,7 @@ def draw_ai_hud(ai_state: AIState) -> None:
         f"Curriculum: {'ON' if ai_state.curriculum else 'OFF'}",
         f"Pieces: {''.join(ai_state._curriculum_types) if ai_state._curriculum_types else 'ALL'}",
         f"Warm-start: {'ON' if ai_state.warm_start else 'OFF'}",
-        f"Maj/pièce: {ai_state.learn_per_action}",
+        f"{tr('Updates/piece')}: {ai_state.learn_per_action}",
     ]
     col_w = (SCREEN_WIDTH - x0) // 3
     for i, item in enumerate(training_items):
@@ -55,7 +55,7 @@ def draw_ai_hud(ai_state: AIState) -> None:
         status, color, level = _cooking_status(ai_state)
         _draw_thermometer(ai_state.screen, x0, y, level, color)
         label_x = x0 + 30
-        surf = ai_state.font.render(f"Cuisson: {status}", True, color)
+        surf = ai_state.font.render(tr("Cooking: {}").format(tr(status)), True, color)
         ai_state.screen.blit(surf, (label_x, y))
         y += max(lh, 20) + 5
 
@@ -69,14 +69,14 @@ def draw_ai_hud(ai_state: AIState) -> None:
 
     headers = ["", "Tetromino", "Lines", "Score", "Level"]
     for i in range(1, 5):
-        surf = ai_state.font.render(headers[i], True, RED)
+        surf = ai_state.font.render(tr(headers[i]), True, RED)
         ai_state.screen.blit(surf, (col_x[i] - surf.get_width(), y))
     y += lh
 
     rows = _hud_table_rows(ai_state.log, ai_state.stats, ai_state.episode_steps)
     for row in rows:
         label = row[0]
-        surf = ai_state.font.render(label, True, RED)
+        surf = ai_state.font.render(tr(label), True, RED)
         ai_state.screen.blit(surf, (x0, y))
         for i in range(1, 5):
             surf = ai_state.font.render(str(row[i]), True, RED)
@@ -88,7 +88,7 @@ def draw_ai_hud(ai_state: AIState) -> None:
         f"{ptype} r{rot} c{col} {'H' if hold else ' '}"
         for _i, (ptype, rot, col, hold) in enumerate(ai_state._last_moves)
     ]
-    moves_text = "Derniers coups: " + " | ".join(parts) if parts else "Derniers coups: —"
+    moves_text = tr("Last moves: {}").format(" | ".join(parts)) if parts else tr("Last moves: —")
     surf = ai_state.font.render(moves_text, True, RED)
     ai_state.screen.blit(surf, HUD_POSITIONS["ai_moves"])
 
@@ -151,7 +151,7 @@ def _cooking_status(ai_state: AIState) -> tuple[str, tuple[int, int, int], float
     # ponytail: n<100 → undercooked by definition; TD window unavailable and early
     # score dips are normal learning churn, not divergence.
     if n < 100:
-        return "Pas assez cuit", (100, 180, 255), level
+        return "Undercooked", (100, 180, 255), level
     health = 0
     # Signal 1: score trend
     if score_trend == "up":
@@ -178,10 +178,10 @@ def _cooking_status(ai_state: AIState) -> tuple[str, tuple[int, int, int], float
         health += 1
 
     if health <= 0:
-        return "Trop cuit", RED, level
+        return "Overcooked", RED, level
     if health <= 1:
-        return "Pas assez cuit", (100, 180, 255), level
-    return "Bien cuit", GREEN, level
+        return "Undercooked", (100, 180, 255), level
+    return "Well done", GREEN, level
 
 
 def _draw_thermometer(screen, x: int, y: int, level: float, color: tuple[int, int, int]) -> None:

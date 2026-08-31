@@ -78,7 +78,7 @@ def _key(key_code):
 
 
 def test_audio_menu_options():
-    assert AudioMenuState._OPTIONS == ("Son", "Musique", "Morceau", "Retour")
+    assert AudioMenuState._OPTIONS == ("Sound", "Music", "Song", "Back")
 
 
 def test_audio_menu_toggle_indices():
@@ -94,7 +94,7 @@ def test_audio_menu_value_labels():
     assert state._value_label(1) == "Max"  # default 3
     # Song label
     assert state._value_label(2) == "Korobeiniki"
-    # Retour has no label
+    # Back has no label
     assert state._value_label(3) == ""
 
 
@@ -173,11 +173,11 @@ def test_audio_menu_handle_left_right_toggle():
 def test_ai_menu_options():
     assert AIMenuState._OPTIONS == (
         "Mode",
-        "Vitesse",
-        "Apprentissage",
-        "Statistiques",
-        "Réinitialiser IA",
-        "Retour",
+        "Speed",
+        "Training",
+        "Statistics",
+        "Reset AI",
+        "Back",
     )
 
 
@@ -189,7 +189,7 @@ def test_ai_menu_value_labels():
     menu = _make_menu()
     state = _make_state(AIMenuState, menu)
     # Mode default "learning"
-    assert state._value_label(0) == "Apprentissage"
+    assert state._value_label(0) == "Training"
     # Speed default "normal"
     assert state._value_label(1) == "Normal"
     # Others have no value
@@ -237,7 +237,7 @@ def test_ai_menu_not_disabled_when_learning(no_training_checkpoint):
 
 
 def test_training_locks_apprentissage_when_checkpoint_exists(monkeypatch, tmp_path):
-    """A trained checkpoint locks the Apprentissage submenu in learning mode."""
+    """A trained checkpoint locks the Training submenu in learning mode."""
     model = tmp_path / "model.pt"
     model.write_bytes(b"checkpoint")
     monkeypatch.setattr("tetris.states.menu.MODEL_PATH", str(model))
@@ -263,7 +263,7 @@ def test_training_log_alone_locks_apprentissage(monkeypatch, no_training_checkpo
 
 
 def test_reset_ai_unlocks_apprentissage(no_training_checkpoint, monkeypatch, tmp_path):
-    """Réinitialiser IA deletes the checkpoint, which unlocks Apprentissage."""
+    """Reset AI deletes the checkpoint, which unlocks Training."""
     import tetris.states.ai_menu as ai_menu_mod
 
     model = tmp_path / "model.pt"
@@ -359,7 +359,7 @@ def test_ai_menu_option_text_confirm_reset():
     state = _make_state(AIMenuState, menu)
     state._confirm_reset = True
     text = state._option_text(4, True)
-    assert "Confirmer" in text
+    assert "Confirm" in text
 
 
 def test_ai_menu_option_text_normal():
@@ -418,7 +418,7 @@ def test_game_rules_value_label_generator():
 def test_game_rules_value_label_preview():
     menu = _make_menu()
     state = _make_state(GameRulesMenuState, menu)
-    assert state._value_label(1) == "3 pièces"
+    assert state._value_label(1) == "3 pieces"
 
 
 def test_game_rules_value_label_handicap():
@@ -484,8 +484,8 @@ def test_hyperparam_value_labels():
     assert state._value_label(11) == "OFF"
     assert state._value_label(3) == "ON"
     assert state._value_label(15) == "ON"
-    assert state._value_label(17) == ""  # Réinitialiser
-    assert state._value_label(18) == ""  # Retour
+    assert state._value_label(17) == ""  # Reset
+    assert state._value_label(18) == ""  # Back
 
 
 def test_hyperparam_toggle_epsilon_decay_up():
@@ -727,7 +727,7 @@ def test_menu_base_handle_right_toggles():
 def test_menu_base_handle_enter_selects():
     menu = _make_menu()
     state = _make_state(AudioMenuState, menu)
-    state.selection = 3  # Retour
+    state.selection = 3  # Back
     result = state.handle_event(_key(pygame.K_RETURN))
     assert result is menu
 
@@ -736,7 +736,7 @@ def test_menu_base_handle_enter_disabled_does_nothing():
     menu = _make_menu()
     menu.ai_mode = "playing"
     state = _make_state(AIMenuState, menu)
-    state.selection = 2  # Apprentissage, disabled when playing
+    state.selection = 2  # Training, disabled when playing
     result = state.handle_event(_key(pygame.K_RETURN))
     assert result is None
 
@@ -856,8 +856,8 @@ def test_menu_base_update_drives_animation():
 
 def test_menu_state_value_labels():
     menu = _make_menu()
-    assert menu._value_label(1) == "Humain"  # Joueur
-    assert menu._value_label(8) == "OFF"  # debug default False (shifted +1)
+    assert menu._value_label(1) == "Human"  # Player
+    assert menu._value_label(9) == "OFF"  # debug default False
     assert menu._value_label(0) == ""  # Démarrer
 
 
@@ -876,9 +876,9 @@ def test_menu_state_disabled_human_when_ai():
 def test_menu_state_disabled_mcp_when_not_mcp():
     menu = _make_menu()
     menu.player = "Humain"
-    assert menu._is_disabled(4) is True  # MCP disabled when player != MCP
+    assert menu._is_disabled(5) is True  # MCP disabled when player != MCP
     menu.player = "MCP"
-    assert menu._is_disabled(4) is False  # MCP enabled when player == MCP
+    assert menu._is_disabled(5) is False  # MCP enabled when player == MCP
 
 
 def test_menu_state_toggle_player():
@@ -887,6 +887,8 @@ def test_menu_state_toggle_player():
     menu._toggle(1)
     assert menu.player == "IA"
     menu._toggle(1)
+    assert menu.player == "Bot"
+    menu._toggle(1)
     assert menu.player == "MCP"
     menu._toggle(1)
     assert menu.player == "Humain"
@@ -894,28 +896,28 @@ def test_menu_state_toggle_player():
 
 def test_menu_state_toggle_debug():
     menu = _make_menu()
-    menu.selection = 8  # Débogage (shifted +1)
+    menu.selection = 9  # Debug
     menu._toggle(1)
     assert menu.debug is True
 
 
 def test_menu_state_select_audio():
     menu = _make_menu()
-    menu.selection = 7  # Audio (shifted +1)
+    menu.selection = 8  # Audio
     result = menu._on_select()
     assert isinstance(result, AudioMenuState)
 
 
 def test_menu_state_select_game_rules():
     menu = _make_menu()
-    menu.selection = 5  # Règles du jeu (shifted +1)
+    menu.selection = 6  # Game rules
     result = menu._on_select()
     assert isinstance(result, GameRulesMenuState)
 
 
 def test_menu_state_select_leaderboard():
     menu = _make_menu()
-    menu.selection = 6  # Leaderboard (shifted +1)
+    menu.selection = 7  # Leaderboard
     result = menu._on_select()
     assert isinstance(result, LeaderboardState)
 
@@ -941,7 +943,7 @@ def test_menu_state_select_mcp():
 
     menu = _make_menu()
     menu.player = "MCP"
-    menu.selection = 4  # MCP
+    menu.selection = 5  # MCP
     result = menu._on_select()
     assert isinstance(result, MCPMenuState)
 
@@ -1076,10 +1078,10 @@ def test_human_menu_value_labels():
     menu = _make_menu()
     state = _make_state(HumanMenuState, menu)
     assert state._value_label(0) == "Normal"  # mode default
-    assert state._value_label(1) == "Aléatoire"  # Graine (seed default: None)
-    assert state._value_label(2) == ""  # Touches
-    assert state._value_label(3) == ""  # Statistiques
-    assert state._value_label(4) == ""  # Retour
+    assert state._value_label(1) == "Random"  # Seed (seed default: None)
+    assert state._value_label(2) == ""  # Keys
+    assert state._value_label(3) == ""  # Statistics
+    assert state._value_label(4) == ""  # Back
 
 
 def test_human_menu_toggle_mode():
@@ -1207,11 +1209,13 @@ def test_menu_toggle_debug_via_event():
 
 
 def test_menu_toggle_player_via_event():
-    """Toggling player via K_LEFT/K_RIGHT cycles: Humain → IA → MCP → Humain."""
+    """Toggling player via K_LEFT/K_RIGHT cycles: Humain → IA → Bot → MCP → Humain."""
     menu = _make_menu()
     menu.selection = 1  # Joueur
     menu.handle_event(_key(pygame.K_RIGHT))
     assert menu.player == "IA"
+    menu.handle_event(_key(pygame.K_RIGHT))
+    assert menu.player == "Bot"
     menu.handle_event(_key(pygame.K_RIGHT))
     assert menu.player == "MCP"
     menu.handle_event(_key(pygame.K_RIGHT))
@@ -1272,7 +1276,7 @@ def test_menu_handle_enter_on_disabled_returns_none():
 def test_menu_handle_left_on_non_toggle_does_nothing():
     """LEFT on non-toggle index does nothing."""
     menu = _make_menu()
-    menu.selection = 7  # Audio (shifted +1) — not a toggle index
+    menu.selection = 8  # Audio — not a toggle index
     menu.handle_event(_key(pygame.K_LEFT))
     assert menu.player == "Humain"
 
@@ -1280,6 +1284,6 @@ def test_menu_handle_left_on_non_toggle_does_nothing():
 def test_menu_handle_right_on_non_toggle_does_nothing():
     """RIGHT on non-toggle index does nothing."""
     menu = _make_menu()
-    menu.selection = 5  # Règles du jeu (shifted +1) — not a toggle index
+    menu.selection = 6  # Game rules — not a toggle index
     menu.handle_event(_key(pygame.K_RIGHT))
     assert menu.player == "Humain"

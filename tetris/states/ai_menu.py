@@ -10,6 +10,7 @@ from tetris.settings import (
     RED,
 )
 from tetris.states.base import State
+from tetris.i18n import tr
 from tetris.states.menu_base import MenuBase
 
 # Files deleted on "Reset AI"
@@ -20,12 +21,12 @@ class AIMenuState(MenuBase):
     """AI sub-menu: mode, speed, learning submenu, stats, reset, back.
 
     Mode and speed are AI settings stored on the parent ``MenuState``.
-    Learning submenu is disabled when Mode = Jeu (playing).
+    Learning submenu is disabled when Mode = Game (playing).
     """
 
-    _OPTIONS = ("Mode", "Vitesse", "Apprentissage", "Statistiques", "Réinitialiser IA", "Retour")
-    _toggle_indices = frozenset({0, 1})  # Mode, Vitesse
-    _title = "IA"
+    _OPTIONS = ("Mode", "Speed", "Training", "Statistics", "Reset AI", "Back")
+    _toggle_indices = frozenset({0, 1})  # Mode, Speed
+    _title = "AI"
 
     def __init__(self, screen, font, audio, menu) -> None:
         super().__init__(screen, font, audio)
@@ -37,23 +38,23 @@ class AIMenuState(MenuBase):
     def _value_label(self, i: int) -> str:
         match i:
             case 0:  # Mode
-                return "Apprentissage" if self.menu.ai_mode == "learning" else "Jeu"
-            case 1:  # Vitesse
-                return "Rapide" if self.menu.ai_speed == "fast" else "Normal"
+                return tr("Training") if self.menu.ai_mode == "learning" else tr("Game")
+            case 1:  # Speed
+                return tr("Fast") if self.menu.ai_speed == "fast" else tr("Normal")
             case _:
                 return ""
 
     def _is_disabled(self, i: int) -> bool:
-        # Apprentissage (2): locked while training is ongoing (a trained
+        # Training (2): locked while training is ongoing (a trained
         # checkpoint exists) — hyperparams would alter a run in progress.
-        # "Réinitialiser IA" deletes the checkpoint and unlocks it again.
+        # "Reset AI" deletes the checkpoint and unlocks it again.
         return bool(i == 2 and (self.menu.ai_mode == "playing" or self.menu.training_in_progress()))
 
     def _toggle(self, direction: int) -> None:
         match self.selection:
             case 0:  # Mode
                 self.menu.ai_mode = "playing" if self.menu.ai_mode == "learning" else "learning"
-            case 1:  # Vitesse
+            case 1:  # Speed
                 self.menu.ai_speed = "fast" if self.menu.ai_speed == "normal" else "normal"
 
     def _save(self) -> None:
@@ -70,28 +71,28 @@ class AIMenuState(MenuBase):
             case 0:  # Mode — toggle
                 self._toggle(-1)
                 self._save()
-            case 2:  # Apprentissage submenu
+            case 2:  # Training submenu
                 from tetris.states.hyperparam_menu import HyperparamMenuState
 
                 return HyperparamMenuState(self.screen, self.font, self.audio, self)
-            case 3:  # Statistiques
+            case 3:  # Statistics
                 from tetris.states.ai_stats import AIStatsState
 
                 return AIStatsState(self.screen, self.font, self.audio, self)
-            case 4:  # Réinitialiser IA
+            case 4:  # Reset AI
                 if not self._confirm_reset:
                     self._confirm_reset = True
                 else:
                     self._reset_ai()
                     self._confirm_reset = False
-            case 5:  # Retour
+            case 5:  # Back
                 return self.menu
         return None
 
     def _option_text(self, i: int, is_sel: bool) -> str:
         if i == 4 and self._confirm_reset:
             prefix = "> " if is_sel else "  "
-            return f"{prefix}Confirmer ? (Entrée)"
+            return f"{prefix}{tr('Confirm reset?')} (Enter)"
         return super()._option_text(i, is_sel)
 
     def _option_color(self, i: int, is_sel: bool, disabled: bool) -> tuple[int, int, int]:

@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 import pygame
 
 from tetris.settings import BLACK, GRAY, SCREEN_WIDTH, WHITE
+from tetris.i18n import tr
 from tetris.states.base import State
 from tetris.visuals.fonts import (
     CONTENT_Y,
@@ -37,14 +38,16 @@ class MenuBase(State):
     - _save() -> None: persist settings after a toggle
     - _option_text(i, is_sel) -> str: custom text for an option
     """
+
     _OPTIONS: tuple[str, ...] = ()
     _title: str = ""
     _toggle_indices: frozenset[int] = frozenset()
     _title_y: int = TITLE_Y
     _options_y: int = CONTENT_Y
     _item_spacing: int = LINE_HEIGHT_SMALL
-    _instructions: str = "Flèches: Navigation | Entrée: Valider | Échap: Retour"
+    _instructions: str = "Arrows: Navigate | Enter: Select | Esc: Back"
     _disabled_color: tuple[int, int, int] = (64, 64, 64)
+
     def __init__(self, screen, font, audio) -> None:
         """Initialize the menu with a fresh background animation instance.
 
@@ -144,7 +147,7 @@ class MenuBase(State):
         if particles is not None:
             particles.draw(screen)
 
-        title = get_large_font().render(self._title, True, WHITE)
+        title = get_large_font().render(tr(self._title), True, WHITE)
         screen.blit(title, (SCREEN_WIDTH // 2 - title.get_width() // 2, self._title_y))
 
         for i, option in enumerate(self._OPTIONS):
@@ -155,11 +158,10 @@ class MenuBase(State):
             surf = self.font.render(text, True, color)
             screen.blit(
                 surf,
-                (SCREEN_WIDTH // 2 - surf.get_width() // 2,
-                 self._options_y + i * self._item_spacing),
+                (SCREEN_WIDTH // 2 - surf.get_width() // 2, self._options_y + i * self._item_spacing),
             )
 
-        instr = self.font.render(self._instructions, True, GRAY)
+        instr = self.font.render(tr(self._instructions), True, GRAY)
         screen.blit(
             instr,
             (SCREEN_WIDTH // 2 - instr.get_width() // 2, INSTRUCTIONS_Y),
@@ -190,8 +192,8 @@ class MenuBase(State):
 
     def _option_text(self, i: int, is_sel: bool) -> str:
         prefix = "> " if is_sel else "  "
-        value = self._value_label(i)
-        return f"{prefix}{self._OPTIONS[i]}" + (f" : {value}" if value else "")
+        value = tr(self._value_label(i))
+        return f"{prefix}{tr(self._OPTIONS[i])}" + (f" : {value}" if value else "")
 
     def _option_color(self, i: int, is_sel: bool, disabled: bool) -> tuple[int, int, int]:
         if disabled:

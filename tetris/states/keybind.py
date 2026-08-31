@@ -10,8 +10,9 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-import pygame
+from tetris.i18n import tr
 
+import pygame
 from tetris.settings import (
     BLACK,
     DEFAULT_KEYBINDS,
@@ -32,38 +33,38 @@ from tetris.visuals.fonts import (
 
 
 def key_name(key: int) -> str:
-    """Human-readable name for a pygame key constant (French where ambiguous)."""
+    """Human-readable name for a pygame key constant."""
     _SPECIALS = {
         pygame.K_LEFT: "←",
         pygame.K_RIGHT: "→",
         pygame.K_UP: "↑",
         pygame.K_DOWN: "↓",
-        pygame.K_SPACE: "Espace",
-        pygame.K_RETURN: "Entrée",
-        pygame.K_ESCAPE: "Échap",
+        pygame.K_SPACE: "Space",
+        pygame.K_RETURN: "Enter",
+        pygame.K_ESCAPE: "Esc",
         pygame.K_TAB: "Tab",
-        pygame.K_BACKSPACE: "Retour",
-        pygame.K_LSHIFT: "Maj G",
-        pygame.K_RSHIFT: "Maj D",
-        pygame.K_LCTRL: "Ctrl G",
-        pygame.K_RCTRL: "Ctrl D",
-        pygame.K_LALT: "Alt G",
-        pygame.K_RALT: "Alt D",
+        pygame.K_BACKSPACE: "Backspace",
+        pygame.K_LSHIFT: "L Shift",
+        pygame.K_RSHIFT: "R Shift",
+        pygame.K_LCTRL: "L Ctrl",
+        pygame.K_RCTRL: "R Ctrl",
+        pygame.K_LALT: "L Alt",
+        pygame.K_RALT: "R Alt",
     }
     if key in _SPECIALS:
-        return _SPECIALS[key]
+        return tr(_SPECIALS[key])
     name = pygame.key.name(key)
     if len(name) == 1:
         return name.upper()
     return name
+
 
 if TYPE_CHECKING:
     from tetris.states.human_menu import HumanMenuState
     from tetris.visuals.particles import ParticleSystem
 
 # Keys that cannot be rebound (reserved for navigation / quit).
-_RESERVED = {pygame.K_UP, pygame.K_DOWN, pygame.K_LEFT, pygame.K_RIGHT,
-             pygame.K_RETURN, pygame.K_ESCAPE}
+_RESERVED = {pygame.K_UP, pygame.K_DOWN, pygame.K_LEFT, pygame.K_RIGHT, pygame.K_RETURN, pygame.K_ESCAPE}
 
 # Action names in display order.
 _ACTIONS = list(DEFAULT_KEYBINDS.keys())
@@ -134,7 +135,7 @@ class KeybindState(State):
             return None
 
         if event.key in _RESERVED:
-            self._conflict_msg = "Touche réservée"
+            self._conflict_msg = tr("Reserved key")
             self._listening = False
             return None
 
@@ -144,8 +145,7 @@ class KeybindState(State):
         # Check for conflict: same key used by a different action
         for other_action, other_key in keybinds.items():
             if other_action != action and other_key == event.key:
-                label = KEYBIND_LABELS[other_action]
-                self._conflict_msg = f"Utilisé par: {label}"
+                self._conflict_msg = tr("Used by: {}").format(tr(KEYBIND_LABELS[other_action]))
                 self._listening = False
                 return None
 
@@ -161,14 +161,14 @@ class KeybindState(State):
     def draw(self, screen: pygame.Surface, *, particles: ParticleSystem | None = None) -> None:
         screen.fill(BLACK)
 
-        title = get_large_font().render("Touches", True, WHITE)
+        title = get_large_font().render(tr("Keys"), True, WHITE)
         screen.blit(title, (SCREEN_WIDTH // 2 - title.get_width() // 2, TITLE_Y))
 
         keybinds = self._keybinds()
         y = CONTENT_Y
         for i, action in enumerate(_ACTIONS):
             is_sel = i == self.selection
-            label = KEYBIND_LABELS[action]
+            label = tr(KEYBIND_LABELS[action])
             key_str = key_name(keybinds[action])
 
             if self._listening and is_sel:
@@ -187,7 +187,7 @@ class KeybindState(State):
         is_reset_sel = self.selection == _RESET_INDEX
         reset_color = WHITE if is_reset_sel else GRAY
         reset_prefix = "> " if is_reset_sel else "  "
-        reset_text = f"{reset_prefix}Réinitialiser"
+        reset_text = f"{reset_prefix}{tr('Reset')}"
         reset_surf = self.font.render(reset_text, True, reset_color)
         screen.blit(reset_surf, (SCREEN_WIDTH // 2 - reset_surf.get_width() // 2, y))
 
@@ -198,9 +198,9 @@ class KeybindState(State):
 
         # Instructions
         if self._listening:
-            instr_text = "Appuyez sur une touche | Échap: Annuler"
+            instr_text = tr("Press a key | Esc: Cancel")
         else:
-            instr_text = "Entrée: Modifier | Échap: Retour"
+            instr_text = tr("Enter: Modify | Esc: Back")
         instr = self.font.render(instr_text, True, GRAY)
         screen.blit(
             instr,

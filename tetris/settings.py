@@ -24,12 +24,12 @@ RED = (255, 0, 0)
 GREEN = (0, 200, 0)
 ORANGE = (255, 165, 0)
 
-# Piece generator labels (French UI)
+# Piece generator labels (English; translated at render time).
 GENERATOR_LABELS = {
-    "random": "Aléatoire",
+    "random": "Random",
     "7bag": "7-bag",
     "35bag": "35-bag",
-    "weighted": "Pondéré",
+    "weighted": "Weighted",
 }
 
 # --- Board geometry ----------------------------------------------------
@@ -93,13 +93,13 @@ SPEED_MODES: dict[str, float] = {
     "insane": 0.060,
 }
 SPEED_MODE_LABELS: dict[str, str] = {
-    "none": "Aucune",
-    "easy": "Facile",
+    "none": "None",
+    "easy": "Easy",
     "normal": "Normal",
-    "medium": "Moyen",
-    "hard": "Difficile",
-    "crazy": "Fou",
-    "insane": "Infernal",
+    "medium": "Medium",
+    "hard": "Hard",
+    "crazy": "Crazy",
+    "insane": "Insane",
 }
 SPEED_MODE_ORDER: list[str] = list(SPEED_MODES.keys())  # ["none", "easy", ...]
 DEFAULT_SPEED_MODE = "normal"
@@ -163,7 +163,7 @@ MENU_ANIM_FADE_DISTANCE = 100  # px from bottom where fade-out begins
 # --- Audio -------------------------------------------------------------
 # Volume levels and labels shared by sound and music (4 steps: Off → Max).
 VOLUME_LEVELS = [0.0, 0.25, 0.5, 1.0]
-VOLUME_LABELS = ["Off", "Bas", "Moyen", "Max"]
+VOLUME_LABELS = ["Off", "Low", "Medium", "Max"]
 
 MUSIC_SONGS = ["korobeiniki", "kalinka"]
 MUSIC_SONG_LABELS = {"korobeiniki": "Korobeiniki", "kalinka": "Kalinka"}
@@ -191,17 +191,17 @@ DEFAULT_KEYBINDS: dict[str, int] = {
     "mute": pygame.K_m,
 }
 
-# Display labels for each action (French).
+# Display labels for each action (English; translated at render time).
 KEYBIND_LABELS: dict[str, str] = {
-    "move_left": "Gauche",
-    "move_right": "Droite",
-    "rotate_cw": "Rotation horaire",
-    "rotate_ccw": "Rotation anti-horaire",
-    "soft_drop": "Chute douce",
-    "hard_drop": "Chute rapide",
-    "hold": "Réserve",
+    "move_left": "Left",
+    "move_right": "Right",
+    "rotate_cw": "Rotate clockwise",
+    "rotate_ccw": "Rotate counter-clockwise",
+    "soft_drop": "Soft drop",
+    "hard_drop": "Hard drop",
+    "hold": "Hold",
     "pause": "Pause",
-    "mute": "Muet",
+    "mute": "Mute",
 }
 
 # --- File paths --------------------------------------------------------

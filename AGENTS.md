@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-A Python pygame Tetris game with an embedded Deep Q-Network (DQN) AI agent that learns to play. UI labels are in French. Runs as a desktop app at 60 FPS with a finite state machine (FSM) driving navigation between menus, gameplay, AI training, and stats views.
+A Python pygame Tetris game with an embedded Deep Q-Network (DQN) AI agent that learns to play. UI labels are internationalized (English default; French, Spanish, Slovenian available via on-the-fly language menu). Runs as a desktop app at 60 FPS with a finite state machine (FSM) driving navigation between menus, gameplay, AI training, and stats views.
 
 ## Architecture & Data Flow
 
@@ -318,7 +318,7 @@ All in `data/` (gitignored via blanket `data/` rule):
 
 ### Language
 - **English only** in `docs/`, `README.md`, and code comments.
-- **French only** for UI labels (in code) and `README-fr.md`.
+- **English default** for UI labels (in code); French, Spanish, Slovenian via i18n catalogs (`tetris/i18n.py`). `README-fr.md` is French translation of README.
 - No mixing languages within a single file.
 
 ### Structure: One Domain = One File
