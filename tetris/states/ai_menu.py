@@ -44,7 +44,10 @@ class AIMenuState(MenuBase):
                 return ""
 
     def _is_disabled(self, i: int) -> bool:
-        return bool(i == 2 and self.menu.ai_mode == "playing")
+        # Apprentissage (2): locked while training is ongoing (a trained
+        # checkpoint exists) — hyperparams would alter a run in progress.
+        # "Réinitialiser IA" deletes the checkpoint and unlocks it again.
+        return bool(i == 2 and (self.menu.ai_mode == "playing" or self.menu.training_in_progress()))
 
     def _toggle(self, direction: int) -> None:
         match self.selection:

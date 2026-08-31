@@ -3,17 +3,19 @@
 from __future__ import annotations
 
 import json
+import os
 import sys
 from typing import ClassVar
 
 import pygame
 from tetris.states.game import GameConfig
 from tetris.states.ai import AIConfig
-
 from tetris.logger import configure_logging, get_logger
 from tetris.settings import (
     DEFAULT_SPEED_MODE,
+    LOG_PATH,
     MCP_SERVER_PORT,
+    MODEL_PATH,
     SETTINGS_PATH,
 )
 from tetris.states.base import State
@@ -91,6 +93,10 @@ class MenuState(MenuBase):
         self.keybinds: dict[str, int] = dict(DEFAULT_KEYBINDS)
         self._load_settings()
         configure_logging(self.debug)
+
+    def training_in_progress(self) -> bool:
+        """True while a training checkpoint exists (model or training log)."""
+        return os.path.exists(MODEL_PATH) or os.path.exists(LOG_PATH)
 
     # --- Settings persistence -------------------------------------------
 

@@ -99,7 +99,7 @@ flowchart TD
 |--------|------|--------|-------------|
 | **Mode** | Toggle | Learning / Playing | Learning: ε-greedy, trains, saves model/log. Playing: greedy (ε=0), no training, full lock delay |
 | **Speed** | Toggle | Normal / Fast | Normal: respects lock delay. Fast: fast-forwards lock delay (learning only) |
-| **Training** | Submenu | — | All DQN hyperparameters (see below) |
+| **Training** | Submenu | — | All DQN hyperparameters (see below). Locked while training is in progress: changing hyperparameters mid-run would alter an ongoing training. Unlocks after Reset AI removes the trained model and log. Greyed out when Mode = Playing |
 | **Statistics** | Submenu | — | Training metrics, score graph (matplotlib → pygame surface) |
 | **Reset AI** | Action | — | Deletes `ai_model.pt`, `ai_training_log.json`, `ai_step_log.jsonl`, `ai_behavior_log.jsonl`, `runs/` (confirmation required) |
 | **Back** | Action | — | Returns to Main Menu |

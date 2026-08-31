@@ -212,6 +212,15 @@ def test_ai_menu_toggle_speed():
     assert menu.ai_speed == "fast"
 
 
+@pytest.fixture
+def no_training_checkpoint(monkeypatch, tmp_path):
+    """Point the checkpoint paths at an empty temp dir (no model, no log)."""
+    import tetris.states.menu as menu_mod
+
+    monkeypatch.setattr(menu_mod, "MODEL_PATH", str(tmp_path / "model.pt"))
+    monkeypatch.setattr(menu_mod, "LOG_PATH", str(tmp_path / "log.json"))
+
+
 def test_ai_menu_disabled_when_playing():
     menu = _make_menu()
     state = _make_state(AIMenuState, menu)
@@ -220,10 +229,54 @@ def test_ai_menu_disabled_when_playing():
     assert state._is_disabled(0) is False
 
 
-def test_ai_menu_not_disabled_when_learning():
+def test_ai_menu_not_disabled_when_learning(no_training_checkpoint):
     menu = _make_menu()
     state = _make_state(AIMenuState, menu)
     menu.ai_mode = "learning"
+    assert state._is_disabled(2) is False
+
+
+def test_training_locks_apprentissage_when_checkpoint_exists(monkeypatch, tmp_path):
+    """A trained checkpoint locks the Apprentissage submenu in learning mode."""
+    model = tmp_path / "model.pt"
+    model.write_bytes(b"checkpoint")
+    monkeypatch.setattr("tetris.states.menu.MODEL_PATH", str(model))
+    menu = _make_menu()
+    state = _make_state(AIMenuState, menu)
+    menu.ai_mode = "learning"
+    assert menu.training_in_progress() is True
+    assert state._is_disabled(2) is True
+    # Enter on a disabled row does nothing (MenuBase blocks select)
+    state.selection = 2
+    assert state.handle_event(pygame.event.Event(pygame.K_RETURN, key=pygame.K_RETURN)) is None
+
+
+def test_training_log_alone_locks_apprentissage(monkeypatch, no_training_checkpoint, tmp_path):
+    """A training log without a model still counts as ongoing training."""
+    log = tmp_path / "log.json"
+    log.write_text("[]")
+    monkeypatch.setattr("tetris.states.menu.LOG_PATH", str(log))
+    menu = _make_menu()
+    state = _make_state(AIMenuState, menu)
+    menu.ai_mode = "learning"
+    assert state._is_disabled(2) is True
+
+
+def test_reset_ai_unlocks_apprentissage(no_training_checkpoint, monkeypatch, tmp_path):
+    """Réinitialiser IA deletes the checkpoint, which unlocks Apprentissage."""
+    import tetris.states.ai_menu as ai_menu_mod
+
+    model = tmp_path / "model.pt"
+    log = tmp_path / "log.json"
+    model.write_bytes(b"checkpoint")
+    log.write_text("[]")
+    monkeypatch.setattr(ai_menu_mod, "AI_FILES", [str(model), str(log)])
+    menu = _make_menu()
+    state = _make_state(AIMenuState, menu)
+    menu.ai_mode = "learning"
+    assert state._is_disabled(2) is True
+    state._reset_ai()
+    assert menu.training_in_progress() is False
     assert state._is_disabled(2) is False
 
 
