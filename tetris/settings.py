@@ -78,7 +78,7 @@ DAS_REPEAT_MS = 50  # auto-shift repeat interval (ms)
 # Super-exponential: (DROP_BASE - level×DROP_STEP)^level.
 # Level 0 → 1.0s, level 10 → 0.04s, level 20 → 0.001s.
 DROP_BASE = 0.8  # Tetris Guideline gravity base
-DROP_MIN_INTERVAL = 0.001  # minimum seconds per row (cap)
+DROP_MIN_INTERVAL = 0.0001  # minimum seconds per row (cap)
 SOFT_DROP_FACTOR = 0.1  # soft drop speed = gravity × SOFT_DROP_FACTOR
 
 # Speed modes: maps mode key → DROP_STEP value (per-level gravity decrement).

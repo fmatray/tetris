@@ -42,18 +42,41 @@ look-ahead uses.
 The bot plays at fixed `AI_ACTION_DELAY_MS` (80ms) between decisions so
 a human can watch; lock delay runs normally (500ms).
 
-## Shared bot library (`tetris/bots/`)
+## BFS Path Replay Fix (Survival Bug Root Cause)
 
-`DellacherieState` and `AIState` are fully independent states — neither
-imports the other. Their shared machinery lives in `tetris/bots/`:
+**Problem**: The bot (and AI) used soft-drop BFS to enumerate candidate placements from the spawn position (3, 0, rotation=0). However, during the decision throttle (`AI_ACTION_DELAY_MS`), the piece pre-falls due to gravity. When the recorded move sequence was replayed, it started from the wrong position — the piece had already fallen several rows, causing the replayed moves to land the piece incorrectly.
+
+**Root Cause**: BFS paths are recorded from spawn, but execution happens after gravity has moved the piece. The board is unchanged since enumeration, so the path is valid at spawn — but not at the pre-fallen position.
+
+**Fix** (committed `e9098d1`): In `BotMovesMixin._execute_move_sequence()` (`tetris/bots/moves.py`), re-anchor the piece to its spawn position (3, 0, rotation=0) **before** replaying the recorded moves. The board has not changed since candidate enumeration, so the path is valid at any gravity level. Removed the incorrect `y >= p.py` guard that assumed monotonic downward movement (SRS kicks can move pieces up).
+
+**Verification**:
+- 0/1831 mismatches on seed 99 (normal speed)
+- Seed 99 reaches level 73 / 730 lines
+- Insane speed seed 42: 120K frames (3731 pieces, 1490 lines)
+
+The throttle cap (`AI_ACTION_DELAY_MS`) is kept as a visual nicety so humans can watch the bot play.
+
+## El-Tetris Adoption
+
+The bot uses the **El-Tetris evaluation** (`el_tetris_value_batch` in `tetris/ai/rewards.py`) instead of the classic Dellacherie heuristic. El-Tetris adds two placement-specific terms to the base 4 board features:
+- `landing_height` (weight −4.5) — distance from board floor to piece centroid
+- `rows_eliminated` (weight +3.42) — lines cleared by this placement
+
+with published PSO-tuned weights from the [El-Tetris paper](https://imake.ninja/el-tetris-an-improvement-on-pierre-dellacheries-algorithm/).
+
+Literature benchmark: ~16M lines average (vs ~5M for classic Dellacherie). The bot serves as a score floor and oracle for debugging candidate generation.
+
+## Shared Bot Library (`tetris/bots/`)
+
+`DellacherieState` and `AIState` are fully independent states — neither imports the other. Their shared machinery lives in `tetris/bots/`:
 
 | Module | Contents |
 |---|---|
 | `tetris/bots/moves.py` | `BotMovesMixin` — `_get_candidate_states()` and `_execute_move_sequence()`, extracted verbatim from AIState. Hosts must provide the attributes listed in the mixin docstring (board, pieces, `_can_hold`, `lookahead`, `lookahead_depth`, `_hold()`). |
 | `tetris/bots/dellacherie.py` | `dellacherie_pick(dellvals)` — pure argmax selection. |
 
-`AIState(BotMovesMixin, GameState)` refactored to inherit the mixin —
-same methods, same behavior, single implementation.
+`AIState(BotMovesMixin, GameState)` refactored to inherit the mixin — same methods, same behavior, single implementation.
 
 ## Game over
 

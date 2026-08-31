@@ -399,7 +399,6 @@ classDiagram
             - _get_candidate_states() tuple~np.ndarray, list~int~, np.ndarray~
             - _execute_move_sequence(action: int) None
         }
-        BotMovesMixin <|-- AIState
         class AIState {
             +ghost_piece: bool
             +agent: DQNAgent
@@ -477,9 +476,6 @@ classDiagram
             +__init__(screen, font, audio, config, piece_provider, menu, bot_config) None
             +update(dt: float, particles: ParticleSystem) State | None
         }
-        MenuBase <|-- BotMenuState
-        BotMovesMixin <|-- DellacherieState
-        GameState <|-- DellacherieState
 
         class GameOverState {
             +screen: pygame.Surface
@@ -1060,6 +1056,11 @@ classDiagram
     nn_Module <|-- DQNetwork
     PieceGenerator <|-- RandomGenerator
     PieceGenerator <|-- BagGenerator
+    GameState <|-- DellacherieState
+    BotMovesMixin <|-- AIState
+    BotMovesMixin <|-- DellacherieState
+    MenuBase <|-- BotMenuState
+
     PieceGenerator <|-- ReplayGenerator
     PieceGenerator <|-- WeightedGenerator
     BagGenerator <|-- SevenBagGenerator

@@ -1,112 +1,180 @@
 # Tetris Python
 
-Un jeu Tetris complet développé en Python avec Pygame, incluant des effets visuels spectaculaires, un système de son procédural, un leaderboard et une animation de fin de partie extravagante.
+A complete Tetris game built in Python with Pygame, featuring an embedded Deep Q-Network (DQN) AI agent, a Dellacherie heuristic bot, and Model Context Protocol (MCP) integration for external agents.
 
-## Fonctionnalités
+## Features
 
 ### Gameplay
+- ✅ **Tetris Guideline compliant** — 22-row board (20 visible + 2 hidden), SRS wall kicks, hold piece, lock delay with reset limit, T-Spin detection (3-corner rule), Back-to-Back chaining, combo scoring
+- ✅ **Four player types** — Human, DQN AI, Dellacherie bot, MCP external agent
+- ✅ **Multiple piece generators** — Random, 7-bag, 35-bag, weighted, replay
+- ✅ **Configurable rules** — Ghost piece, preview count (0/1/3), handicap (0–5), speed modes (none/insane)
+- ✅ **Reproducible seeds** — Numeric seed entry for deterministic piece sequences
 
-- ✅ Mécaniques de Tetris classiques (rotation, déplacement, chute)
-- ✅ Système de score standard (Guideline Tetris) : Single 100×niveau, Double 300×niveau, Triple 500×niveau, Tetris 800×niveau, combos 50×compteur×niveau, chute douce 1 pt/case, chute rapide 2 pts/case
-- ✅ Niveaux progressifs (la vitesse augmente selon `0.5 × 0.98^niveau` toutes les 10 lignes)
-- ✅ Handicap personnalisable (0-5, chaque niveau ajoute 2 rangées partielles de blocs gris en bas)
+### AI Player (DQN)
+- ✅ **V-network DQN** — 17→256→128→1 MLP evaluating board quality per candidate placement
+- ✅ **DT-20 features** — 17-dimensional normalized state vector (holes, height, bumpiness, wells, transitions, next piece one-hot)
+- ✅ **PBRS reward shaping** — Potential-based reward shaping preserves optimal policy
+- ✅ **Prioritized Experience Replay** — Beta annealing 0.4→1.0 over 10K learn steps
+- ✅ **N-step returns** — Configurable n-step TD targets
+- ✅ **Soft-drop BFS** — Full SRS wall-kick enumeration for all reachable placements including overhangs
+- ✅ **Look-ahead** — Simulates best next-piece placement (depth 1–3, Dellacherie-optimal)
+- ✅ **Hold candidates** — AI can hold once per lock, same rules as human
+- ✅ **Curriculum learning** — Progressive piece-set restriction with epsilon reset
+- ✅ **Two modes** — Learning (epsilon-greedy, training updates, fast-forward lock) vs Playing (greedy, full lock delay)
+- ✅ **5-tier observability** — Per-episode JSON, per-step JSONL, behavioral JSONL, reward decomposition, TensorBoard
 
-- ✅ **Diagnostic des trous et surplombs** : option « Trous et surplombs » (menu Règles du jeu) affichant des marqueurs blancs sur la grille — `X` = trou inaccessible depuis le haut, `O` = surplomb atteignable mais recouvert. L'IA intègre aussi une pénalité sur les surplombs dans sa récompense.
+### Dellacherie Bot
+- ✅ **El-Tetris evaluation** — 6 heuristics (landing height, eroded cells, row transitions, column transitions, holes, well sums) with weighted sum
+- ✅ **Soft-drop BFS** — Same candidate enumeration as AI, exact path replay via BFS move sequences
+- ✅ **Look-ahead** — Configurable depth (none / preview)
+- ✅ **Shared bot library** — `BotMovesMixin` reused by AI and Dellacherie states
 
-### Effets visuels
-
-- ✅ **Particules explosives** : 80 particules par ligne détruite, avec physique (gravité, friction).
-- ✅ **Animation de Game Over Spectaculaire** : Séquence chaotique de 4 secondes incluant screen-shake, glitchs visuels, flashs d'écran et texte arc-en-ciel pulsé.
-- ✅ Affichage de la pièce suivante.
-- ✅ Interface utilisateur complète (score, lignes, niveau).
+### MCP Integration
+- ✅ **FastMCP HTTP server** — Streamable-http transport, daemon thread
+- ✅ **Tools** — `play(moves)`, `start_game(config)`
+- ✅ **Resources** — `board://state` (live board snapshot), `tetris://rules` (rule reference)
+- ✅ **Queue architecture** — Thread-safe communication between MCP server and `MCPState`
 
 ### Audio
+- ✅ **Procedural SFX** — NumPy-synthesized sine waves with envelopes (move, rotate, lock, line clear, level up, game over)
+- ✅ **Polyphonic MIDI music** — Korobeiniki and Kalinka parsed from `.mid` files, synthesized via NumPy
+- ✅ **Music speed adaptation** — Tempo scaling regenerates audio buffer at `1/speed` duration
+- ✅ **Crossfade** — Smooth transitions between tracks
+- ✅ **Volume controls** — Independent sound/music volumes (0–3)
 
-- ✅ **Sons Procéduraux** : Générés via NumPy (ondes sinusoïdales avec enveloppe) pour une expérience unique sans fichiers externes.
-- ✅ **Mélodies de Clear** : Musiques spécifiques selon le nombre de lignes effacées (1 à 4).
-- ✅ **Impacts & Rotations** : Sons de verrouillage de pièce et rotations (horaires et anti-horaires).
-- ✅ **Séquence Finale** : Mélodie dramatique descendante et effets sonores de glitch lors du Game Over.
-- ✅ Option pour activer/désactiver le son.
+### Visuals
+- ✅ **Renderer** — Pure presentation layer (board, preview, hold, ghost, stats, leaderboard)
+- ✅ **Particle system** — Physics-based effects (gravity, friction) on line clears (80 particles/line)
+- ✅ **Debug overlay** — 7-bag visualization, speed info, hole/overhang debug (toggle with `d` key)
 
-### Débogage
-
-- ✅ **Mode Débogage** : Option activable dans le menu principal (Débogage ON/OFF). Journalise les événements de jeu (apparition de pièces, verrouillage, fin de partie, épisodes IA, curriculum) dans `data/debug.log` via Python `logging`. Visualise le contenu restant du sac 7-bag (pièces colorées avec lettres) à droite de l'aperçu de la prochaine pièce. Pendant le jeu, la touche **`d`** active/désactive l'overlay visuel de débogage (Humain, IA, MCP).
-
-### Expérience utilisateur
-- ✅ Menu de démarrage avec sélection du joueur (Humain/IA/Bot/MCP), du son, du générateur (Aléatoire/7-bag), du débogage (ON/OFF), et sous-menus dédiés.
-- ✅ **Sous-menu Humain** : Mode (Normal/Replay), Handicap (0-5), Touches (touches configurables), Statistiques (page de statistiques du joueur humain).
-- ✅ **Sous-menu IA** : Mode (Apprentissage/Jeu), Vitesse (normal/rapide), Apprentissage (13 hyperparamètres DQN : Epsilon decay, Epsilon fin, Learning rate, Gamma, Batch size, Buffer size, Curriculum, Fréq. curriculum, Epsilon curr., Warm-start, Maj. par pièce, Look-ahead, Soft-drop — configurables via ◄ ►, persistés dans `settings.json`, reset aux valeurs par défaut), Statistiques (tableau + graphique score/épisode), Réinitialiser IA, Retour.
-- ✅ **Touches configurables** : 7 actions (gauche, droite, rotation horaire/anti-horaire, chute douce, chute rapide, pause) reconfigurables via le menu. Détection de conflits et touches réservées. Persistance dans `settings.json`.
-- ✅ Saisie du nom (15 caractères max) en fin de partie.
-- ✅ Leaderboard top 10 persistant (JSON).
-- ✅ Retour automatique au menu principal après le leaderboard.
-- ✅ **Joueur IA (V-network DQN)** : Mode apprentissage par renforcement (Deep Q-Learning). L'IA apprend à jouer de manière autonome, à vitesse humaine, et affiche ses statistiques d'apprentissage en temps réel : paramètres d'entraînement (mode, vitesse, épisode, epsilon, decay, perte, look-ahead, soft-drop, maj/pièce) et tableau de statistiques (pièces, lignes, score, niveau — courant, total, meilleur, moyenne, 100 derniers, tendance ↑/↓/→). Évaluation par candidat (V-function) avec features DT-20 normalisées, PBRS (Dellacherie, scale 0.1), Prioritized Experience Replay, n-step returns (3-step), soft-drop BFS avec SRS wall kicks, 2-piece look-ahead. Paramètres ε configurables (decay, fin) persistés dans `settings.json`. Mode Jeu (greedy, sans apprentissage) ou Apprentissage (exploration ε-greedy). **Indicateur de cuisson** : le HUD d'apprentissage affiche un indicateur visuel undercooked/good/overcooked (bleu/vert/rouge) avec thermomètre de progression. **Logs séparés** : le mode Jeu écrit dans `ai_playing_log.json` / `ai_playing_behavior_log.jsonl` (séparés du mode apprentissage). **Script d'analyse** : `scripts/analyze_training.py` produit un rapport de santé read-only des logs IA avec flags `[OK]`/`[ATTN]`/`[CRIT]` et charts optionnels (`--charts`).
-- ✅ **Joueur Bot Dellacherie** : joueur déterministe par heuristique Dellacherie. Évalue chaque placement possible (soft-drop BFS + hold) et joue le meilleur. Sous-menu dédié avec un réglage d'anticipation (Non / Comme aperçu). Aucun apprentissage, aucune persistance ; sert de référence de score et d'oracle pour la génération de candidats.
+### Persistence & Logging
+- ✅ **Settings** — `data/settings.json` (all menu prefs, keybinds, AI hyperparams)
+- ✅ **Leaderboard** — Top 10 scores (`data/leaderboard.json`)
+- ✅ **Human stats** — Unbounded game history (`data/human_stats.json`)
+- ✅ **AI model** — PyTorch checkpoint (`data/ai_model.pt`: weights, optimizer, epsilon, curriculum state)
+- ✅ **Training logs** — 5-tier observability (see AI Player section)
+- ✅ **Centralized logging** — `tetris.logger` module, debug mode writes to `data/debug.log`
 
 ## Installation
 
-### Prérequis
-
+### Prerequisites
 - Python 3.9+
-- Pygame ≥ 2.5.0
-- NumPy ≥ 1.24.0
-- PyTorch ≥ 2.0 (requis pour le mode IA)
+- pygame-ce 2.5.x (not stock pygame)
+- PyTorch 2.0+
+- NumPy 1.24+
+- matplotlib 3.7+
+- mido 1.3+
 
-### Installation
-
+### Install
 ```bash
-git clone <url-du-dépôt>
-cd tetris
 pip install -r requirements.txt
 ```
 
-### Lancement
-
+### Run
 ```bash
 python main.py
 ```
 
-## Contrôles
+### Headless / Smoke Test (No Display)
+```bash
+SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy python3 -c "
+import pygame
+from tetris.states.menu import MenuState
+pygame.init()
+screen = pygame.Surface((1500, 800))
+font = pygame.font.Font(None, 20)
+from tetris.audio import AudioManager
+audio = AudioManager(sound_volume=0, music_volume=0)
+state = MenuState(screen, font, audio)
+# Drive states with synthetic events...
+"
+```
 
-Les touches sont configurables via le menu (**Humain > Touches**). Les valeurs par défaut :
+### AI Training Validation (Headless)
+```bash
+python -m tetris.verify_training
+```
+Success criteria: best_score > 10000, avg_score > 1000, avg_duration > 30s, max_loss < 1000.
 
-| Touche | Jeu | Menu |
-| -------- | -------- | -------- |
-| ← → | Déplacer la pièce | Modifier valeur / Navigation |
-| ↑ | Rotation horaire | Navigation vers le haut |
-| ↓ | Chute douce | Navigation vers le bas |
-| S | Rotation anti-horaire | - |
-| Espace | Chute rapide | - |
-| P | Pause | - |
-| Échap | Retour au menu (sans sauvegarde du score) | Retour / Quitter |
-| Entrée | - | Valider l'action |
+## Controls
 
-## Documentation Technique
+Keys are configurable via the menu (**Human > Keys**). Default bindings:
 
-La documentation détaillée se trouve dans le dossier `docs/` :
+| Key | Game | Menu |
+|-----|------|------|
+| `←` / `→` | Move left/right | Navigate |
+| `↑` | Rotate CW | Navigate / Change value |
+| `↓` | Soft drop | Navigate / Change value |
+| `Space` | Hard drop | Select |
+| `C` / `Shift` | Hold piece | — |
+| `P` / `Escape` | Pause | Back |
+| `M` | Mute audio | — |
+| `D` | Toggle debug overlay | — |
+| `Return` | — | Select |
+| `Backspace` | — | Back |
+
+## Documentation
+
+Technical documentation is in the `docs/` directory:
 
 | Document | Description |
-| -------- | -------- |
-| [Architecture](docs/architecture.md) | Architecture technique, structure du projet et principes de conception |
-| [Bot Dellacherie](docs/bot.md) | Design document du joueur bot Dellacherie |
-| [IA](docs/ai.md) | Design document du mode joueur IA (V-network DQN) |
-| [Menus](docs/menus.md) | Arborescence complète des menus |
-| [Personnalisation](docs/customization.md) | Paramètres configurables |
-| [Roadmap](docs/roadmap.md) | État d'avancement et améliorations futures |
+|----------|-------------|
+| `architecture.md` | System architecture, FSM state diagram, class diagram |
+| `ai.md` | DQN AI design, V-network, DT-20 features, PBRS, training pipeline |
+| `bot.md` | Dellacherie bot, El-Tetris evaluation, shared bot library |
+| `game_rules.md` | Tetris Guideline compliance, rule engine, human/AI alignment |
+| `menus.md` | Menu hierarchy, keybinds, settings persistence |
+| `human.md` | Human gameplay, DAS, keybind customization, seed/replay |
+| `music_and_sound.md` | SFX synthesis, MIDI parsing, music speed adaptation |
+| `mcp.md` | MCP server, tools, resources, simulation |
+| `performance.md` | Profiling methodology, optimizations, benchmarks |
+| `development.md` | Commands, conventions, testing, data files, DQN summary |
+| `roadmap.md` | Milestones, priorities, enhancements, technical debt |
 
-## Crédits
+## Project Structure
 
-Développé par Frédéric Matray
-Musique et effets sonores générés procéduralement avec NumPy.
+```
+tetris/
+├── ai/              # DQN agent, network, rewards, candidates, HUD
+├── audio/           # AudioManager, SFX synthesis, MIDI parsing
+├── bots/            # Shared bot library (BotMovesMixin, Dellacherie)
+├── game/            # Pure domain: Board, Tetromino, shapes, scoring, stats, piece providers, rules
+├── logger.py        # Central logging
+├── mcp_server.py    # FastMCP HTTP server
+├── settings.py      # All constants, path constants
+├── states/          # FSM states (16 classes)
+├── storage/         # JSON persistence
+└── visuals/         # Renderer, ParticleSystem
+```
 
-## Licence
+## Development
 
-MIT License - Libre d'utilisation et de modification
+```bash
+# Lint
+ruff check .
 
-## Références
+# Type check
+zuban check .
 
-- [Tetris Wiki](https://tetris.wiki) — Guide exhaustif sur mécaniques, SRS et histoire du jeu.
-- [Harddrop tetris wiki](https://harddrop.com/wiki/Tetris_Wiki) - Un autre wiki sur tetris 
-- [Pygame CE](https://pygame-ce.org) — Documentation de l'extension Community Edition de Pygame.
-- [PyTorch Documentation](https://pytorch.org/docs/) — Référence pour l'implémentation du réseau de neurones DQN.
-- [Deep Q-Learning (Nature)](https://www.nature.com/articles/nature14236) — Article fondateur sur les réseaux DQN.
+# Tests (headless)
+SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy python -m pytest tests/ -q
+
+# Coverage
+SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy python -m pytest tests/ --cov=tetris --cov-report=term-missing -q
+```
+
+## Credits
+
+Developed by Frédéric Matray.
+Music and sound effects generated procedurally with NumPy.
+Tetris® is a trademark of The Tetris Company.
+
+## License
+
+MIT License — Free to use and modify.
+
+## References
+
+- [Tetris Wiki](https://tetris.wiki) — Comprehensive guide to mechanics, SRS, and game history.
+- [Tetris Guideline](https://tetris.wiki/Tetris_Guideline) — Official specification for Tetris implementations.

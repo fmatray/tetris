@@ -1,146 +1,670 @@
-(Created: 2026-08-10)
+# Architecture
 
-## Architecture Technique
+## Overview
 
-Le projet repose sur une architecture modulaire et extensible :
+This project is a Python pygame Tetris game with an embedded Deep Q-Network (DQN) AI agent. The architecture follows a modular, layered design with a Finite State Machine (FSM) driving navigation between menus, gameplay, AI training, and statistics views.
 
-- **Machine à États Finis (FSM)** : Utilisation du *State Pattern* pour gérer les transitions fluides entre `MenuState`, `HumanMenuState`, `KeybindState`, `HumanState`, `AIState`, `AIMenuState`, `HyperparamMenuState`, `AIStatsState`, `DellacherieState`, `BotMenuState`, `GameOverState` et `LeaderboardState`.
-- **Audio Procédural** : Génération d'ondes sinusoïdales via NumPy pour créer des mélodies et effets sonores sans dépendances de fichiers externes.
-- **Système de Particules** : Moteur d'effets visuels gérant la physique (gravité, friction) et le cycle de vie des particules pour des explosions dynamiques.
-- **Rendu Isolé** : Classe `Renderer` dédiée pour séparer la logique de mise à jour du moteur graphique.
-- **Détection partagée des trous/surplombs** : fonctions pures dans `tetris/game/rules.py` (`find_holes`, `find_overhangs`, `count_overhangs`) — un *trou* est une case vide isolée du haut (inaccessible), un *surplomb* une case vide atteignable depuis le haut mais recouverte par une case pleine. Partagées par le rendu (marqueurs X/O blancs selon le menu « Trous et surplombs ») et la récompense IA (pénalité sur les surplombs créés).
-- **Persistance JSON** : Leaderboard stocké dans `leaderboard.json`, trié par score décroissant, incluant le nom, le score, le niveau, les lignes effacées, le générateur de pièces, le mode de jeu et la date.
-- **Apprentissage par Renforcement (V-network DQN)** : Agent V-network DQN implémenté avec PyTorch. L'IA apprend en jouant de manière autonome : évaluation par candidat (V-function, features DT-20 17-dim normalisées), exploration ε-greedy (decay et fin configurables), Prioritized Experience Replay (PER Schaul et al. 2015, avec importance sampling), n-step returns (3-step), target network (hard sync toutes les 500 étapes, Bellman), LR scheduler (ReduceLROnPlateau). La récompense pénalise les nouveaux trous (delta), la hauteur, l'irrégularité et les puits, avec PBRS (Dellacherie, scale 0.1). Soft-drop BFS avec SRS wall kicks pour les surplombs et T-Spins, move-sequence planner (Placement.moves). Look-ahead 2 pièces. Le modèle, les statistiques et les paramètres sont sauvegardés entre les sessions (`ai_model.pt`, `ai_training_log.json`, `settings.json`). **Mode Jeu** (greedy, sans apprentissage) écrit dans des fichiers séparés (`ai_playing_log.json`, `ai_playing_behavior_log.jsonl`) — les artefacts d'entraînement ne sont jamais modifiés. **Indicateur de cuisson** : le HUD d'apprentissage affiche un indicateur undercooked/good/overcooked (bleu/vert/rouge) avec thermomètre de progression. **Script d'analyse** (`scripts/analyze_training.py`) : lecture read-only des logs IA, rapport de santé avec flags `[OK]`/`[ATTN]`/`[CRIT]`, charts optionnels (`--charts`).
+**Core principles:**
+- **Packages over monolithic files** — code is organized in packages (`game/`, `audio/`, `visuals/`, `states/`, `storage/`, `bots/`, `ai/`) each with a clear responsibility
+- **DRY (Don't Repeat Yourself)** — shared logic centralized (e.g., `draw_leaderboard()` in `visuals/leaderboard_view.py`, scoring in `settings.py`)
+- **KISS (Keep It Simple)** — each module is small and does one thing; `main.py` is a 10-line entry point
+- **SOLID** — single responsibility, open/closed, dependency inversion applied throughout
+- **SLAP (Single Layer of Abstraction)** — each function operates at one abstraction level
 
-## Structure du projet
+## Data Flow
+
+```
+main.py → tetris.run() → TetrisApp.run()
+                            │
+                            └─ FSM loop (60 FPS):
+                                 1. event.get() → state.handle_event(event) → Optional[State]
+                                 2. state.update(dt, particles)            → Optional[State]
+                                 3. state.draw(screen)
+                                 4. display.flip() + particles.update()
+```
+
+Returning a new `State` from `handle_event` or `update` transitions the app; `None` stays. Concrete states are imported lazily inside methods to avoid import cycles.
+
+## Layering
+
+The codebase follows a three-layer architecture:
+
+| Layer | Packages | Responsibility |
+|-------|----------|----------------|
+| Domain | `tetris/game/` | Pure game logic: board, tetromino, scoring, stats, piece provider, rules (SRS kicks, collision, line clear) |
+| Presentation | `tetris/visuals/`, `tetris/audio/`, `tetris/states/` | Rendering, particle effects, procedural SFX/MIDI music, FSM states binding input → game logic → rendering |
+| Persistence | `tetris/storage/` | JSON load/save for leaderboard, human stats, settings |
+
+## Package Structure
 
 ```
 tetris/
-├── main.py                      # Point d'entrée (lance tetris.run())
-├── tetris/                      # Package principal
-│   ├── __init__.py              # API publique (run)
-│   ├── app.py                   # TetrisApp : boucle principale et FSM
-│   ├── settings.py              # Constantes et configurations
-│   ├── logger.py               # Logging central (configure_logging, get_logger)
-│   ├── verify_training.py       # Validation headless de l'entraînement IA
-│   ├── game/                    # Logique métier (sans pygame)
-│   │   ├── __init__.py
-│   │   ├── tetromino.py         # Modèle de pièce
-│   │   ├── shapes.py            # Données de formes (SHAPES, SHAPES_TYPES, helpers rotation)
-│   │   ├── rules.py             # Fonctions de jeu grid-agnostic (SRS kicks, shape_fits, hard_drop_y)
-│   │   ├── board.py             # Grille, collisions, lignes, handicap, hard drop
-│   │   ├── piece_provider.py    # Fournisseur de pièces (Aléatoire / 7-Bag / Replay, 1ère pièce sûre I/J/L/T)
-│   │   ├── scoring.py           # Règles de score (Guideline : lignes × niveau, combos, drop)
-│   │   └── stats.py             # Score, lignes, niveau
-│   ├── ai/                      # Apprentissage par renforcement (V-network DQN)
-│   │   ├── __init__.py
-│   │   ├── network.py           # Réseau de neurones (17→256→128→1)
-│   │   ├── agent.py             # DQNAgent (ε-greedy, per-candidate eval, replay, target net)
-│   │   ├── replay_buffer.py     # Prioritized Experience Replay (PER, 50 000)
-│   │   ├── rewards.py           # Récompense (delta trous + PBRS scale 0.1), features DT-20 normalisées, simulation soft-drop BFS + SRS
-│   │   └── trainer.py           # Journal d'entraînement (JSON)
-│   ├── audio/                   # Audio procédural (NumPy)
-│   │   └── __init__.py          # AudioManager
-│   ├── visuals/                 # Rendu et effets visuels
-│   │   ├── __init__.py
-│   │   ├── fonts.py             # Gestion des polices (tailles normalisées)
-│   │   ├── particles.py         # Particle, ParticleSystem
-│   │   ├── renderer.py          # Renderer (grille, HUD, animation Game Over)
-│   │   ├── graph_view.py        # Rendu du graphique score/épisode (matplotlib)
-│   │   └── leaderboard_view.py  # Rendu du tableau des scores
-│   ├── states/                  # États FSM (State Pattern)
-│   │   ├── __init__.py
-│   │   ├── base.py              # State (classe de base)
-│   │   ├── menu_base.py         # MenuStateBase (logique de menu réutilisable)
-│   │   ├── menu.py              # MenuState (persistance settings.json)
-│   │   ├── human_menu.py        # HumanMenuState (mode, touches, stats)
-│   │   ├── human_stats.py       # HumanStatsState (page de statistiques humaines)
-│   │   ├── keybind.py           # KeybindState (configuration des touches)
-│   │   ├── game.py              # GameState (base abstraite: board, pieces, gravité, GameConfig)
-│   │   ├── human.py             # HumanState (jeu humain: clavier, DAS, pause)
-│   │   ├── ai.py                # AIState (DQN agent, HUD apprentissage + stats; AIConfig; candidates/HUD extraits vers tetris/ai/)
-│   │   ├── ai_menu.py           # AIMenuState (mode, vitesse, apprentissage, stats, reset)
-│   │   ├── hyperparam_menu.py   # HyperparamMenuState (13 hyperparamètres DQN + reset)
-│   │   ├── ai_stats.py          # AIStatsState (tableau stats + graphique)
-│   │   ├── dellacherie.py       # DellacherieState (bot Dellacherie; BotConfig; hérite BotMovesMixin + GameState)
-│   │   ├── bot_menu.py          # BotMenuState (anticipation du bot Dellacherie)
-│   │   ├── game_over.py         # GameOverState
-│   │   ├── leaderboard.py       # LeaderboardState
-│   │   ├── mcp.py               # MCPState (jeu MCP, hérite GameState ; MCPConfig)
-│   │   └── mcp_menu.py          # MCPMenuState (port)
-│   ├── bots/                    # Bibliothèque bot partagée (BotMovesMixin, dellacherie_pick)
-│   └── storage/                 # Persistance JSON
-├── mcp_server.py            # TetrisMCPServer (serveur MCP HTTP, outils play + simulate + start_game + enumerate_drops + resources)
-├── scripts/                    # Scripts utilitaires
-│   └── analyze_training.py     # Analyse read-only des logs IA (rapport de santé + charts optionnels)
-├── tests/                       # Tests unitaires
-│   ├── __init__.py
-│   ├── conftest.py              # Fixtures partagées
-│   ├── test_board.py            # Tests Board
-│   ├── test_tetromino.py        # Tests Tetromino
-│   ├── test_piece_provider.py   # Tests PieceProvider
-│   ├── test_scoring.py          # Tests ScoreEngine
-│   ├── test_stats.py            # Tests GameStats
-│   ├── test_agent.py            # Tests DQNAgent
-│   ├── test_mcp_states.py     # Tests MCPState
-│   ├── test_rewards.py          # Tests features + récompense
-│   └── test_curriculum.py       # Tests curriculum learning
-├── data/                        # Données générées (settings, leaderboard, stats, IA)
-│   ├── settings.json            # Préférences du menu
-│   ├── leaderboard.json         # Scores top 10
-│   ├── human_stats.json         # Historique des parties humaines
-│   ├── ai_model.pt              # Poids du modèle DQN
-│   ├── ai_training_log.json     # Journal d'entraînement (mode apprentissage)
-│   ├── ai_playing_log.json      # Journal du mode jeu (séparé du mode apprentissage)
-│   ├── ai_step_log.jsonl        # Journal par learn() (perte, TD, grad, LR)
-│   ├── ai_behavior_log.jsonl    # Analytics comportementales (mode apprentissage)
-│   ├── ai_playing_behavior_log.jsonl  # Analytics comportementales (mode jeu)
-│   ├── debug.log                # Journal de débogage (mode débogage ON)
-│   └── replay_pieces.json       # Séquences de pièces (mode replay)
-├── requirements.txt             # Dépendances (pygame, numpy, torch)
-└── README.md                    # Documentation du projet
+├── app.py                    # TetrisApp — main loop, pygame init, state dispatch
+├── run.py                    # Entry point function
+├── settings.py               # All constants, path constants, keybinds, labels
+├── logger.py                 # Central logging (configure_logging, get_logger)
+├── mcp_server.py             # MCP HTTP server (FastMCP)
+├── verify_training.py        # Headless training validation script
+├── game/                     # Pure domain logic
+│   ├── board.py              # Board class — grid, collision, locking, line clear, handicap
+│   ├── tetromino.py          # Tetromino class — stateful piece model
+│   ├── shapes.py             # SHAPES dict (SRS rotation states), SHAPES_TYPES, helpers
+│   ├── stats.py              # GameStats, ClearCounts dataclasses
+│   ├── piece_provider.py     # PieceProvider facade + PieceGenerator hierarchy
+│   ├── scoring.py            # ScoreEngine — points, T-spin, B2B
+│   └── rules.py              # Grid-agnostic game rules (collision, rotation, hard drop, line clear)
+├── visuals/                  # Rendering + particles
+│   ├── renderer.py           # Renderer — pure presentation, draws game state
+│   ├── particles.py          # ParticleSystem — physics-based effects
+│   └── leaderboard_view.py   # Shared leaderboard rendering
+├── audio/                    # Procedural audio
+│   ├── __init__.py           # AudioManager — NumPy SFX + MIDI polyphonic music
+│   └── midi_gen.py           # MIDI file generation (Korobeiniki, Kalinka)
+├── states/                   # FSM states
+│   ├── base.py               # State base class contract
+│   ├── menu.py               # MenuState — root menu, settings load/save
+│   ├── game.py               # GameState — abstract base: board, pieces, gravity, lock delay
+│   ├── human.py              # HumanState — human gameplay: keyboard, DAS, pause
+│   ├── ai.py                 # AIState — AI gameplay + RL training integration
+│   ├── dellacherie.py        # DellacherieState — Dellacherie bot gameplay
+│   ├── bot_menu.py           # BotMenuState — Dellacherie sub-menu
+│   ├── mcp.py                # MCPState — external agent via HTTP
+│   ├── mcp_menu.py           # MCPMenuState — MCP sub-menu
+│   ├── seed_entry.py         # SeedEntryState — numeric seed input
+│   ├── human_menu.py         # HumanMenuState, KeybindState, HumanStatsState
+│   ├── ai_menu.py            # AIMenuState, TrainingMenuState, AIStatsState
+│   ├── game_rules_menu.py    # GameRulesMenuState — generator, preview, handicap, speed, ghost
+│   ├── audio_menu.py         # AudioMenuState — volume, song selection
+│   └── leaderboard.py        # LeaderboardState
+├── bots/                     # Shared bot algorithm library
+│   ├── moves.py              # BotMovesMixin — candidate enumeration + BFS move replay
+│   └── dellacherie.py        # dellacherie_pick — pure argmax selection
+├── ai/                       # V-network DQN agent
+│   ├── agent.py              # DQNAgent — select_action, store, learn, save, load
+│   ├── network.py            # DQNetwork — 17→256→128→1 V-network MLP
+│   ├── candidates.py         # Placement generation + soft-drop BFS
+│   ├── hud.py                # AI training HUD rendering
+│   └── rewards.py            # DT-20 features, PBRS reward, El-Tetris evaluation
+└── storage/                  # JSON persistence
+    ├── leaderboard.py        # Leaderboard load/save
+    └── human_stats.py        # Human game history load/save
 ```
 
-## Principes de conception
+## FSM State Machine
 
-Le codebase suit un ensemble de principes de génie logiciel pour rester lisible, testable et extensible.
+The FSM is the central control flow. Each state implements `handle_event()`, `update()`, and `draw()`. Transitions happen by returning a new state instance.
 
-### Packages plutôt qu'un fichier monolithique
+```mermaid
+stateDiagram-v2
+    [*] --> MenuState
+    MenuState --> GameRulesMenuState : Règles du jeu
+    MenuState --> HumanMenuState : Humain
+    MenuState --> AIMenuState : IA
+    MenuState --> BotMenuState : Bot
+    MenuState --> MCPMenuState : MCP
+    MenuState --> AudioMenuState : Audio
+    MenuState --> LeaderboardState : Leaderboard
+    MenuState --> [*] : Quitter
 
-Le code est organisé en packages (`game/`, `audio/`, `visuals/`, `states/`, `storage/`) plutôt qu'en un seul fichier. Chaque package a une responsabilité claire, et `main.py` se réduit à un point d'entrée de 10 lignes qui appelle `tetris.run()`.
+    HumanMenuState --> SeedEntryState : Mode Normal/Replay
+    HumanMenuState --> KeybindState : Touches
+    HumanMenuState --> HumanStatsState : Statistiques
+    HumanMenuState --> MenuState : Retour
 
-### DRY (Don't Repeat Yourself)
+    AIMenuState --> TrainingMenuState : Apprentissage
+    AIMenuState --> AIStatsState : Statistiques
+    AIMenuState --> MenuState : Retour
 
-- `draw_leaderboard()` dans `visuals/leaderboard_view.py` centralise le rendu du tableau des scores, partagé par `LeaderboardState` et `GameOverState` (auparavant dupliqué). Le paramètre `highlight_index` permet à `GameOverState` de surligner en rouge la nouvelle entrée du joueur.
-- Le tableau des points de ligne (`LINE_CLEAR_POINTS`) est défini une fois dans `settings.py` et utilisé par `ScoreEngine` — pas de logique de score dupliquée.
+    TrainingMenuState --> HyperparamMenuState : Hyperparamètres
+    TrainingMenuState --> MenuState : Retour
 
-### KISS (Keep It Simple)
+    GameRulesMenuState --> MenuState : Retour
 
-Chaque module est petit et fait une seule chose. `main.py` ne contient que l'appel à `tetris.run()`. La boucle principale vit dans `TetrisApp._frame()`, qui se lit en une dizaine de lignes.
+    BotMenuState --> MenuState : Retour
 
-### SOLID
+    MCPMenuState --> MenuState : Retour
 
-| Principe | Application |
-| -------- | -------- |
-| **S** — Single Responsibility | `Board` (grille), `Tetromino` (pièce), `GameStats` (score/niveau), `ScoreEngine` (règles), `AudioManager` (son), `Renderer` (affichage), `ParticleSystem` (effets), `TetrisApp` (boucle) — une classe, un rôle. |
-| **O** — Open/Closed | `State` est une classe de base ; ajouter un état se fait par sous-classe sans modifier `TetrisApp`. Les points de ligne s'ajoutent via `LINE_CLEAR_POINTS` (donnée) sans modifier `ScoreEngine`. |
-| **L** — Liskov Substitution | Tous les états héritent de `State` avec la même signature `handle_event` / `update` / `draw`. `TetrisApp` les dispatche polymorphiquement. |
-| **I** — Interface Segregation | Les `__init__.py` de chaque package sont des docstrings-only — pas de re-exports inutilisés. Les imports se font directement depuis le module source (ex. `from tetris.game.board import Board`). |
-| **D** — Dependency Inversion | Les états reçoivent `AudioManager` et `Board` par injection de dépendances (constructeur), jamais par construction interne. `Renderer` lit l'état du jeu sans le muter. |
+    AudioMenuState --> MenuState : Retour
 
-### Logging et mode débogage
+    MenuState --> HumanState : Démarrer (Joueur=Humain)
+    MenuState --> AIState : Démarrer (Joueur=IA)
+    MenuState --> DellacherieState : Démarrer (Joueur=Bot)
+    MenuState --> MCPState : Démarrer (Joueur=MCP)
 
-Le module `tetris/logger.py` centralise la journalisation via Python `logging`. `configure_logging(debug)` configure le logger racine `tetris` :
-- **Debug OFF** (défaut) : niveau WARNING — seul les erreurs sont écrites dans `data/debug.log`.
-- **Debug ON** : niveau DEBUG — tous les messages (apparition de pièces, verrouillage, fin de partie, épisodes IA, curriculum) sont journalisés.
+    HumanState --> GameOverState : Game Over
+    AIState --> AIState : Episode reset (auto)
+    DellacherieState --> MenuState : Game Over
+    MCPState --> MenuState : Game Over / Disconnect
 
-Le mode débogage est activable depuis le menu principal (option Débogage ON/OFF). Il active également la visualisation du sac de pièces restantes (7-bag ou 35-bag) à droite de l'aperçu de la prochaine pièce.
+    GameOverState --> MenuState : Name entered / ESC
 
-### SLAP (Single Layer of Abstraction)
+    HumanState --> MenuState : Pause → Quitter
+    AIState --> MenuState : Not applicable (no pause menu)
+    DellacherieState --> MenuState : Not applicable
+    MCPState --> MenuState : Disconnect
+```
 
-Chaque fonction opère à un seul niveau d'abstraction :
-- `TetrisApp._frame()` — niveau *dispatch FSM* (events, update, draw).
-- `GameState.update()` — niveau *boucle de jeu* (gravité, lock delay, spawn). `HumanState.update()` ajoute le DAS.
-- `Board.clear_lines()` — niveau *ligne de grille* (détection, suppression, compactage).
+## Key Architectural Patterns
 
-Aucune fonction mélange plusieurs niveaux, ce qui garde chaque méthode courte et focalisée.
+### 1. State Pattern (FSM)
+
+All game modes are states inheriting from `State` base class. The `TetrisApp` holds a reference to the current state and calls `handle_event()`, `update()`, `draw()` each frame. State transitions are explicit returns.
+
+### 2. Shared Game Logic Base
+
+`GameState` is an abstract base class containing all shared gameplay logic:
+- Board, piece provider, stats, gravity, lock delay
+- Movement primitives (`_move`, `_rotate_cw`, `_rotate_ccw`, `_hard_drop`, `_hold`)
+- Scoring, line clearing, level progression
+- Ghost piece rendering
+
+Concrete states (`HumanState`, `AIState`, `DellacherieState`, `MCPState`) inherit from `GameState` and only override input handling and decision-making.
+
+### 3. Shared Bot Library (`tetris/bots/`)
+
+`BotMovesMixin` provides candidate enumeration (`_get_candidate_states`) and BFS move replay (`_execute_move_sequence`). Both `AIState` and `DellacherieState` inherit this mixin. The `dellacherie_pick` function in `dellacherie.py` is a pure argmax selection.
+
+This eliminates duplicate candidate generation code between the AI and the Dellacherie bot.
+
+### 4. Grid-Agnostic Rule Engine (`tetris/game/rules.py`)
+
+All game rules (collision detection, SRS rotation, hard drop, line clear, piece placement) are implemented once in `rules.py` as pure functions operating on an abstract grid interface. Two implementations exist:
+- `Board` uses list-of-lists with color tuples (authoritative for gameplay)
+- AI simulation uses numpy arrays for vectorized feature extraction
+
+Both paths call the same rule functions — one rule engine, two representations.
+
+### 5. Settings Owner Pattern
+
+`MenuState` owns all settings. It loads/saves `data/settings.json`. Child menu states hold a reference to `MenuState` and mutate its attributes directly, then trigger `save_settings()`. This avoids propagating settings through multiple layers.
+
+### 6. Procedural Audio
+
+`AudioManager` generates SFX via NumPy sine waves with envelopes. Music is loaded from MIDI files (generated by `midi_gen.py` if missing), parsed, and synthesized into a polyphonic audio buffer at runtime. Tempo scaling regenerates the buffer at `1/_music_speed` duration.
+
+## Logging and Debug Mode
+
+`tetris/logger.py` centralizes logging via Python `logging`. `configure_logging(debug)` configures the root logger `tetris`:
+- **Debug OFF** (default): level WARNING — only errors written to `data/debug.log`
+- **Debug ON**: level DEBUG — all events written to `data/debug.log`
+
+The debug flag is toggled via the main menu (persisted in `settings.json`). During gameplay, pressing **`d`** toggles the visual debug overlay (7-bag visualization, speed info, hole/overhang debug) on all player types — this flips `GameState.debug` live without changing the logging level.
+
+## Data Files
+
+All runtime-generated files live in `data/` (gitignored):
+
+| File | Path Constant | Purpose |
+|------|---------------|---------|
+| `settings.json` | `SETTINGS_PATH` | Menu prefs, AI hyperparams, keybinds, debug flag |
+| `leaderboard.json` | `LEADERBOARD_PATH` | Top 10 scores (capped) |
+| `human_stats.json` | `HUMAN_STATS_PATH` | Unbounded human game history |
+| `ai_model.pt` | `MODEL_PATH` | DQN weights + optimizer + epsilon |
+| `ai_training_log.json` | `LOG_PATH` | Per-episode training metrics (35 fields) |
+| `ai_step_log.jsonl` | `STEP_LOG_PATH` | Per-`learn()`-call metrics (rotates at 1M lines) |
+| `ai_behavior_log.jsonl` | `BEHAVIOR_LOG_PATH` | Per-episode behavioral analytics |
+| `ai_playing_log.json` | `PLAYING_LOG_PATH` | Per-episode playing-mode metrics |
+| `ai_playing_behavior_log.jsonl` | `PLAYING_BEHAVIOR_LOG_PATH` | Playing-mode behavioral analytics |
+| `runs/` | `TB_LOG_DIR` | TensorBoard event files |
+| `replay_pieces.json` | `REPLAY_PATH` | Stored piece sequences for Replay mode |
+
+## Media Files
+
+| File | Path Constant | Purpose |
+|------|---------------|---------|
+| `media/korobeiniki.mid` | `MUSIC_SONG_PATHS["korobeiniki"]` | Korobeiniki music (melody + bass) |
+| `media/kalinka.mid` | `MUSIC_SONG_PATHS["kalinka"]` | Kalinka music (melody + bass) |
+
+## Class Diagram
+
+The exhaustive Mermaid class diagram is maintained in the source of this document.
+
+```mermaid
+classDiagram
+    %% ===== tetris.app =====
+    class TetrisApp {
+        +screen: pygame.Surface
+        +clock: pygame.time.Clock
+        +font: pygame.font.Font
+        +audio: AudioManager
+        +particles: ParticleSystem
+        +state: State
+        +menu: MenuState
+        +__init__()
+        +run()
+        +_frame()
+    }
+
+    %% ===== tetris.states.base =====
+    class State {
+        <<abstract>>
+        +handle_event(event): State | None
+        +update(dt, particles): State | None
+        +draw(screen): None
+    }
+
+    %% ===== tetris.states.menu =====
+    class MenuState {
+        +screen: pygame.Surface
+        +font: pygame.font.Font
+        +audio: AudioManager
+        +particles: ParticleSystem
+        +selected: int
+        +player: str
+        +mode: str
+        +handicap: int
+        +sound_volume: int
+        +music_volume: int
+        +song: str
+        +debug: bool
+        +ghost_piece: bool
+        +preview_count: int
+        +piece_generator: str
+        +speed_mode: str
+        +ai_speed: str
+        +ai_epsilon_decay: float
+        +ai_epsilon_end: float
+        +ai_lr: float
+        +ai_gamma: float
+        +ai_batch_size: int
+        +ai_buffer_size: int
+        +ai_mode: str
+        +ai_curriculum: bool
+        +ai_curriculum_freq: int
+        +ai_curriculum_epsilon: str
+        +ai_warm_start: bool
+        +ai_learn_per_action: int
+        +ai_lookahead: bool
+        +ai_lookahead_depth: int
+        +mcp_port: int
+        +bot_lookahead: str
+        +seed: int | None
+        +keybinds: dict
+        +_load_settings()
+        +save_settings()
+        +handle_event(event)
+        +update(dt, particles)
+        +draw(screen)
+    }
+
+    %% ===== tetris.states.game =====
+    class GameState {
+        +board: Board
+        +pieces: PieceProvider
+        +stats: GameStats
+        +current_piece: Tetromino
+        +next_piece: str
+        +hold_piece: str | None
+        +_can_hold: bool
+        +gravity_timer: float
+        +lock_delay_timer: float
+        +lock_delay_resets: int
+        +paused: bool
+        +ghost_piece: bool
+        +preview_count: int
+        +debug: bool
+        +_drop_interval(level)
+        +_spawn_piece()
+        +_move(dx)
+        +_rotate_cw()
+        +_rotate_ccw()
+        +_hard_drop()
+        +_hold()
+        +_lock_and_spawn()
+        +_do_game_over()
+        +update(dt, particles)
+        +draw(screen)
+    }
+
+    %% ===== tetris.states.human =====
+    class HumanState {
+        +_setup_keybinds(menu)
+        +handle_event(event)
+        +update(dt, particles)
+    }
+
+    %% ===== tetris.states.ai =====
+    class AIState {
+        +agent: DQNAgent
+        +ai_config: AIConfig
+        +lookahead: bool
+        +lookahead_depth: int
+        +_prev_action: Placement | None
+        +_get_candidate_states()
+        +_execute_move_sequence(moves)
+        +update(dt, particles)
+        +_reset_episode()
+        +_on_episode_end()
+    }
+
+    %% ===== tetris.states.dellacherie =====
+    class DellacherieState {
+        +bot_config: BotConfig
+        +_get_candidate_states()
+        +_execute_move_sequence(moves)
+        +update(dt, particles)
+    }
+
+    %% ===== tetris.states.mcp =====
+    class MCPState {
+        +action_queue: queue.Queue
+        +result_queue: queue.Queue
+        +update(dt, particles)
+        +handle_request(request)
+    }
+
+    %% ===== tetris.game.board =====
+    class Board {
+        +grid: list[list[tuple | None]]
+        +width: int
+        +height: int
+        +apply_handicap(level)
+        +is_valid_move(piece, dx, dy, rot)
+        +try_rotate(piece, direction)
+        +lock_tetromino(piece)
+        +clear_lines()
+        +is_tspin(piece, rotation, kick_used)
+        +find_holes()
+        +find_overhangs()
+    }
+
+    %% ===== tetris.game.tetromino =====
+    class Tetromino {
+        +piece_type: str
+        +color: tuple
+        +rotation: int
+        +x: int
+        +y: int
+        +rotate(dir)
+        +move(dx, dy)
+        +get_cells()
+    }
+
+    %% ===== tetris.game.piece_provider =====
+    class PieceProvider {
+        +generator: PieceGenerator
+        +next_piece: str
+        +preview_pieces: list[str]
+        +record: bool
+        +replay: list[str] | None
+        +get_next()
+        +peek(n)
+        +set_allowed_types(types)
+        +start_recording()
+        +stop_recording()
+    }
+
+    class PieceGenerator {
+        <<abstract>>
+        +generate()
+    }
+
+    class RandomGenerator
+    class BagGenerator
+    class SevenBagGenerator
+    class ThirtyFiveBagGenerator
+    class WeightedGenerator
+    class ReplayGenerator
+
+    %% ===== tetris.game.stats =====
+    class GameStats {
+        +score: int
+        +lines: int
+        +level: int
+        +combo: int
+        +b2b: int
+        +pieces: int
+        +clear_counts: ClearCounts
+        +on_piece_locked()
+        +on_lines_cleared(count, tspin)
+    }
+
+    class ClearCounts {
+        +single: int
+        +double: int
+        +triple: int
+        +tetris: int
+    }
+
+    %% ===== tetris.game.scoring =====
+    class ScoreEngine {
+        +line_points(lines, level)
+        +tspin_points(lines, level, mini)
+        +b2b_bonus(points)
+    }
+
+    %% ===== tetris.ai.agent =====
+    class DQNAgent {
+        +online_net: DQNetwork
+        +target_net: DQNetwork
+        +optimizer: Adam
+        +buffer: PrioritizedReplayBuffer
+        +epsilon: float
+        +gamma: float
+        +batch_size: int
+        +learn_per_action: int
+        +lr_scheduler: ReduceLROnPlateau
+        +curriculum_level: int
+        +curriculum_episode_count: int
+        +select_action(candidates)
+        +store(state, action, reward, next_state, done)
+        +learn()
+        +save(path)
+        +load(path)
+        +advance_curriculum(max_level, freq)
+        +training_metrics()
+        +flush_logs()
+    }
+
+    %% ===== tetris.ai.network =====
+    class DQNetwork {
+        +layers: Sequential
+        +forward(x): Tensor
+    }
+
+    %% ===== tetris.ai.candidates =====
+    class Placement {
+        <<NamedTuple>>
+        +piece_type: str
+        +rot: int
+        +px: int
+        +py: int
+        +hold: bool
+        +moves: list[str]
+    }
+
+    %% ===== tetris.ai.rewards =====
+    class DellacherieWeights {
+        <<constants>>
+    }
+
+    %% ===== tetris.ai.hud =====
+    %% (pure functions)
+
+    %% ===== tetris.bots.moves =====
+    class BotMovesMixin {
+        +_get_candidate_states()
+        +_execute_move_sequence(moves)
+    }
+
+    %% ===== tetris.bots.dellacherie =====
+    %% dellacherie_pick(dellvals) — pure argmax
+
+    %% ===== tetris.visuals.renderer =====
+    class Renderer {
+        +draw_board(screen, board, ...)
+        +draw_ghost_piece(...)
+        +draw_hold(screen, ...)
+        +draw_next(screen, ...)
+        +draw_stats(screen, stats, ...)
+        +draw_debug_overlay(screen, state)
+    }
+
+    %% ===== tetris.visuals.particles =====
+    class ParticleSystem {
+        +particles: list[Particle]
+        +add_explosion(x, y, color, count)
+        +update()
+        +draw(screen)
+    }
+
+    class Particle {
+        +x, y, vx, vy, color, life, size
+    }
+
+    %% ===== tetris.visuals.leaderboard_view =====
+    %% draw_leaderboard() — pure function
+
+    %% ===== tetris.audio =====
+    class AudioManager {
+        +sound_volume: int
+        +music_volume: int
+        +song: str
+        +_music_speed: float
+        +_init_sounds()
+        +_parse_midi(path): list[MidiNote]
+        +_generate_music()
+        +_build_music_sound()
+        +generate_melody(notes): Sound
+        +play(key)
+        +start_music()
+        +stop_music()
+        +set_music_speed(speed)
+        +apply_settings(sound, music, song)
+    }
+
+    class MidiNote {
+        <<NamedTuple>>
+        +start: float
+        +duration: float
+        +note: int
+    }
+
+    %% ===== tetris.storage =====
+    class LeaderboardStorage {
+        +load(): list[dict]
+        +save(entries)
+        +add_entry(entry)
+    }
+
+    class HumanStatsStorage {
+        +load(): list[dict]
+        +save(entries)
+        +add_entry(entry)
+    }
+
+    %% ===== tetris.mcp_server =====
+    class TetrisMCPServer {
+        +port: int
+        +mcp: FastMCP
+        +state_ref: MCPState | None
+        +attach(state)
+        +detach()
+        +_play_tool(actions, frames)
+        +_start_game_tool(seed)
+        +_board_resource()
+        +_rules_resource()
+    }
+
+    %% ===== Relationships =====
+    TetrisApp --> State : current state
+    TetrisApp --> MenuState : menu reference
+    State <|-- MenuState
+    State <|-- GameState
+    State <|-- HumanState
+    State <|-- AIState
+    State <|-- DellacherieState
+    State <|-- MCPState
+    State <|-- GameOverState
+    State <|-- LeaderboardState
+    MenuState --> HumanMenuState : sub-menu
+    MenuState --> AIMenuState : sub-menu
+    MenuState --> BotMenuState : sub-menu
+    MenuState --> MCPMenuState : sub-menu
+    MenuState --> GameRulesMenuState : sub-menu
+    MenuState --> AudioMenuState : sub-menu
+    GameState <|-- HumanState
+    GameState <|-- AIState
+    GameState <|-- DellacherieState
+    GameState <|-- MCPState
+    AIState --> BotMovesMixin : inherits
+    DellacherieState --> BotMovesMixin : inherits
+    AIState --> DQNAgent : uses
+    DQNAgent --> DQNetwork : uses
+    DQNAgent --> PrioritizedReplayBuffer : uses
+    GameState --> Board : owns
+    GameState --> PieceProvider : owns
+    GameState --> GameStats : owns
+    GameState --> Tetromino : current piece
+    PieceProvider --> PieceGenerator : uses
+    PieceGenerator <|-- RandomGenerator
+    PieceGenerator <|-- BagGenerator
+    BagGenerator <|-- SevenBagGenerator
+    BagGenerator <|-- ThirtyFiveBagGenerator
+    PieceGenerator <|-- WeightedGenerator
+    PieceGenerator <|-- ReplayGenerator
+    GameStats --> ClearCounts : has
+    Board --> Tetromino : locks
+    Board --> rules : uses (grid-agnostic)
+    AIState --> rules : uses (via Board / simulation)
+    DellacherieState --> dellacherie_pick : uses
+    AudioManager --> MidiNote : parses
+    TetrisMCPServer --> MCPState : communicates via queue
+    MCPState --> GameState : inherits
+    Renderer --> GameState : reads for draw
+    ParticleSystem --> Particle : manages
+```
+
+## Module-Level Functions
+
+### `tetris/game/rules.py`
+- `shape_fits(grid, shape, x, y)` → bool
+- `try_rotation(grid, shape, x, y, rot, kicks)` → tuple[int, int] | None
+- `hard_drop_y(grid, shape, x, y)` → int
+- `place_cells(grid, shape, x, y, value=1.0)` → None
+- `find_full_rows(grid)` → list[int]
+- `clear_rows(grid, rows)` → None
+- `count_holes(grid)` → int
+- `hole_depth(grid)` → int
+- `rows_with_holes(grid)` → int
+- `wells(grid)` → int
+- `bumpiness(grid)` → int
+- `aggregate_height(grid)` → int
+- `column_transitions(grid)` → int
+- `row_transitions(grid)` → int
+- `max_height(grid)` → int
+
+### `tetris/game/shapes.py`
+- `num_shape_rot(piece_type)` → int
+- `get_shape_rot(piece_type, rot)` → list[tuple[int, int]]
+
+### `tetris/ai/rewards.py`
+- `extract_features(grid, lines_cleared, next_piece_type)` → np.ndarray[17]
+- `extract_features_batch(grids, lines_cleared, next_piece_types)` → np.ndarray[N, 17]
+- `dellacherie_value(grid)` → float
+- `dellacherie_value_batch(grids)` → np.ndarray[N]
+- `el_tetris_value(grid, landing_height, rows_eliminated)` → float
+- `el_tetris_value_batch(grids, landing_heights, rows_eliminated)` → np.ndarray[N]
+- `compute_reward(old_stats, new_stats, old_grid, new_grid, game_over)` → float
+- `compute_reward_components(...)` → dict[str, float] (9 components)
+
+### `tetris/ai/candidates.py`
+- `soft_drop_placements(board_grid, piece_type, ...)` → list[Placement]
+- `best_next_placement(board_grid, next_piece_type, ...)` → Placement | None
+- `iter_column_positions(piece_type)` → Generator[tuple[int, int], None, None]
+
+### `tetris/bots/dellacherie.py`
+- `dellacherie_pick(dellvals: np.ndarray)` → int
+
+### `tetris/visuals/leaderboard_view.py`
+- `draw_leaderboard(surface, font, entries, highlight_index)` → None
+
+### `tetris/storage/leaderboard.py`
+- `load_leaderboard()` → list[dict]
+- `save_leaderboard(entries)` → None
+- `add_leaderboard_entry(entry)` → None
+
+### `tetris/storage/human_stats.py`
+- `load_human_stats()` → list[dict]
+- `save_human_stats(entries)` → None
+- `save_human_game(entry)` → None

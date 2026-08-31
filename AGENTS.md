@@ -313,3 +313,74 @@ All in `data/` (gitignored via blanket `data/` rule):
 - **Observability** (5 tiers): Tier 1 enriches per-episode JSON log with 26 new fields (LR, TD errors, grad norm, buffer fill, target syncs, PER beta, V-value spread/margin, candidate count, random/greedy ratio, hold rate, move-sequence length, avg reward, curriculum level, 9 reward components). Tier 2 writes per-`learn()`-call JSONL to `STEP_LOG_PATH` (rotates at 100K lines). Tier 3 writes per-episode behavioral JSONL to `BEHAVIOR_LOG_PATH` (column histogram 10 bins, rotation histogram 4 bins, placement success rate). Tier 4 decomposes reward via `compute_reward_components()` in `rewards.py` (9 components: lines, holes_delta, overhangs, height, bumpiness, wells, survival, pbrs, game_over — sum equals `compute_reward()`). Tier 5 writes TensorBoard scalars via `SummaryWriter` in `DQNAgent.learn()` to `TB_LOG_DIR` (runtime-guarded by `ImportError`). `DQNAgent.training_metrics()` snapshots dynamics; `flush_logs()` flushes TB writer; `AIState._write_behavior_log()` writes behavioral JSONL. `last_action_was_random` flag tracks actual exploration rate. `target_syncs` persisted in checkpoint. All logs are best-effort (I/O errors never crash training). Playing mode disables step log and TB writer.
 - **Cooking-state indicator** (`tetris/ai/hud.py`): `_cooking_status()` uses a 4-signal health scoring system: (1) score trend (`log._trend("score")`: up=+1, down=-1), (2) TD error trend (50-ep window ratio: <0.9=+1 converging, >1.5=-1 diverging), (3) V-margin (`agent.last_v_margin > 0.01` = +1, network discriminates top-2 candidates), (4) epsilon (`< 0.2` = +1, exploration winding down). Health score range -1 to +3: <=0 "Trop cuit" (red), 1 "Pas assez cuit" (blue `(100,180,255)`), >=2 "Bien cuit" (green). `_draw_thermometer()` renders a 12x20px vertical bar with fill proportional to training progress (`max(eps_progress, ep_maturity)` clamped 0..1). Shown in `draw_ai_hud()` only in learning mode. Color + label encode cooking health; thermometer level encodes training progress.
 - **Training analysis** (`scripts/analyze_training.py`): Standalone read-only script that reads `ai_training_log.json`, `ai_step_log.jsonl`, and `ai_behavior_log.jsonl`, and produces a health report with `[OK]`/`[ATTN]`/`[CRIT]` flags. Replicates `_trend`, `_moving_average`, and `_cooking_status` logic from game code for consistency. Optional `--charts` flag saves PNGs to `data/analysis/` (score curve, column heatmap, dynamics 4-panel, reward decomposition). TensorBoard loading disabled (event files too large for quick analysis; step log JSONL covers same metrics). No game code modified; lazy imports of `tetris.settings` inside `main()` to avoid pygame init at import time.
+## Documentation Rules
+
+**Source of truth**: All documentation follows the rules defined in this section. The `simple-english` skill (ASD-STE100 Simplified Technical English) MUST be used for all documentation writing and rewriting.
+
+### Language
+- **English only** in `docs/`, `README.md`, and code comments.
+- **French only** for UI labels (in code) and `README-fr.md`.
+- No mixing languages within a single file.
+
+### Structure: One Domain = One File
+Each domain has exactly one file in `docs/`:
+
+| Domain | File |
+|--------|------|
+| Architecture | `architecture.md` |
+| AI (DQN) | `ai.md` |
+| Bot (Dellacherie) | `bot.md` |
+| Game Rules (Guideline) | `game_rules.md` |
+| Menus & Settings | `menus.md` |
+| Human Gameplay | `human.md` |
+| Audio & Music | `music_and_sound.md` |
+| MCP Integration | `mcp.md` |
+| Performance | `performance.md` |
+| Development Guide | `development.md` |
+| Roadmap | `roadmap.md` |
+
+**No duplicate content** across files. Cross-reference with links instead of copying.
+
+### `docs/studies/` — Analysis Only
+- Contains **only** non-implemented features, rejected proposals, or exploratory analysis.
+- **Implemented studies MUST be moved out** (to `docs/studies/archived/` or integrated into domain files).
+- Current non-adopted studies kept: `python_statemachine_study.md`, `states_split_study.md`, `pygame_menu_study.md`, `AI_REQUIREMENTS.md` (requirements spec).
+
+### Diagrams
+- **All schematics MUST use Mermaid.js** (` ```mermaid ` blocks).
+- Diagram types: `flowchart`, `graph`, `stateDiagram-v2`, `classDiagram`, `sequenceDiagram`, `erDiagram`, `gantt`, `timeline`, `pie`, `quadrantChart`, `requirementDiagram`, `gitgraph`, `mindmap`, `sankey`, `block`, `packet`, `journey`.
+- **Verify with `mmdc`** before commit: `mmdc -i <file>.md -o /dev/null` (checks syntax only).
+- No ASCII art diagrams in documentation.
+
+### Code in Documentation
+- **No executed or evaluated code** in documentation.
+- Code snippets are illustrative only — show API shape, not runnable scripts.
+- Runnable examples go in `scripts/` or tests, referenced from docs.
+
+### Cleanup
+- **Remove unused/outdated information** when consolidating.
+- **Archive, don't delete** — move superseded content to `docs/studies/archived/` with a note.
+- **No stale status markers** (e.g., "TODO", "WIP", "deprecated") in domain files.
+
+### README Files
+- `README.md` — English, primary entry point.
+- `README-fr.md` — French translation, kept in sync.
+- Both link to `docs/` for technical detail.
+
+### Verification (Pre-Commit)
+Run both checks before committing documentation changes:
+
+```bash
+# 1. Mermaid syntax validation (all .md files with mermaid blocks)
+for f in docs/*.md README.md README-fr.md; do
+  if grep -q '^```mermaid' "$f"; then
+    mmdc -i "$f" -o /dev/null || exit 1
+  fi
+done
+
+# 2. Documentation duplication < 1% (excludes class_diagram.md per .jscpd.json)
+npx jscpd docs/ README.md README-fr.md
+# Or via jscpd MCP: get_statistics with path "docs"
+```
+
+Target: **<1% duplication rate** across documentation files.
