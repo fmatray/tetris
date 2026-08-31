@@ -220,11 +220,11 @@ class TestGenPlacements:
         placements = list(gen_placements(grid, "O"))
         assert len(placements) >= 1
         ai = _make_ai()
-        candidates, actions, dellvals = ai._get_candidate_states()
+        candidates, actions, eval_values = ai._get_candidate_states()
         assert candidates.ndim == 2
         assert candidates.shape[1] == 17
         assert len(actions) == len(candidates)
-        assert len(dellvals) == len(candidates)
+        assert len(eval_values) == len(candidates)
 
     def test_includes_hold_candidates(self):
         ai = _make_ai()
@@ -246,11 +246,11 @@ class TestGenPlacements:
         for y in range(BOARD_HEIGHT):
             for x in range(BOARD_WIDTH):
                 ai.board.grid[y][x] = GRAY
-        candidates, actions, dellvals = ai._get_candidate_states()
+        candidates, actions, eval_values = ai._get_candidate_states()
         # Spawn placements are valid (y=0, shape fits at spawn)
         assert len(candidates) >= 1
         assert len(actions) == len(candidates)
-        assert len(dellvals) == len(candidates)
+        assert len(eval_values) == len(candidates)
 
     def test_warm_start_prior_uses_el_tetris_values(self):
         """Warm-start exploration prior is the El-Tetris values array:

@@ -1,12 +1,12 @@
 # Tetris Python
 
-A complete Tetris game built in Python with Pygame, featuring an embedded Deep Q-Network (DQN) AI agent, a Dellacherie heuristic bot, and Model Context Protocol (MCP) integration for external agents.
+A complete Tetris game built in Python with Pygame, featuring an embedded Deep Q-Network (DQN) AI agent, an El-Tetris heuristic bot, and Model Context Protocol (MCP) integration for external agents.
 
 ## Features
 
 ### Gameplay
 - ✅ **Tetris Guideline compliant** — 22-row board (20 visible + 2 hidden), SRS wall kicks, hold piece, lock delay with reset limit, T-Spin detection (3-corner rule), Back-to-Back chaining, combo scoring
-- ✅ **Four player types** — Human, DQN AI, Dellacherie bot, MCP external agent
+- ✅ **Four player types** — Human, DQN AI, El-Tetris bot, MCP external agent
 - ✅ **Multiple piece generators** — Random, 7-bag, 35-bag, weighted, replay
 - ✅ **Configurable rules** — Ghost piece, preview count (0/1/3), handicap (0–5), speed modes (none/insane)
 - ✅ **Reproducible seeds** — Numeric seed entry for deterministic piece sequences
@@ -18,17 +18,17 @@ A complete Tetris game built in Python with Pygame, featuring an embedded Deep Q
 - ✅ **Prioritized Experience Replay** — Beta annealing 0.4→1.0 over 10K learn steps
 - ✅ **N-step returns** — Configurable n-step TD targets
 - ✅ **Soft-drop BFS** — Full SRS wall-kick enumeration for all reachable placements including overhangs
-- ✅ **Look-ahead** — Simulates best next-piece placement (depth 1–3, Dellacherie-optimal)
+- ✅ **Look-ahead** — Simulates best next-piece placement (depth 1–3, El-Tetris-optimal)
 - ✅ **Hold candidates** — AI can hold once per lock, same rules as human
 - ✅ **Curriculum learning** — Progressive piece-set restriction with epsilon reset
 - ✅ **Two modes** — Learning (epsilon-greedy, training updates, fast-forward lock) vs Playing (greedy, full lock delay)
 - ✅ **5-tier observability** — Per-episode JSON, per-step JSONL, behavioral JSONL, reward decomposition, TensorBoard
 
-### Dellacherie Bot
+### El-Tetris Bot
 - ✅ **El-Tetris evaluation** — 6 heuristics (landing height, eroded cells, row transitions, column transitions, holes, well sums) with weighted sum
 - ✅ **Soft-drop BFS** — Same candidate enumeration as AI, exact path replay via BFS move sequences
 - ✅ **Look-ahead** — Configurable depth (none / preview)
-- ✅ **Shared bot library** — `BotMovesMixin` reused by AI and Dellacherie states
+- ✅ **Shared bot library** — `BotMovesMixin` reused by AI and bot states
 
 ### MCP Integration
 - ✅ **FastMCP HTTP server** — Streamable-http transport, daemon thread
@@ -122,7 +122,7 @@ Technical documentation is in the `docs/` directory:
 |----------|-------------|
 | `architecture.md` | System architecture, FSM state diagram, class diagram |
 | `ai.md` | DQN AI design, V-network, DT-20 features, PBRS, training pipeline |
-| `bot.md` | Dellacherie bot, El-Tetris evaluation, shared bot library |
+| `bot.md` | El-Tetris bot, El-Tetris evaluation, shared bot library |
 | `game_rules.md` | Tetris Guideline compliance, rule engine, human/AI alignment |
 | `menus.md` | Menu hierarchy, keybinds, settings persistence |
 | `human.md` | Human gameplay, DAS, keybind customization, seed/replay |
@@ -138,7 +138,7 @@ Technical documentation is in the `docs/` directory:
 tetris/
 ├── ai/              # DQN agent, network, rewards, candidates, HUD
 ├── audio/           # AudioManager, SFX synthesis, MIDI parsing
-├── bots/            # Shared bot library (BotMovesMixin, Dellacherie)
+├── bots/            # Shared bot library (BotMovesMixin)
 ├── game/            # Pure domain: Board, Tetromino, shapes, scoring, stats, piece providers, rules
 ├── logger.py        # Central logging
 ├── mcp_server.py    # FastMCP HTTP server

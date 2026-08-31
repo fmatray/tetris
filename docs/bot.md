@@ -1,13 +1,17 @@
-# Dellacherie Bot
+# El-Tetris Bot
 
 A deterministic rule-based player. It evaluates every reachable placement
 of the current piece with the El-Tetris heuristic and plays the best
 one. No learning, no model, no persistence — a watch and benchmark player.
 
+El-Tetris (Yiyuan Lee, 2009) is an improvement on Pierre Dellacherie's
+classic algorithm; this bot descends from that feature family and uses
+the full published El-Tetris evaluation.
+
 ## Player type
 
 `player = "Bot"` in `data/settings.json` (menu: Joueur → Bot).
-Its sub-menu ("Bot Dellacherie") has one setting:
+Its sub-menu ("Bot El-Tetris") has one setting:
 
 | Option | Values | Meaning |
 |---|---|---|
@@ -15,7 +19,7 @@ Its sub-menu ("Bot Dellacherie") has one setting:
 
 ## Selection algorithm
 
-`DellacherieState.update()` (tetris/states/dellacherie.py):
+`ElTetrisState.update()` (tetris/states/eltetris.py):
 
 1. **Enumerate candidates** — all reachable placements of the current
    piece via soft-drop BFS with SRS wall kicks, plus hold-swap
@@ -28,8 +32,7 @@ Its sub-menu ("Bot Dellacherie") has one setting:
    weight −4.5) and `rows_eliminated` (weight +3.42), with the published
    PSO-tuned weights
    ([El-Tetris](https://imake.ninja/el-tetris-an-improvement-on-pierre-dellacheries-algorithm/)).
-3. **Pick** — `dellacherie_pick()` returns the argmax; ties resolve to
-   the lowest index (tetris/bots/dellacherie.py).
+3. **Pick** — `int(np.argmax(values))`; ties resolve to the lowest index.
 4. **Execute** — the placement's recorded BFS move sequence is replayed
    atomically (`BotMovesMixin._execute_move_sequence`), so the piece
    lands exactly where the evaluation saw it. No execution mismatch.
@@ -57,9 +60,9 @@ a human can watch; lock delay runs normally (500ms).
 
 The throttle cap (`AI_ACTION_DELAY_MS`) is kept as a visual nicety so humans can watch the bot play.
 
-## El-Tetris Adoption
+## El-Tetris evaluation
 
-The bot uses the **El-Tetris evaluation** (`el_tetris_value_batch` in `tetris/ai/rewards.py`) instead of the classic Dellacherie heuristic. El-Tetris adds two placement-specific terms to the base 4 board features:
+The bot uses the **El-Tetris evaluation** (`el_tetris_value_batch` in `tetris/ai/rewards.py`). El-Tetris adds two placement-specific terms to the base 4 board features:
 - `landing_height` (weight −4.5) — distance from board floor to piece centroid
 - `rows_eliminated` (weight +3.42) — lines cleared by this placement
 
@@ -69,12 +72,11 @@ Literature benchmark: ~16M lines average (vs ~5M for classic Dellacherie). The b
 
 ## Shared Bot Library (`tetris/bots/`)
 
-`DellacherieState` and `AIState` are fully independent states — neither imports the other. Their shared machinery lives in `tetris/bots/`:
+`ElTetrisState` and `AIState` are fully independent states — neither imports the other. Their shared machinery lives in `tetris/bots/`:
 
 | Module | Contents |
 |---|---|
 | `tetris/bots/moves.py` | `BotMovesMixin` — `_get_candidate_states()` and `_execute_move_sequence()`, extracted verbatim from AIState. Hosts must provide the attributes listed in the mixin docstring (board, pieces, `_can_hold`, `lookahead`, `lookahead_depth`, `_hold()`). |
-| `tetris/bots/dellacherie.py` | `dellacherie_pick(dellvals)` — pure argmax selection. |
 
 `AIState(BotMovesMixin, GameState)` refactored to inherit the mixin — same methods, same behavior, single implementation.
 

@@ -208,9 +208,9 @@ class TestWarmStart:
     def test_warm_start_on_passes_dellacherie(self, audio):
         ai = _make_ai(audio, curriculum=False)
         assert ai.warm_start is True
-        candidates, _, dellvals = ai._get_candidate_states()
+        candidates, _, eval_values = ai._get_candidate_states()
         assert len(candidates) > 0
-        assert len(dellvals) == len(candidates)
+        assert len(eval_values) == len(candidates)
 
     def test_warm_start_setting_persisted(self, audio):
         """MenuState persists ai_warm_start via settings."""

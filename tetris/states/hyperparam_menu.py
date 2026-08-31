@@ -64,7 +64,7 @@ class HyperparamMenuState(MenuBase):
         ("", "", "", ""),  # EXPLORATION header
         ("0.990", "0.9999", "0.0001", "Décroissance d'epsilon. ↑ = exploration plus longue, apprentissage plus lent"),
         ("0.02", "0.10", "0.01", "Epsilon minimal. ↑ = plus d'exploration résiduelle, moins de convergence"),
-        ("OFF", "ON", "ON/OFF", "Exploration dirigée par heuristique Dellacherie (warm-start)"),
+        ("OFF", "ON", "ON/OFF", "Exploration dirigée par heuristique El-Tetris (warm-start)"),
         ("", "", "", ""),  # APPRENTISSAGE header
         ("1e-6", "1e-2", "x10", "Taux d'apprentissage Adam. ↑ = apprentissage plus rapide mais instable"),
         ("0.80", "0.99", "0.01", "Actualisation récompenses futures. ↑ = long terme, ↓ = court terme"),

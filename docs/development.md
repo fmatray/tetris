@@ -27,7 +27,7 @@ Returning a new `State` from `handle_event`/`update` transitions the app; `None`
 | Domain | `tetris/game/` | Pure game logic: board, tetromino, scoring, stats, piece provider, rules |
 | Presentation | `tetris/visuals/`, `tetris/audio/`, `tetris/states/` | Rendering, particle effects, SFX/music, FSM states |
 | Persistence | `tetris/storage/` | JSON load/save for leaderboard, human stats |
-| AI | `tetris/ai/`, `tetris/bots/` | DQN agent, Dellacherie bot, shared bot algorithms |
+| AI | `tetris/ai/`, `tetris/bots/` | DQN agent, El-Tetris bot, shared bot algorithms |
 | External | `tetris/mcp_server.py` | FastMCP HTTP server for external agents |
 
 ### State Machine
@@ -43,7 +43,7 @@ MenuState (root, owns settings)
 ├── GameState (abstract base)
 │   ├── HumanState
 │   ├── AIState
-│   ├── DellacherieState
+│   ├── ElTetrisState
 │   └── MCPState
 ├── LeaderboardState
 └── Quit

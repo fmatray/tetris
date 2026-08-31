@@ -1,12 +1,12 @@
 # Tetris Python
 
-Un jeu Tetris complet développé en Python avec Pygame, incluant un agent IA Deep Q-Network (DQN), un bot heuristique Dellacherie et une intégration Model Context Protocol (MCP) pour agents externes.
+Un jeu Tetris complet développé en Python avec Pygame, incluant un agent IA Deep Q-Network (DQN), un bot heuristique El-Tetris et une intégration Model Context Protocol (MCP) pour agents externes.
 
 ## Fonctionnalités
 
 ### Gameplay
 - ✅ **Conforme au Tetris Guideline** — Plateau 22 lignes (20 visibles + 2 cachées), rotations SRS avec wall kicks, pièce en réserve (hold), délai de verrouillage avec limite de réinitialisation, détection T-Spin (règle des 3 coins), chaînage Back-to-Back, score combo
-- ✅ **Quatre types de joueurs** — Humain, IA DQN, Bot Dellacherie, Agent MCP externe
+- ✅ **Quatre types de joueurs** — Humain, IA DQN, Bot El-Tetris, Agent MCP externe
 - ✅ **Générateurs de pièces multiples** — Aléatoire, sac 7-bag, sac 35-bag, pondéré, replay
 - ✅ **Règles configurables** — Pièce fantôme, nombre d'aperçus (0/1/3), handicap (0–5), modes de vitesse (aucun/insane)
 - ✅ **Graines reproductibles** — Saisie numérique de graine pour séquences de pièces déterministes
@@ -18,17 +18,17 @@ Un jeu Tetris complet développé en Python avec Pygame, incluant un agent IA De
 - ✅ **Prioritized Experience Replay** — Recuit beta 0.4→1.0 sur 10K pas d'apprentissage
 - ✅ **Retours N-step** — Cibles TD n-step configurables
 - ✅ **BFS Soft-drop** — Énumération complète SRS wall-kick de tous les placements accessibles incluant surplombs
-- ✅ **Look-ahead** — Simulation du meilleur placement pièce suivante (profondeur 1–3, optimal Dellacherie)
+- ✅ **Look-ahead** — Simulation du meilleur placement pièce suivante (profondeur 1–3, optimal El-Tetris)
 - ✅ **Candidats hold** — L'IA peut garder une fois par verrouillage, mêmes règles qu'humain
 - ✅ **Apprentissage par curriculum** — Restriction progressive du set de pièces avec réinitialisation epsilon
 - ✅ **Deux modes** — Apprentissage (epsilon-greedy, mises à jour entraînement, verrouillage accéléré) vs Jeu (glouton, délai complet)
 - ✅ **Observabilité 5 niveaux** — JSON par épisode, JSONL par pas, JSONL comportemental, décomposition récompense, TensorBoard
 
-### Bot Dellacherie
+### Bot El-Tetris
 - ✅ **Évaluation El-Tetris** — 6 heuristiques (hauteur d'atterrissage, cellules érodées, transitions lignes/colonnes, trous, sommes puits) avec somme pondérée
 - ✅ **BFS Soft-drop** — Même énumération candidats que l'IA, replay exact via séquences de mouvements BFS
 - ✅ **Look-ahead** — Profondeur configurable (aucun / aperçu)
-- ✅ **Bibliothèque bot partagée** — `BotMovesMixin` réutilisé par états IA et Dellacherie
+- ✅ **Bibliothèque bot partagée** — `BotMovesMixin` réutilisé par états IA et bot
 
 ### Intégration MCP
 - ✅ **Serveur HTTP FastMCP** — Transport streamable-http, thread démon
@@ -122,7 +122,7 @@ La documentation technique se trouve dans le dossier `docs/` :
 |----------|-------------|
 | `architecture.md` | Architecture système, diagramme FSM, diagramme classes |
 | `ai.md` | Conception IA DQN, réseau V, features DT-20, PBRS, pipeline entraînement |
-| `bot.md` | Bot Dellacherie, évaluation El-Tetris, bibliothèque bot partagée |
+| `bot.md` | Bot El-Tetris, évaluation El-Tetris, bibliothèque bot partagée |
 | `game_rules.md` | Conformité Guideline, moteur règles, alignement humain/IA |
 | `menus.md` | Hiérarchie menus, keybinds, persistance réglages |
 | `human.md` | Gameplay humain, DAS, personnalisation touches, graine/replay |
@@ -138,7 +138,7 @@ La documentation technique se trouve dans le dossier `docs/` :
 tetris/
 ├── ai/              # Agent DQN, réseau, récompenses, candidats, HUD
 ├── audio/           # AudioManager, synthèse SFX, parsing MIDI
-├── bots/            # Bibliothèque bot partagée (BotMovesMixin, Dellacherie)
+├── bots/            # Bibliothèque bot partagée (BotMovesMixin)
 ├── game/            # Domaine pur: Board, Tetromino, formes, score, stats, fournisseurs pièces, règles
 ├── logger.py        # Logging centralisé
 ├── mcp_server.py    # Serveur HTTP FastMCP

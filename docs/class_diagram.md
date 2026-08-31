@@ -110,7 +110,7 @@ classDiagram
             # _on_select() State | None
             - _build_ai_state() State
             - _build_mcp_state() State
-            - _build_dellacherie_state() State
+            - _build_eltetris_state() State
             - _game_config() GameConfig
             +holes_overhangs_help: str
         }
@@ -447,7 +447,6 @@ classDiagram
         %% Module-level function: draw_ai_hud(ai_state) -> None
         %% Module-level function: _hud_table_rows(log, stats, episode_steps: int) -> list
         %% Module-level function: _cooking_status(ai_state) -> tuple[str, tuple[int, int, int], float]
-        %% Module-level function: dellacherie_pick(dellvals: np.ndarray) -> int
 
         class BotConfig {
             +lookahead: bool
@@ -464,7 +463,7 @@ classDiagram
             - _on_select() State | None
         }
 
-        class DellacherieState {
+        class ElTetrisState {
             +lookahead: bool
             +lookahead_depth: int
             +player_type: str
@@ -778,7 +777,7 @@ classDiagram
             +last_v_margin: float
             +last_action_was_random: bool
             +__init__(state_size, lr, gamma, epsilon_start, epsilon_end, epsilon_decay, batch_size, buffer_size, device, seed, step_log_path, tb_log_dir) None
-            +select_action(candidate_states: np.ndarray, dellacherie_values: np.ndarray | None) int
+            +select_action(candidate_states: np.ndarray, prior_values: np.ndarray | None) int
             +store(state: np.ndarray, action: int, reward: float, next_state: np.ndarray, done: bool) None
             - _push_n_step() None
             +flush_n_step() None
@@ -1056,9 +1055,9 @@ classDiagram
     nn_Module <|-- DQNetwork
     PieceGenerator <|-- RandomGenerator
     PieceGenerator <|-- BagGenerator
-    GameState <|-- DellacherieState
+    GameState <|-- ElTetrisState
     BotMovesMixin <|-- AIState
-    BotMovesMixin <|-- DellacherieState
+    BotMovesMixin <|-- ElTetrisState
     MenuBase <|-- BotMenuState
 
     PieceGenerator <|-- ReplayGenerator

@@ -1,6 +1,6 @@
-"""Dellacherie bot state and shared bot library tests.
+"""El-Tetris bot state and shared bot library tests.
 
-Run: SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy python -m pytest tests/test_dellacherie_state.py -q
+Run: SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy python -m pytest tests/test_eltetris_state.py -q
 """
 
 from __future__ import annotations
@@ -15,11 +15,11 @@ import pytest
 from pathlib import Path
 
 from tetris.audio import AudioManager
-from tetris.bots.dellacherie import dellacherie_pick
+
 from tetris.bots.moves import BotMovesMixin
 from tetris.game.piece_provider import PieceProvider
 from tetris.states.bot_menu import BotMenuState
-from tetris.states.dellacherie import BotConfig, DellacherieState
+from tetris.states.eltetris import BotConfig, ElTetrisState
 from tetris.states.game import GameConfig
 from tetris.states.menu import MenuState
 from tetris.visuals.particles import ParticleSystem
@@ -32,7 +32,7 @@ _counter = 0
 def _unique_path() -> str:
     global _counter
     _counter += 1
-    return f"/tmp/_test_dellacherie_{_counter}.json"
+    return f"/tmp/_test_eltetris_{_counter}.json"
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -46,12 +46,12 @@ def _make_bot(
     lookahead: bool = False,
     lookahead_depth: int = 1,
     preview_count: int = 1,
-) -> DellacherieState:
+) -> ElTetrisState:
     screen = pygame.Surface((800, 600))
     font = pygame.font.Font(None, 20)
     audio = AudioManager(sound_volume=0, music_volume=0)
     provider = PieceProvider(generator="7bag", path=_unique_path())
-    return DellacherieState(
+    return ElTetrisState(
         screen=screen,
         font=font,
         audio=audio,
@@ -70,18 +70,19 @@ def _make_bot(
     )
 
 
-class TestDellacheriePick:
+class TestElTetrisPick:
     def test_picks_max(self):
-        assert dellacherie_pick(np.array([1.0, 3.0, 2.0])) == 1
+        assert int(np.argmax(np.array([1.0, 3.0, 2.0]))) == 1
 
     def test_tie_lowest_index(self):
-        assert dellacherie_pick(np.array([2.0, 3.0, 3.0])) == 1
+        # np.argmax resolves ties to the lowest index — the pick rule
+        assert int(np.argmax(np.array([2.0, 3.0, 3.0]))) == 1
 
     def test_single(self):
-        assert dellacherie_pick(np.array([5.0])) == 0
+        assert int(np.argmax(np.array([5.0]))) == 0
 
 
-class TestDellacherieStateInit:
+class TestElTetrisStateInit:
     def test_defaults_no_lookahead(self):
         bot = _make_bot()
         assert bot.lookahead is False
@@ -90,7 +91,7 @@ class TestDellacherieStateInit:
         assert bot.player_type == "Bot"
 
     def test_none_config_falls_back(self):
-        bot = DellacherieState(
+        bot = ElTetrisState(
             pygame.Surface((800, 600)),
             pygame.font.Font(None, 20),
             AudioManager(sound_volume=0, music_volume=0),
@@ -114,14 +115,14 @@ class TestDellacherieStateInit:
         assert bot.lookahead_depth == 2
 
 
-class TestDellacherieIndependence:
+class TestElTetrisIndependence:
     def test_no_ai_state_dependency(self):
-        source = (ROOT / "tetris" / "states" / "dellacherie.py").read_text()
+        source = (ROOT / "tetris" / "states" / "eltetris.py").read_text()
         assert not re.search(r"from tetris\.states\.ai\b", source)
         assert "tetris.ai.agent" not in source
 
 
-class TestDellacherieGameplay:
+class TestElTetrisGameplay:
     def test_bot_places_pieces(self):
         bot = _make_bot()
         parts = ParticleSystem()
@@ -146,7 +147,7 @@ class TestDellacherieGameplay:
         bot = _make_bot()
         parts = ParticleSystem()
         placements: list = []
-        orig = DellacherieState._execute_move_sequence
+        orig = ElTetrisState._execute_move_sequence
 
         def spy(self: BotMovesMixin, action: int) -> None:
             # Simulate one frame of gravity pre-fall before replay.
@@ -156,12 +157,12 @@ class TestDellacherieGameplay:
             orig(self, action)
             placements.append((p, (self.current_piece.x, self.current_piece.y, self.current_piece.rotation % 4)))
 
-        DellacherieState._execute_move_sequence = spy  # type: ignore[method-assign]
+        ElTetrisState._execute_move_sequence = spy  # type: ignore[method-assign]
         try:
             for _ in range(120):
                 bot.update(16, parts)
         finally:
-            DellacherieState._execute_move_sequence = orig  # type: ignore[method-assign]
+            ElTetrisState._execute_move_sequence = orig  # type: ignore[method-assign]
         assert placements, "bot never executed a move"
         for p, (x, y, rot) in placements:
             assert (x, y, rot) == (p.px, p.py, p.rot % 4)
@@ -181,12 +182,12 @@ class TestBotMenu:
         audio = AudioManager(sound_volume=0, music_volume=0)
         return MenuState(screen, font, audio)
 
-    def test_menu_builds_dellacherie_state(self):
+    def test_menu_builds_eltetris_state(self):
         menu = self._make_menu()
         menu.player = "Bot"
         menu.selection = 0
         state = menu._on_select()
-        assert isinstance(state, DellacherieState)
+        assert isinstance(state, ElTetrisState)
         # Default bot_lookahead="preview", preview_count=3 → depth 3
         assert state.lookahead_depth == 3
         assert state.lookahead is True

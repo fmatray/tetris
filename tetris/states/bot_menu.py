@@ -1,4 +1,4 @@
-"""Bot sub-menu: Dellacherie lookahead setting."""
+"""Bot sub-menu: El-Tetris lookahead setting."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ from tetris.states.menu_base import MenuBase
 
 
 class BotMenuState(MenuBase):
-    """Dellacherie bot sub-menu: single lookahead setting.
+    """El-Tetris bot sub-menu: single lookahead setting.
 
     ``Anticipation`` ("Non" / "Comme aperçu") is stored on the parent
     ``MenuState`` as ``bot_lookahead`` ("none" / "preview").
@@ -15,7 +15,7 @@ class BotMenuState(MenuBase):
 
     _OPTIONS = ("Anticipation", "Retour")
     _toggle_indices = frozenset({0})  # Anticipation
-    _title = "Bot Dellacherie"
+    _title = "Bot El-Tetris"
 
     def __init__(self, screen, font, audio, menu) -> None:
         super().__init__(screen, font, audio)

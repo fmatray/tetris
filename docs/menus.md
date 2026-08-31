@@ -72,7 +72,7 @@ flowchart TD
 | 1 | **Player** | Toggle | Cycles: Human → AI → Bot → MCP (persisted) |
 | 2 | **Human** | Submenu | Human-specific settings (enabled only when Player=Human) |
 | 3 | **AI** | Submenu | AI-specific settings (enabled only when Player=AI) |
-| 4 | **Bot** | Submenu | Dellacherie bot settings (enabled only when Player=Bot) |
+| 4 | **Bot** | Submenu | El-Tetris bot settings (enabled only when Player=Bot) |
 | 5 | **MCP** | Submenu | MCP server settings (enabled only when Player=MCP) |
 | 6 | **Game Rules** | Submenu | Game rule configuration |
 | 7 | **Leaderboard** | Submenu | Top 10 scores display |

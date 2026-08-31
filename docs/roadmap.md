@@ -8,7 +8,7 @@ All core features are **implemented and functional**:
 |---------|--------|---------|
 | Human Player | ✅ Complete | Keyboard input, DAS, pause, ghost piece, hold, configurable keybinds |
 | AI Player (DQN) | ✅ Complete | V-network DQN, learning/playing modes, PER, n-step, look-ahead, curriculum |
-| Dellacherie Bot | ✅ Complete | El-Tetris evaluation, soft-drop BFS, look-ahead, shared bot library |
+| El-Tetris Bot | ✅ Complete | El-Tetris evaluation, soft-drop BFS, look-ahead, shared bot library |
 | MCP Player | ✅ Complete | FastMCP HTTP server, play/start_game tools, board/rules resources |
 | Game Rules (Guideline) | ✅ Complete | All 11 indispensable/recommended rules implemented |
 | SRS Wall Kicks | ✅ Complete | Human + AI + Bot use same rule engine |
@@ -24,7 +24,7 @@ All core features are **implemented and functional**:
 
 - **v1** — Human player with basic Tetris rules
 - **v2** — Menu system, settings persistence, keybinds
-- **v3** — AI player (DQN), Dellacherie bot, MCP integration
+- **v3** — AI player (DQN), El-Tetris bot (descended from the Dellacherie feature family), MCP integration
 - **v3.1** — Full Guideline compliance (22-row board, SRS, hold, lock delay, T-spin, B2B, DAS, 3+ preview)
 - **v3.2** — Rule engine centralization (`tetris/game/rules.py`), human/AI alignment
 - **v3.3** — El-Tetris adoption, BFS path replay fix (survival bug), AI network widening

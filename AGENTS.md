@@ -24,7 +24,7 @@ Returning a new `State` from `handle_event`/`update` transitions the app; `None`
 - `tetris/audio/` — procedural SFX synthesis + MIDI-based polyphonic music
 - `tetris/storage/` — JSON persistence (leaderboard, human stats)
 - `tetris/states/` — FSM states binding input → game logic → rendering
-- `tetris/bots/` — shared bot-algorithm library (`BotMovesMixin` candidate enumeration + BFS move replay, `dellacherie_pick`), reused by `AIState` and `DellacherieState`
+- `tetris/bots/` — shared bot-algorithm library (`BotMovesMixin` candidate enumeration + BFS move replay), reused by `AIState` and `ElTetrisState`
 - `tetris/ai/` — V-network DQN agent, DT-20 features, PBRS reward shaping, PER, n-step returns, soft-drop BFS, training log
 - `tetris/mcp_server.py` — MCP HTTP server (FastMCP): exposes `play` + `start_game` tools and board/rules resources to external agents
 
@@ -35,13 +35,13 @@ MenuState (root, owns settings)
 ├── GameRulesMenuState (generator, preview, handicap, speed, ghost piece)
 ├── HumanMenuState → { SeedEntryState, KeybindState, HumanStatsState }
 ├── AIMenuState → { TrainingMenuState → { HyperparamMenuState, PlaceholderState }, AIStatsState }
-├── BotMenuState (Dellacherie lookahead)
+├── BotMenuState (El-Tetris lookahead)
 ├── MCPMenuState (port, retour)
 ├── AudioMenuState
 ├── GameState   (abstract base: board, pieces, gravity, lock delay)
 │   ├── HumanState (human gameplay: keyboard, DAS, pause)
 │   ├── AIState   (AI gameplay, inherits BotMovesMixin + GameState)
-│   ├── DellacherieState (Dellacherie bot, inherits BotMovesMixin + GameState)
+│   ├── ElTetrisState (El-Tetris bot, inherits BotMovesMixin + GameState)
 │   └── MCPState  (MCP gameplay, inherits GameState — external agent via HTTP)
 ├── LeaderboardState
 └── Quit
@@ -56,7 +56,7 @@ MenuState (root, owns settings)
 |---|---|
 | `tetris/game/` | Pure domain: `Board`, `Tetromino`, `shapes` (`SHAPES` rotation data + `SHAPES_TYPES` + helpers), `PieceProvider` facade + `PieceGenerator` hierarchy (`RandomGenerator`, `BagGenerator`→`SevenBagGenerator`/`ThirtyFiveBagGenerator`, `WeightedGenerator`, `ReplayGenerator`), `ScoreEngine`, `GameStats`, `rules` (grid-agnostic game-rule functions + SRS kick data) |
 | `tetris/states/` | FSM states (`State` base + 15 concrete states) |
-| `tetris/bots/` | Shared bot-algorithm library: `BotMovesMixin` (candidate enumeration + BFS move replay, in `moves.py`), `dellacherie_pick` (in `dellacherie.py`). Reused by `AIState` and `DellacherieState` |
+| `tetris/bots/` | Shared bot-algorithm library: `BotMovesMixin` (candidate enumeration + BFS move replay, in `moves.py`). Reused by `AIState` and `ElTetrisState` |
 | `tetris/ai/` | V-network DQN: `DQNetwork` (V-function), `DQNAgent` (per-candidate eval), `PrioritizedReplayBuffer`, DT-20 features + PBRS reward, `TrainingLog`, `candidates.py` (placement generation + soft-drop BFS), `hud.py` (AI HUD rendering). Game-rule functions (SRS kicks) extracted to `tetris/game/rules.py` |
 | `tetris/visuals/` | `Renderer`, `ParticleSystem`, leaderboard/graph views |
 | `tetris/audio/` | `AudioManager` — NumPy SFX synthesis + MIDI parsing for polyphonic music; `midi_gen` generates `.mid` files |
@@ -123,10 +123,9 @@ python -m tetris.verify_training
 | `tetris/states/human.py` | `HumanState` — human gameplay: keyboard, DAS, pause, keybind setup |
 | `tetris/states/ai.py` | AI gameplay state + RL training integration (candidate generation and HUD rendering extracted to `tetris/ai/candidates.py` and `tetris/ai/hud.py`); `AIConfig` dataclass (DQN hyperparameters) |
 | `tetris/states/seed_entry.py` | `SeedEntryState` — numeric text input for game seed (empty = random) |
-| `tetris/states/bot_menu.py` | `BotMenuState` — Dellacherie bot sub-menu: lookahead toggle (Non / Comme aperçu) |
-| `tetris/states/dellacherie.py` | `DellacherieState` — Dellacherie bot gameplay state (`BotMovesMixin` + `GameState`); `BotConfig` dataclass. No learning, no logs, game over returns to menu |
-| `tetris/bots/moves.py` | `BotMovesMixin` — shared candidate enumeration (`_get_candidate_states`) + BFS move replay (`_execute_move_sequence`), reused by `AIState` and `DellacherieState` |
-| `tetris/bots/dellacherie.py` | `dellacherie_pick(dellvals)` — pure argmax selection for the Dellacherie bot |
+| `tetris/states/bot_menu.py` | `BotMenuState` — El-Tetris bot sub-menu: lookahead toggle (Non / Comme aperçu) |
+| `tetris/states/eltetris.py` | `ElTetrisState` — El-Tetris bot gameplay state (`BotMovesMixin` + `GameState`); `BotConfig` dataclass. No learning, no logs, game over returns to menu |
+| `tetris/bots/moves.py` | `BotMovesMixin` — shared candidate enumeration (`_get_candidate_states`) + BFS move replay (`_execute_move_sequence`), reused by `AIState` and `ElTetrisState` |
 | `tetris/states/mcp_menu.py` | `MCPMenuState` — MCP sub-menu: port selection, back |
 | `tetris/mcp_server.py` | `TetrisMCPServer` — MCP HTTP server (FastMCP streamable-http): `play` + `start_game` tools, `board://state` + `tetris://rules` resources. Daemon thread, queue-based communication with `MCPState` |
 | `tetris/ai/agent.py` | `DQNAgent` — `select_action`, `store`, `learn`, `save`, `load` |
@@ -302,7 +301,7 @@ All in `data/` (gitignored via blanket `data/` rule):
 
 - **Network**: `DQNetwork` — Input(17, normalized) → Dense(256, ReLU) → Dense(128, ReLU) → Output(1, Linear). V-function evaluates board quality per candidate placement.
 - **State vector** (`extract_features`, 17-dim DT-20, normalized via `(x - mean) / std`): `[lines_cleared, holes, aggregate_height, bumpiness, max_height, row_transitions, column_transitions, wells, hole_depth, rows_with_holes, *next_piece_one_hot(7)]`.
-- **Candidate generation**: soft-drop BFS (`soft_drop_placements` in `tetris/ai/candidates.py`) with SRS wall kicks (`SRS_KICKS_JLSTZ`, `SRS_KICKS_I`) — enumerates all reachable placements including overhangs. Placements are `Placement` NamedTuples `(piece_type, rot, px, py, hold, moves)` — `shape` is derived from `get_shape_rot(piece_type, rot)` (see `tetris/game/shapes.py`); `moves` is the full path of atomic actions (`["left", "rot_cw", "soft_drop", ...]`) from BFS. Hold candidates: when `_can_hold` is True, the AI also enumerates placements for the held piece (or next piece if hold is empty), doubling the candidate space. Look-ahead depth configurable (`ai_lookahead_depth` 1–3): simulates best next-piece placement (Dellacherie-optimal) for N upcoming pieces. Look-ahead uses hard-drop (`best_next_placement`), independent of the main soft-drop BFS path.
+- **Candidate generation**: soft-drop BFS (`soft_drop_placements` in `tetris/ai/candidates.py`) with SRS wall kicks (`SRS_KICKS_JLSTZ`, `SRS_KICKS_I`) — enumerates all reachable placements including overhangs. Placements are `Placement` NamedTuples `(piece_type, rot, px, py, hold, moves)` — `shape` is derived from `get_shape_rot(piece_type, rot)` (see `tetris/game/shapes.py`); `moves` is the full path of atomic actions (`["left", "rot_cw", "soft_drop", ...]`) from BFS. Hold candidates: when `_can_hold` is True, the AI also enumerates placements for the held piece (or next piece if hold is empty), doubling the candidate space. Look-ahead depth configurable (`ai_lookahead_depth` 1–3): simulates best next-piece placement (El-Tetris-optimal) for N upcoming pieces. Look-ahead uses hard-drop (`best_next_placement`), independent of the main soft-drop BFS path.
 - **Move execution**: `_execute_move_sequence` replays `p.moves` atomic actions using `Board.is_valid_move`/`try_rotate`, eliminating execution mismatch for overhang placements.
 - **Target network sync**: Hard sync every 500 learn steps (`target_sync_freq=500`), replacing Polyak averaging.
 - **LR scheduling**: `ReduceLROnPlateau(optimizer, mode="min", factor=0.5, patience=50, min_lr=1e-6)` — `learn()` calls `scheduler.step(last_loss)` after each gradient step.
@@ -329,7 +328,7 @@ Each domain has exactly one file in `docs/`:
 |--------|------|
 | Architecture | `architecture.md` |
 | AI (DQN) | `ai.md` |
-| Bot (Dellacherie) | `bot.md` |
+| Bot (El-Tetris) | `bot.md` |
 | Game Rules (Guideline) | `game_rules.md` |
 | Menus & Settings | `menus.md` |
 | Human Gameplay | `human.md` |

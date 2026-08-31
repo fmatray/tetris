@@ -219,7 +219,7 @@ class MenuState(MenuBase):
                 if self.player == "IA":
                     return self._build_ai_state()
                 if self.player == "Bot":
-                    return self._build_dellacherie_state()
+                    return self._build_eltetris_state()
                 if self.player == "MCP":
                     return self._build_mcp_state()
                 from tetris.states.human import HumanState
@@ -265,13 +265,13 @@ class MenuState(MenuBase):
                 sys.exit()
         return None
 
-    def _build_dellacherie_state(self) -> State:
+    def _build_eltetris_state(self) -> State:
         from tetris.game.piece_provider import PieceProvider
-        from tetris.states.dellacherie import BotConfig, DellacherieState
+        from tetris.states.eltetris import BotConfig, ElTetrisState
 
         bot_provider = PieceProvider(mode="normal", generator=self.piece_generator, seed=self.seed)
         lookahead = self.bot_lookahead == "preview"
-        return DellacherieState(
+        return ElTetrisState(
             self.screen,
             self.font,
             self.audio,

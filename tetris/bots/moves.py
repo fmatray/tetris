@@ -1,4 +1,4 @@
-"""Shared bot move machinery, reused by AIState and DellacherieState.
+"""Shared bot move machinery, reused by AIState and ElTetrisState.
 
 ``BotMovesMixin`` is stateless with respect to the FSM: it only depends
 on the host ``GameState`` providing the attributes/methods listed in

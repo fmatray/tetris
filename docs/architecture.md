@@ -66,8 +66,8 @@ tetris/
 │   ├── game.py               # GameState — abstract base: board, pieces, gravity, lock delay
 │   ├── human.py              # HumanState — human gameplay: keyboard, DAS, pause
 │   ├── ai.py                 # AIState — AI gameplay + RL training integration
-│   ├── dellacherie.py        # DellacherieState — Dellacherie bot gameplay
-│   ├── bot_menu.py           # BotMenuState — Dellacherie sub-menu
+│   ├── eltetris.py           # ElTetrisState — El-Tetris bot gameplay
+│   ├── bot_menu.py           # BotMenuState — El-Tetris sub-menu
 │   ├── mcp.py                # MCPState — external agent via HTTP
 │   ├── mcp_menu.py           # MCPMenuState — MCP sub-menu
 │   ├── seed_entry.py         # SeedEntryState — numeric seed input
@@ -77,8 +77,7 @@ tetris/
 │   ├── audio_menu.py         # AudioMenuState — volume, song selection
 │   └── leaderboard.py        # LeaderboardState
 ├── bots/                     # Shared bot algorithm library
-│   ├── moves.py              # BotMovesMixin — candidate enumeration + BFS move replay
-│   └── dellacherie.py        # dellacherie_pick — pure argmax selection
+│   └── moves.py              # BotMovesMixin — candidate enumeration + BFS move replay
 ├── ai/                       # V-network DQN agent
 │   ├── agent.py              # DQNAgent — select_action, store, learn, save, load
 │   ├── network.py            # DQNetwork — 17→256→128→1 V-network MLP
@@ -128,20 +127,17 @@ stateDiagram-v2
 
     MenuState --> HumanState : Démarrer (Joueur=Humain)
     MenuState --> AIState : Démarrer (Joueur=IA)
-    MenuState --> DellacherieState : Démarrer (Joueur=Bot)
-    MenuState --> MCPState : Démarrer (Joueur=MCP)
+    MenuState --> ElTetrisState : Démarrer (Joueur=Bot)
 
     HumanState --> GameOverState : Game Over
     AIState --> AIState : Episode reset (auto)
-    DellacherieState --> MenuState : Game Over
-    MCPState --> MenuState : Game Over / Disconnect
+    ElTetrisState --> MenuState : Game Over
 
     GameOverState --> MenuState : Name entered / ESC
 
     HumanState --> MenuState : Pause → Quitter
     AIState --> MenuState : Not applicable (no pause menu)
-    DellacherieState --> MenuState : Not applicable
-    MCPState --> MenuState : Disconnect
+    ElTetrisState --> MenuState : Not applicable
 ```
 
 ## Key Architectural Patterns
@@ -158,13 +154,13 @@ All game modes are states inheriting from `State` base class. The `TetrisApp` ho
 - Scoring, line clearing, level progression
 - Ghost piece rendering
 
-Concrete states (`HumanState`, `AIState`, `DellacherieState`, `MCPState`) inherit from `GameState` and only override input handling and decision-making.
+Concrete states (`HumanState`, `AIState`, `ElTetrisState`, `MCPState`) inherit from `GameState` and only override input handling and decision-making.
 
 ### 3. Shared Bot Library (`tetris/bots/`)
 
-`BotMovesMixin` provides candidate enumeration (`_get_candidate_states`) and BFS move replay (`_execute_move_sequence`). Both `AIState` and `DellacherieState` inherit this mixin. The `dellacherie_pick` function in `dellacherie.py` is a pure argmax selection.
+`BotMovesMixin` provides candidate enumeration (`_get_candidate_states`) and BFS move replay (`_execute_move_sequence`). Both `AIState` and `ElTetrisState` inherit this mixin. The bot picks with `int(np.argmax(...))` over El-Tetris values.
 
-This eliminates duplicate candidate generation code between the AI and the Dellacherie bot.
+This eliminates duplicate candidate generation code between the AI and the bot.
 
 ### 4. Grid-Agnostic Rule Engine (`tetris/game/rules.py`)
 
@@ -337,8 +333,8 @@ classDiagram
         +_on_episode_end()
     }
 
-    %% ===== tetris.states.dellacherie =====
-    class DellacherieState {
+    %% ===== tetris.states.eltetris =====
+    class ElTetrisState {
         +bot_config: BotConfig
         +_get_candidate_states()
         +_execute_move_sequence(moves)
@@ -487,9 +483,6 @@ classDiagram
         +_execute_move_sequence(moves)
     }
 
-    %% ===== tetris.bots.dellacherie =====
-    %% dellacherie_pick(dellvals) — pure argmax
-
     %% ===== tetris.visuals.renderer =====
     class Renderer {
         +draw_board(screen, board, ...)
@@ -573,7 +566,7 @@ classDiagram
     State <|-- GameState
     State <|-- HumanState
     State <|-- AIState
-    State <|-- DellacherieState
+    State <|-- ElTetrisState
     State <|-- MCPState
     State <|-- GameOverState
     State <|-- LeaderboardState
@@ -585,10 +578,10 @@ classDiagram
     MenuState --> AudioMenuState : sub-menu
     GameState <|-- HumanState
     GameState <|-- AIState
-    GameState <|-- DellacherieState
+    GameState <|-- ElTetrisState
     GameState <|-- MCPState
     AIState --> BotMovesMixin : inherits
-    DellacherieState --> BotMovesMixin : inherits
+    ElTetrisState --> BotMovesMixin : inherits
     AIState --> DQNAgent : uses
     DQNAgent --> DQNetwork : uses
     DQNAgent --> PrioritizedReplayBuffer : uses
@@ -607,7 +600,6 @@ classDiagram
     Board --> Tetromino : locks
     Board --> rules : uses (grid-agnostic)
     AIState --> rules : uses (via Board / simulation)
-    DellacherieState --> dellacherie_pick : uses
     AudioManager --> MidiNote : parses
     TetrisMCPServer --> MCPState : communicates via queue
     MCPState --> GameState : inherits
@@ -652,9 +644,6 @@ classDiagram
 - `soft_drop_placements(board_grid, piece_type, ...)` → list[Placement]
 - `best_next_placement(board_grid, next_piece_type, ...)` → Placement | None
 - `iter_column_positions(piece_type)` → Generator[tuple[int, int], None, None]
-
-### `tetris/bots/dellacherie.py`
-- `dellacherie_pick(dellvals: np.ndarray)` → int
 
 ### `tetris/visuals/leaderboard_view.py`
 - `draw_leaderboard(surface, font, entries, highlight_index)` → None

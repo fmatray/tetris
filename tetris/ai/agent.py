@@ -147,15 +147,16 @@ class DQNAgent:
 
     # --- Action selection -----------------------------------------------
 
-    def select_action(self, candidate_states: np.ndarray, dellacherie_values: np.ndarray | None = None) -> int:
+    def select_action(self, candidate_states: np.ndarray, prior_values: np.ndarray | None = None) -> int:
         """ε-greedy: random candidate with prob ε, greedy (max V) otherwise.
 
         During exploration, uses El-Tetris-weighted softmax (warm-start)
-        instead of uniform random when ``dellacherie_values`` is provided.
+        instead of uniform random when ``prior_values`` is provided.
 
         Args:
             candidate_states: (N, 17) array of feature vectors for valid placements.
-            dellacherie_values: (N,) array of El-Tetris evaluation values for warm-start.
+            prior_values: (N,) array of per-candidate evaluation values (El-Tetris)
+                used as the warm-start prior for directed exploration.
         Returns:
             Index of the chosen candidate (0..N-1).
         """
@@ -164,9 +165,9 @@ class DQNAgent:
             self.last_action_was_random = True
             self.last_v_spread = 0.0
             self.last_v_margin = 0.0
-            if dellacherie_values is not None and len(dellacherie_values) == n:
+            if prior_values is not None and len(prior_values) == n:
                 # Warm-start: softmax over El-Tetris values (directed exploration)
-                probs = _softmax(dellacherie_values / WARM_START_TEMP)
+                probs = _softmax(prior_values / WARM_START_TEMP)
                 return int(np.random.choice(n, p=probs))
             return random.randint(0, n - 1)
         self.last_action_was_random = False

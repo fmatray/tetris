@@ -178,7 +178,7 @@ def test_select_action_greedy_picks_argmax():
 
 
 def test_select_action_epsilon_one_uniform():
-    """With epsilon=1.0 and no dellacherie_values, select_action picks uniformly at random."""
+    """With epsilon=1.0 and no prior_values, select_action picks uniformly at random."""
     agent = DQNAgent(epsilon_start=1.0)
     states = _candidate_states(4)
     counts = np.zeros(4)
@@ -191,14 +191,14 @@ def test_select_action_epsilon_one_uniform():
 
 
 def test_select_action_warm_start_proportional():
-    """With dellacherie_values, exploration is softmax-weighted (not uniform)."""
+    """With prior_values, exploration is softmax-weighted (not uniform)."""
     agent = DQNAgent(epsilon_start=1.0)
     states = _candidate_states(10)
-    # Dellacherie values: one candidate is much better than the rest
+    # El-Tetris values: one candidate is much better than the rest
     dell = np.array([-200.0] * 9 + [-10.0], dtype=np.float32)
     counts = np.zeros(10)
     for _ in range(3000):
-        action = agent.select_action(states, dellacherie_values=dell)
+        action = agent.select_action(states, prior_values=dell)
         counts[action] += 1
     # The best candidate (index 9) should be selected far more often than average
     assert counts[9] > counts[0]
@@ -206,11 +206,11 @@ def test_select_action_warm_start_proportional():
 
 
 def test_select_action_warm_start_length_mismatch_falls_back():
-    """If dellacherie_values length != n candidates, falls back to uniform random."""
+    """If prior_values length != n candidates, falls back to uniform random."""
     agent = DQNAgent(epsilon_start=1.0)
     states = _candidate_states(5)
-    # Wrong-length dellacherie_values → should use uniform random
-    action = agent.select_action(states, dellacherie_values=np.array([1.0, 2.0]))
+    # Wrong-length prior_values → should use uniform random
+    action = agent.select_action(states, prior_values=np.array([1.0, 2.0]))
     assert 0 <= action < 5
 
 
