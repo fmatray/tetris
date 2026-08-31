@@ -23,10 +23,11 @@ class LanguageMenuState(MenuBase):
 
     def _value_label(self, i: int) -> str:
         if i < 4 and self._LANG_CODES[i] == i18n.get_language():
-            return "✓"
+            return "[*]"
         return ""
 
     def _toggle(self, direction: int) -> None:
+        # Left/Right cycle through languages (only when on a language option)
         code = self._LANG_CODES[(self.selection + direction) % 4]
         self.menu.language = code
         i18n.set_language(code)
@@ -40,6 +41,9 @@ class LanguageMenuState(MenuBase):
     def _on_select(self) -> State | None:
         if self.selection == 4:  # Back
             return self.menu
-        self._toggle(1)
+        # Select the language at current index
+        code = self._LANG_CODES[self.selection]
+        self.menu.language = code
+        i18n.set_language(code)
         self._save()
         return None

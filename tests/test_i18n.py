@@ -125,16 +125,28 @@ def test_language_menu_options_and_codes():
     assert LanguageMenuState._LANG_CODES == ("en", "fr", "es", "sl")
 
 
-def test_language_menu_toggle_sets_language_and_menu():
+def test_language_menu_toggle_cycles_languages():
     from tetris.states.language_menu import LanguageMenuState
 
     menu = _make_menu()
     state = _make_state(LanguageMenuState, menu)
     state.selection = 1  # Français
-    state._toggle(1)
+    state._toggle(1)  # cycles to next (Español)
+    assert get_language() == "es"
+    assert menu.language == "es"
+    assert state._value_label(2) == "[*]"
+    assert state._value_label(1) == ""
+
+def test_language_menu_select_sets_language_and_menu():
+    from tetris.states.language_menu import LanguageMenuState
+
+    menu = _make_menu()
+    state = _make_state(LanguageMenuState, menu)
+    state.selection = 1  # Français
+    state._on_select()  # selects current
     assert get_language() == "fr"
     assert menu.language == "fr"
-    assert state._value_label(1) == "✓"
+    assert state._value_label(1) == "[*]"
     assert state._value_label(0) == ""
 
 
