@@ -20,6 +20,46 @@ All core features are **implemented and functional**:
 
 ---
 
+## TOP 10 Features
+
+Ranked by player value ÷ effort. Every item is additive — no regression to
+existing modes, tests, or behavior. Each ships behind its own menu entry.
+
+| # | Feature | Effort | Why |
+|---|---------|--------|-----|
+| 1 | **Sprint (40 Lines)** | Low | Race to clear 40 lines with a live timer. Reuses `GameStats.lines` + existing `GameState`; adds win condition + timer HUD only. Standard modern mode. |
+| 2 | **Blitz (2-minute Ultra)** | Low | Max score in 120 s. Reuses `ScoreEngine`; adds countdown + end condition. Same skeleton as Sprint — build both together. |
+| 3 | **VS AI with garbage** | High | Local versus: human vs El-Tetris bot; garbage rows per clear with combo + B2B bonuses (Guideline). New `GarbageQueue` domain class in `tetris/game/`; bot side reuses `ElTetrisState`. |
+| 4 | **Replay viewer** | Medium | Scrub recorded human games. `ReplayGenerator` + `replay_pieces.json` already store piece sequences — extend to render board states per frame. |
+| 5 | **Per-mode leaderboards** | Low | Separate top-10 tables for Marathon/Sprint/Blitz in `leaderboard.json` (new `mode` field, backward-compatible read). |
+| 6 | **Efficiency stats (PPS, finesse)** | Low | Post-game PPS + finesse-error count (Galactoid-style feedback) in `human_stats.json` and stats screen. Pure accounting, no gameplay change. |
+| 7 | **Daily challenge** | Medium | Seeded run (date-derived seed) with one leaderboard entry per day. Seed machinery already exists (`SeedEntryState`). |
+| 8 | **Human-AI co-op hints** | Medium | Optional overlay showing the DQN agent's best placement for the human's current piece. Read-only; uses existing candidate generation. |
+| 9 | **Custom rule sets** | Medium | Configurable guideline subsets (starting garbage rows, inverted colors, gravity curves) via a rules menu entry persisted in `settings.json`. |
+| 10 | **Network play via MCP** | High | Two-instance LAN play through the existing MCP HTTP server; garbage attacks reuse item 3's `GarbageQueue`. |
+
+---
+
+## TOP 10 Technical
+
+Ranked by engineering value ÷ effort. Every item is additive or parallel —
+current behavior stays the default until a replacement proves out.
+
+| # | Improvement | Effort | Why |
+|---|-------------|--------|-----|
+| 1 | **Retrain AI model** | Low | Current `ai_model.pt` was trained on buggy pre-BFS features. Run `python -m tetris.verify_training`; target best_score > 10k, avg_score > 1k. Pure re-run, zero code risk. |
+| 2 | **Performance re-profiling** | Low | Re-run cProfile/py-spy with widened network, BFS path recording, look-ahead depth 3. Informs items 3–5; no user-visible change. |
+| 3 | **Vectorized simulation** | Medium | Numpy/bitboard board ops for candidate evaluation (arXiv 2603.26765 reports ~53× faster engines). Cuts wall-clock per episode; same placements, same rewards. |
+| 4 | **Dueling network head** | Medium | Split V into value + advantage streams over DT-20 features (Rainbow-family). Architecture flag; current V-network stays default until the dueling model beats baseline in `verify_training`. |
+| 5 | **Imitation warm-start** | Medium | Pre-train V-network on placements from `human_stats.json` before RL. Addresses cold-start; gated behind existing `ai_warm_start` setting. |
+| 6 | **Visual regression harness** | Medium | Headless `SDL_VIDEODRIVER=dummy` screenshot-diff of menus/HUD states. Catches layout regressions like the FR/ES HUD overflow (fixed d33393f) before they ship. |
+| 7 | **CI pipeline** | Low | GitHub Actions: `ruff check`, `zuban check`, headless pytest on every push. Codifies the pre-commit ritual already documented in AGENTS.md. |
+| 8 | **Fix pre-existing test debt** | Low | Repair failing `test_mcp_states.py`/`test_menus.py` cases and `zuban` type errors in `mcp_server.py` (Technical Debt table). No behavior change. |
+| 9 | **MCTS look-ahead** | High | Combine DQN value with Monte Carlo Tree Search for deeper-than-3 search at play time. Optional mode; greedy V-eval stays default. |
+| 10 | **Self-play tournament** | High | Population of agents competing, evolutionary selection. Reuses `verify_training` harness; new experiment, no change to shipped agent. |
+
+---
+
 ## Completed Milestones
 
 - **v1** — Human player with basic Tetris rules
@@ -33,50 +73,15 @@ All core features are **implemented and functional**:
 
 ## Near-Term Priorities
 
-### 1. Documentation Consolidation (In Progress)
+### Documentation Consolidation
 - [x] Consolidate 10 docs → 11 domain files (one domain = one file)
 - [x] Clean `docs/studies/` — archive implemented studies (6 moved to `archived/`)
-- [ ] Write `README.md` (English) + `README-fr.md` (French)
-- [ ] Add Documentation Rules to `AGENTS.md`
+- [x] Write `README.md` (English) + `README-fr.md` (French)
+- [x] Add Documentation Rules to `AGENTS.md`
 - [ ] Verify all Mermaid diagrams with `mmdc`
 - [ ] Verify documentation duplication < 1% with `jscpd`
 
-### 2. AI Model Retraining
-The current `data/ai_model.pt` was trained on buggy features (pre-BFS-fix). Retrain using:
-```bash
-python -m tetris.verify_training
-```
-Expected: best_score > 10k, avg_score > 1k, avg_duration > 30s.
-
-### 3. Performance Re-profiling
-Re-run cProfile/py-spy benchmarks with:
-- Widened network (17→256→128→1)
-- El-Tetris evaluation in warm-start
-- BFS path recording overhead
-- Look-ahead depth 3 (playing mode)
-
----
-
-## Medium-Term Enhancements
-
-| Area | Idea | Effort |
-|------|------|--------|
-| **AI — MCTS** | Combine DQN value with Monte Carlo Tree Search for deeper look-ahead | High |
-| **AI — Self-Play Tournament** | Population of agents competing, evolutionary selection | High |
-| **AI — Imitation Learning** | Pre-train on human replays from `human_stats.json` | Medium |
-| **AI — Double DQN** | Already implemented (V-network DQN) | Done |
-| **AI — Dueling Network** | Separate value/advantage streams | Medium |
-| **Replay System** | Full game replay viewer with scrubbing | Medium |
-| **Statistics Dashboard** | Web-based training analytics (TensorBoard already available) | Low |
-
----
-
-## Long-Term Vision
-
-- **Multi-agent training** — Multiple AI agents learning simultaneously
-- **Human-AI co-op** — Human and AI playing together (e.g., AI suggests moves)
-- **Custom rule sets** — Configurable guideline subsets for variants
-- **Network play** — Multiplayer over LAN/Internet via MCP
+AI model retraining and performance re-profiling are tracked as TOP 10 Technical items #1–2.
 
 ---
 
