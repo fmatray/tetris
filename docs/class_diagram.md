@@ -99,7 +99,7 @@ classDiagram
             +bot_lookahead: str
             +speed_mode: str
             +language: str
-            +seed: int | None
+            +are: bool
             +__init__(screen, font, audio) None
             - _load_settings() None
             +save_settings() None
@@ -324,6 +324,7 @@ classDiagram
             +debug: bool
             +ghost_piece: bool
             +preview_count: int
+            +are: bool
             +speed_mode: str
             +renderer: Renderer
             +board: Board
@@ -343,6 +344,9 @@ classDiagram
             - _lock_timer: float
             - _lock_resets: int
             - _grounded: bool
+            - _are_timer: float
+            - _irs_pending: int
+            - _ihs_pending: bool
             - _mute_key: int
             +player_type: str
             +__init__(screen, font, audio, config, piece_provider, menu) None
@@ -354,8 +358,10 @@ classDiagram
             - _hard_drop() None
             - _hold() None
             - _advance_piece_pipeline() None
-            - _on_piece_moved() None
             - _lock_and_spawn(hard_drop: bool) tuple~int, list~
+            - _finalize_spawn() None
+            - are_active: bool <<property>>
+            - _on_piece_moved() None
             - _do_game_over() State
             - _return_to_menu() State
             - _on_exit() None

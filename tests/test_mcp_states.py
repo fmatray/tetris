@@ -94,6 +94,7 @@ def test_mcp_state_board_snapshot_keys():
         "level",
         "clear_counts",
         "game_over",
+        "are_ms",
         "seed",
         "action_results",
         "holes",

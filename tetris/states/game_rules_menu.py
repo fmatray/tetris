@@ -18,8 +18,8 @@ _HOLES_OVERHANGS_VALUES = ("none", "holes", "overhangs", "both")
 class GameRulesMenuState(MenuBase):
     """Game rules sub-menu: random generator, preview count, handicap, speed mode, ghost piece, back."""
 
-    _OPTIONS = ("Generator", "Preview", "Handicap", "Speed", "Ghost piece", "Holes and overhangs", "Back")
-    _toggle_indices = frozenset({0, 1, 2, 3, 4, 5})
+    _OPTIONS = ("Generator", "Preview", "Handicap", "Speed", "Ghost piece", "Holes and overhangs", "ARE", "Back")
+    _toggle_indices = frozenset({0, 1, 2, 3, 4, 5, 6})
     _title = "Game rules"
 
     def __init__(self, screen, font, audio, menu) -> None:
@@ -41,6 +41,8 @@ class GameRulesMenuState(MenuBase):
                 return "ON" if self.menu.ghost_piece else "OFF"
             case 5:
                 return tr(_HOLES_OVERHANGS_LABELS[_HOLES_OVERHANGS_VALUES.index(self.menu.holes_overhangs_help)])
+            case 6:
+                return "ON" if self.menu.are else "OFF"
             case _:
                 return ""
 
@@ -64,6 +66,8 @@ class GameRulesMenuState(MenuBase):
                 self.menu.holes_overhangs_help = _HOLES_OVERHANGS_VALUES[
                     (idx + direction) % len(_HOLES_OVERHANGS_VALUES)
                 ]
+            case 6:
+                self.menu.are = not self.menu.are
 
     def _save(self) -> None:
         self.menu.save_settings()
@@ -72,7 +76,7 @@ class GameRulesMenuState(MenuBase):
         return self.menu
 
     def _on_select(self) -> State | None:
-        if self.selection == 6:  # Back
+        if self.selection == 7:  # Back
             return self.menu
         self._toggle(1)
         self._save()

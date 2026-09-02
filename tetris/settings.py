@@ -73,6 +73,7 @@ LOCK_DELAY_MS = 500  # ms before a grounded piece locks
 LOCK_DELAY_RESETS = 15  # max move/rotate resets before forced lock
 DAS_DELAY_MS = 170  # initial auto-shift delay (ms)
 DAS_REPEAT_MS = 50  # auto-shift repeat interval (ms)
+ARE_MS = 100  # Appearance (entry) delay between lock and next piece
 
 # Drop speed: Tetris Guideline formula (seconds per row at given level).
 # Super-exponential: (DROP_BASE - level×DROP_STEP)^level.

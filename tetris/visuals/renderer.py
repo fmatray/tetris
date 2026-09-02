@@ -62,9 +62,10 @@ class Renderer:
         """Draw a complete game frame: board, ghost, current piece, HUD, panels."""
         self.screen.fill(BLACK)
         self.draw_grid(game.board)
-        if game.ghost_piece:
+        if not getattr(game, "are_active", False) and game.ghost_piece:
             self.draw_ghost(game.current_piece, game.board)
-        self.draw_tetromino(game.current_piece)
+        if not getattr(game, "are_active", False):
+            self.draw_tetromino(game.current_piece)
         self._draw_text(f"{tr('SCORE')}: {game.stats.score}", HUD_POSITIONS["score"])
         self._draw_text(f"{tr('TETROMINOS')}: {game.stats.piece_count}", HUD_POSITIONS["tetrominos"])
         self._draw_text(f"{tr('LINES')}: {game.stats.total_lines}", HUD_POSITIONS["lines"])

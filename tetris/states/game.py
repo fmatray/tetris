@@ -24,6 +24,7 @@ class GameConfig:
     speed_mode: str
 
     holes_overhangs_help: str = "none"
+    are: bool = False
     seed: int | None = None
 
 
@@ -38,6 +39,7 @@ from tetris.game.stats import GameStats
 from tetris.game.tetromino import Tetromino
 from tetris.logger import get_logger
 from tetris.settings import (
+    ARE_MS,
     BLOCK_SIZE,
     BOARD_OFFSET_X,
     BOARD_OFFSET_Y,
@@ -114,6 +116,7 @@ class GameState(State):
         self.debug = config.debug
         self.ghost_piece = config.ghost_piece
         self.preview_count = config.preview_count
+        self.are = config.are
 
         self.holes_overhangs_help = config.holes_overhangs_help
         self.renderer = Renderer(screen, font)
@@ -151,6 +154,10 @@ class GameState(State):
         self._lock_timer: float = 0.0
         self._lock_resets: int = 0
         self._grounded: bool = False
+        # ARE (entry delay) state
+        self._are_timer: float = 0.0
+        self._irs_pending: int = 0  # -1 ccw, +1 cw (last input wins)
+        self._ihs_pending: bool = False
         # Mute key (shared by all player types)
         from tetris.settings import DEFAULT_KEYBINDS
 
@@ -159,14 +166,17 @@ class GameState(State):
         self.player_type: str = "Humain"
 
     # --- Input handlers (SLAP: one operation each) ---------------------
-
     def _move_left(self) -> None:
-        if not self.paused and self.board.is_valid_move(self.current_piece, dx=-1):
+        if self.paused or self.are_active:
+            return
+        if self.board.is_valid_move(self.current_piece, dx=-1):
             self.current_piece.move(-1, 0)
             self._on_piece_moved()
 
     def _move_right(self) -> None:
-        if not self.paused and self.board.is_valid_move(self.current_piece, dx=1):
+        if self.paused or self.are_active:
+            return
+        if self.board.is_valid_move(self.current_piece, dx=1):
             self.current_piece.move(1, 0)
             self._on_piece_moved()
 
@@ -177,22 +187,36 @@ class GameState(State):
             self._lock_resets += 1
 
     def _rotate_cw(self) -> None:
-        if not self.paused and self.board.try_rotate(self.current_piece, 1):
+        if self.paused:
+            return
+        if self.are_active:
+            self._irs_pending = 1  # IRS buffer: applied at spawn
+            return
+        if self.board.try_rotate(self.current_piece, 1):
             self.audio.play("rotate_cw")
             self._on_piece_moved()
 
     def _rotate_ccw(self) -> None:
-        if not self.paused and self.board.try_rotate(self.current_piece, -1):
+        if self.paused:
+            return
+        if self.are_active:
+            self._irs_pending = -1  # IRS buffer: applied at spawn
+            return
+        if self.board.try_rotate(self.current_piece, -1):
             self.audio.play("rotate_ccw")
             self._on_piece_moved()
 
     def _soft_drop(self) -> None:
+        if self.are_active:
+            # Buffer: key is still held; soft drop resumes at spawn
+            self.down_pressed = True
+            return
         self.down_pressed = True
         self.audio.play("soft_drop")
 
     def _hard_drop(self) -> None:
         """Drop piece to bottom instantly, lock, and spawn next piece."""
-        if self.paused:
+        if self.paused or self.are_active:
             return
         if not self.current_piece:
             # Simulator horizon exceeded: no active piece to drop.
@@ -206,6 +230,9 @@ class GameState(State):
     def _hold(self) -> None:
         """Swap current piece with held piece. Can't hold twice per lock."""
         if self.paused or not self._can_hold:
+            return
+        if self.are_active:
+            self._ihs_pending = True  # IHS buffer: applied at spawn
             return
         if self.hold_piece is None:
             self.hold_piece = Tetromino(self.current_piece.type)
@@ -304,10 +331,35 @@ class GameState(State):
         self._lock_timer = 0.0
         self._lock_resets = 0
         self._grounded = False
+        self._are_timer = ARE_MS if self.are else 0.0
         if self.current_piece and not self.board.is_valid_move(self.current_piece):
             self.game_over = True
         _logger.debug("Locked %s, cleared %d", locked_type, cleared)
         return LineClearResult(cleared, rows_data)
+
+    def _finalize_spawn(self) -> None:
+        """Apply pending IRS/IHS at the end of ARE, then activate the piece."""
+        self.drop_time = 0.0
+        self._lock_timer = 0.0
+        self._lock_resets = 0
+        self._grounded = False
+        if not self.current_piece:
+            # Simulator horizon: nothing to activate.
+            return
+        if self._ihs_pending:
+            self._ihs_pending = False
+            self._hold()
+        if self._irs_pending and self.current_piece:
+            direction = self._irs_pending
+            self._irs_pending = 0
+            self.board.try_rotate(self.current_piece, direction)  # SRS kicks, silent
+        if self.current_piece and not self.board.is_valid_move(self.current_piece):
+            self.game_over = True  # block-out after IHS/IRS
+
+    @property
+    def are_active(self) -> bool:
+        """True while the entry delay (ARE) gates piece activity."""
+        return self._are_timer > 0
 
     def _do_game_over(self) -> State:
         """Stop music, save, and transition to GameOverState."""
@@ -366,36 +418,43 @@ class GameState(State):
         if self.paused:
             return None
 
-        # --- Gravity / soft drop ---
-        self.drop_time += dt
-        step = SPEED_MODES[self.speed_mode]
-        speed = (
-            _drop_interval(self.stats.level, step) * SOFT_DROP_FACTOR
-            if self.down_pressed
-            else _drop_interval(self.stats.level, step)
-        )
-        self.current_speed = speed
-
-        # Check grounded state
-        can_drop = self.board.is_valid_move(self.current_piece, dy=1)
-        self._grounded = not can_drop
-
-        if can_drop:
-            if self.drop_time / 1000 >= speed:
-                self.current_piece.move(0, 1)
-                if self.down_pressed:
-                    self.stats.add_soft_drop(1)
-                self.drop_time = 0
+        if self._are_timer > 0:
+            # --- ARE (entry delay): piece inactive, inputs buffer ---
+            self._are_timer -= dt
+            if self._are_timer <= 0:
+                self._are_timer = 0.0
+                self._finalize_spawn()
         else:
-            # Piece is grounded: run lock delay (non-locking soft drop)
-            self._lock_timer += dt
-            if self._lock_timer >= LOCK_DELAY_MS:
-                cleared, rows_data = self._lock_and_spawn()
-                if cleared > 0:
-                    self._emit_line_particles(particles, rows_data)
-                self._lock_timer = 0.0
-                self._lock_resets = 0
-                self.drop_time = 0
+            # --- Gravity / soft drop ---
+            self.drop_time += dt
+            step = SPEED_MODES[self.speed_mode]
+            speed = (
+                _drop_interval(self.stats.level, step) * SOFT_DROP_FACTOR
+                if self.down_pressed
+                else _drop_interval(self.stats.level, step)
+            )
+            self.current_speed = speed
+
+            # Check grounded state
+            can_drop = self.board.is_valid_move(self.current_piece, dy=1)
+            self._grounded = not can_drop
+
+            if can_drop:
+                if self.drop_time / 1000 >= speed:
+                    self.current_piece.move(0, 1)
+                    if self.down_pressed:
+                        self.stats.add_soft_drop(1)
+                    self.drop_time = 0
+            else:
+                # Piece is grounded: run lock delay (non-locking soft drop)
+                self._lock_timer += dt
+                if self._lock_timer >= LOCK_DELAY_MS:
+                    cleared, rows_data = self._lock_and_spawn()
+                    if cleared > 0:
+                        self._emit_line_particles(particles, rows_data)
+                    self._lock_timer = 0.0
+                    self._lock_resets = 0
+                    self.drop_time = 0
 
         if self.stats.level > self._last_level:
             self._pending_level_up = True

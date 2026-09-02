@@ -156,7 +156,8 @@ The MCP server exposes `play` and `start_game` tools plus `board://state` and `t
 | **Handicap** | Toggle | 0–5 | 0 | Initial garbage rows at game start |
 | **Speed** | Toggle | None / Easy / Normal / Medium / Hard / Crazy / Insane | Normal | Gravity curve preset (see Speed Modes below) |
 | **Ghost Piece** | Toggle | ON / OFF | ON | Show piece landing preview |
-| **Debug Overlay** | Toggle | None / Holes / Overhangs / Both | None | Visual debug: highlight holes and/or overhangs in renderer |
+| **ARE** | Toggle | ON / OFF | ON | Entry delay (100ms) with IRS/IHS input buffering ([game_rules.md §12](game_rules.md#12-are-appearance-delay-irs-ihs)) |
+| **Back** | Action | — | — | Returns to Main Menu (last item, 8th) |
 
 #### Speed Modes (Gravity Curves)
 

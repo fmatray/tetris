@@ -125,6 +125,9 @@ class MCPState(GameState):
         self._lock_timer = 0.0
         self._lock_resets = 0
         self._grounded = False
+        self._are_timer = 0.0
+        self._irs_pending = 0
+        self._ihs_pending = False
         self._last_level = 0
         self._pending_level_up = False
         gen_name = self.pieces.generator
@@ -155,6 +158,7 @@ class MCPState(GameState):
             "lines": self.stats.total_lines,
             "level": self.stats.level,
             "game_over": self.game_over,
+            "are_ms": round(self._are_timer, 1),
             "clear_counts": {
                 "single": self.stats.clear_counts.single,
                 "double": self.stats.clear_counts.double,

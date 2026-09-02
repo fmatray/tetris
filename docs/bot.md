@@ -45,6 +45,8 @@ look-ahead uses.
 The bot plays at fixed `AI_ACTION_DELAY_MS` (80ms) between decisions so
 a human can watch; lock delay runs normally (500ms).
 
+The bot is subject to the ARE entry delay: its selection is deferred during ARE, and the `GameState` base class handles the delay. See [game_rules.md §12](game_rules.md#12-are-appearance-delay-irs-ihs).
+
 ## BFS Path Replay Fix (Survival Bug Root Cause)
 
 **Problem**: The bot (and AI) used soft-drop BFS to enumerate candidate placements from the spawn position (3, 0, rotation=0). However, during the decision throttle (`AI_ACTION_DELAY_MS`), the piece pre-falls due to gravity. When the recorded move sequence was replayed, it started from the wrong position — the piece had already fallen several rows, causing the replayed moves to land the piece incorrectly.

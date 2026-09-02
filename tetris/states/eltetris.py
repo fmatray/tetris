@@ -86,6 +86,9 @@ class ElTetrisState(BotMovesMixin, GameState):
         """Select and execute one El-Tetris macro-action per piece."""
         if self.paused or self.game_over:
             return super().update(dt, particles)
+        if self._are_timer > 0:
+            # ARE gates bot selection; replayed moves need an active piece
+            return super().update(dt, particles)
 
         # Human-watchable pace: throttle decisions to ~80ms, capped so
         # pre-fall (and the snap-back in _execute_move_sequence) stays

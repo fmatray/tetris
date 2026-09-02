@@ -10,6 +10,7 @@ A complete Tetris game built in Python with Pygame, featuring an embedded Deep Q
 - ✅ **Multiple piece generators** — Random, 7-bag, 35-bag, weighted, replay
 - ✅ **Configurable rules** — Ghost piece, preview count (0/1/3), handicap (0–5), speed modes (none/insane)
 - ✅ **Reproducible seeds** — Numeric seed entry for deterministic piece sequences
+- ✅ **ARE entry delay** — 100ms appearance delay with IRS/IHS input buffering (configurable)
 
 ### AI Player (DQN)
 - ✅ **V-network DQN** — 17→256→128→1 MLP evaluating board quality per candidate placement

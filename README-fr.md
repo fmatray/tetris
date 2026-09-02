@@ -10,6 +10,7 @@ Un jeu Tetris complet développé en Python avec Pygame, incluant un agent IA De
 - ✅ **Générateurs de pièces multiples** — Aléatoire, sac 7-bag, sac 35-bag, pondéré, replay
 - ✅ **Règles configurables** — Pièce fantôme, nombre d'aperçus (0/1/3), handicap (0–5), modes de vitesse (aucun/insane)
 - ✅ **Graines reproductibles** — Saisie numérique de graine pour séquences de pièces déterministes
+- ✅ **Délai d'apparition ARE** — 100 ms avec mise en mémoire IRS/IHS (configurable)
 
 ### IA Joueur (DQN)
 - ✅ **Réseau V DQN** — MLP 17→256→128→1 évaluant la qualité du plateau par placement candidat

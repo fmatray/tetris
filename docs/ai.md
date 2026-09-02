@@ -149,7 +149,7 @@ An episode runs from game start to game over. One placement per piece:
 | Aspect | Learning Mode | Playing Mode |
 |--------|---------------|--------------|
 | ε-greedy | Yes (decay from 1.0 → ε_end) | No (ε=0, greedy) |
-| Lock delay | Fast-forwarded (piece already positioned) | Full 500ms with resets |
+| ARE entry delay | Fast-forwarded (no delay, training speed preserved) | Full 100ms delay, IRS/IHS buffered |
 | Replay buffer | Stores transitions | No storage |
 | Learning | `learn_per_action` updates per piece | Skipped |
 | Logging | `ai_training_log.json`, `ai_step_log.jsonl`, `ai_behavior_log.jsonl`, TensorBoard | `ai_playing_log.json`, `ai_playing_behavior_log.jsonl` |
@@ -157,6 +157,8 @@ An episode runs from game start to game over. One placement per piece:
 | Curriculum | Active if enabled | Disabled |
 
 **Playing-mode logging**: Separate files, mode implicit by filename — no `mode` field in entries. Training files never written by playing mode. `_on_exit()` saves model + flushes TB only in learning mode; playing mode flushes playing log only.
+
+The ARE entry delay and its IRS/IHS buffering follow the shared rule in [game_rules.md §12](game_rules.md#12-are-appearance-delay-irs-ihs).
 
 ### Configurable Hyperparameters (in AI Submenu, persisted to `settings.json`)
 

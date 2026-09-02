@@ -440,10 +440,20 @@ def test_game_rules_value_label_ghost():
     assert state._value_label(4) == "ON"  # ghost_piece default True
 
 
+def test_game_rules_value_label_are():
+    menu = _make_menu()
+    state = _make_state(GameRulesMenuState, menu)
+    assert state._value_label(6) == "ON"  # are default True
+
+    menu.are = False
+    state = _make_state(GameRulesMenuState, menu)
+    assert state._value_label(6) == "OFF"
+
+
 def test_game_rules_value_label_retour():
     menu = _make_menu()
     state = _make_state(GameRulesMenuState, menu)
-    assert state._value_label(6) == ""
+    assert state._value_label(7) == ""
 
 
 # ── HyperparamMenuState ───────────────────────────────────────────────

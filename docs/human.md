@@ -62,6 +62,10 @@ The human player mode provides a complete Tetris Guideline-compliant experience 
 - **Independent per direction** — left and right tracked separately
 - **Stops on key release** or piece lock
 
+### ARE (Entry Delay)
+
+When a piece locks, the next piece stays inactive for 100ms (`ARE_MS`). Rotation or hold input during this delay is buffered (IRS/IHS) and applied when the next piece appears. See [game_rules.md §12](game_rules.md#12-are-appearance-delay-irs-ihs) for details.
+
 ### Soft Drop
 
 - Holding `Down` accelerates gravity to 10× normal (`SOFT_DROP_FACTOR = 0.1`)

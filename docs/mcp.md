@@ -121,10 +121,12 @@ Execute actions on the real board, advance `frames` gravity ticks, return snapsh
   "max_height": 18,
   "hole_depth": 2,
   "merit": 38500.4,
+  "are_ms": 0.0,
   "action_results": ["moved", "rotated", "locked"],
   "lines_cleared": 1
-}
 ```
+
+`are_ms` — remaining entry delay in milliseconds (0.0 when no ARE is active). Actions received during ARE are buffered or gated per the rule in [game_rules.md §12](game_rules.md#12-are-appearance-delay-irs-ihs).
 
 ---
 

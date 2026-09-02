@@ -75,6 +75,7 @@ class MenuState(MenuBase):
         self.language = "en"
 
         self.holes_overhangs_help = "none"
+        self.are = True
         self.seed: int | None = None
         self.ai_epsilon_decay = 0.999
         self.ai_epsilon_end = 0.1
@@ -132,6 +133,7 @@ class MenuState(MenuBase):
         "debug": "debug",
         "speed_mode": "speed_mode",
         "holes_overhangs_help": "holes_overhangs_help",
+        "are": "are",
         "mcp_port": "mcp_port",
         "bot_lookahead": "bot_lookahead",
         "seed": "seed",
@@ -216,6 +218,7 @@ class MenuState(MenuBase):
             preview_count=self.preview_count,
             speed_mode=self.speed_mode,
             holes_overhangs_help=self.holes_overhangs_help,
+            are=self.are,
             seed=self.seed,
         )
 

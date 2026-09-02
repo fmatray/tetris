@@ -19,8 +19,9 @@ This document consolidates the Tetris Guideline compliance audit and the Human v
 | 9 | T-Spin detection & rewarding | ✅ Implemented | `Board.is_tspin()` 3-corner rule, `ScoreEngine.tspin_points()` |
 | 10 | Back-to-Back chains | ✅ Implemented | `GameStats.b2b` + `ScoreEngine.b2b_bonus()` ×1.5 |
 | 11 | DAS (Delayed Auto Shift) | ✅ Implemented | `DAS_DELAY_MS = 170`, `DAS_REPEAT_MS = 50` |
+| 12 | ARE (entry delay) + IRS/IHS | ✅ Implemented | `ARE_MS = 100` in `settings.py`, `_are_timer` in `GameState` |
 
-All 11 indispensable/recommended rules are now **implemented**.
+All 12 indispensable/recommended rules are now **implemented**.
 
 ---
 
@@ -162,6 +163,23 @@ All 11 indispensable/recommended rules are now **implemented**.
 - `tetris/settings.py` — `DAS_DELAY_MS`, `DAS_REPEAT_MS`
 - `tetris/states/human.py` — DAS handling in `update()`
 
+
+### 12. ARE (Appearance Delay) + IRS/IHS
+
+**Implementation:**
+- `ARE_MS = 100` — after a piece locks, the next piece stays inactive for 100 ms
+- ARE gates piece activity: gravity, movement, and rendering are on hold
+- **IRS** (Initial Rotation System): rotation input during ARE buffers into `_irs_pending` (last input wins) and applies at spawn with SRS kicks
+- **IHS** (Initial Hold System): hold input during ARE buffers into `_ihs_pending` and swaps at spawn
+- Held soft drop continues through ARE (`down_pressed` persists)
+- Applies to all player types: Human, AI, Bot (El-Tetris), MCP. AI learning mode fast-forwards ARE for training speed
+- Toggle: Game Rules menu → "ARE" (default ON); `GameConfig.are` keyword (default `False` keeps legacy behavior)
+
+**Files:**
+- `tetris/settings.py` — `ARE_MS`
+- `tetris/states/game.py` — `_are_timer`, `_irs_pending`, `_ihs_pending`, `_finalize_spawn()`, `are_active` property
+- `tests/test_are.py` — ARE/IRS/IHS coverage
+
 ---
 
 ## Human vs AI Rule Alignment
@@ -231,8 +249,8 @@ All divergences identified in the Human vs AI analysis have been **fixed**. The 
 All game rule settings are configurable via the **Game Rules** menu and persisted to `data/settings.json`:
 
 | Setting | Values | Default | Description |
-|---------|--------|---------|-------------|
 | Generator | Random / 7-Bag / 35-Bag / Weighted | 7-Bag | Piece generation algorithm |
+| ARE | On / Off | On | Entry delay (100 ms) with IRS/IHS buffering |
 | Preview | 0 / 1 / 3 | 1 | Number of next pieces shown |
 | Handicap | 0–5 | 0 | Initial garbage rows |
 | Speed Mode | None / Easy / Normal / Medium / Hard / Crazy / Insane | Normal | Gravity curve preset |

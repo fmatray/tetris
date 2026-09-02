@@ -244,7 +244,9 @@ class AIState(BotMovesMixin, GameState):
     def _lock_and_spawn(self, hard_drop: bool = False) -> LineClearResult:
         """Intercept piece locking to compute reward and store transition (delayed)."""
         cleared, rows_data = super()._lock_and_spawn(hard_drop=hard_drop)
-
+        if self.ai_mode == "learning":
+            # Training fast-forward: skip ARE (piece activity resumes at once)
+            self._are_timer = 0.0
         new_grid = board_to_grid(self.board)
         reward = compute_reward(
             lines_cleared=cleared,
@@ -310,12 +312,17 @@ class AIState(BotMovesMixin, GameState):
         In ``"normal"`` speed, throttles decisions to ~80ms. In ``"fast"``,
         acts immediately. In learning mode, fast-forwards lock delay when the
         piece is grounded (no re-selection possible). Calls ``super().update``
-        for gravity/lock-delay.
+        for gravity/lock-delay. ARE gates AI selection; buffered inputs
+        would be double-applied.
 
         Returns a new :class:`State` on episode end, or ``None``.
         """
         if self.paused or self.game_over:
             return self._on_episode_end()
+        if self._are_timer > 0:
+            # ARE gates AI selection; buffered inputs would be double-applied
+            new_state = super().update(dt, particles)
+            return self._on_episode_end() if new_state is not None else None
 
         # Normal mode: throttle decisions to ~80ms for human-like reaction
         # speed, capped so pre-fall (and the snap-back in
@@ -477,6 +484,9 @@ class AIState(BotMovesMixin, GameState):
         self.episode = self.log.total_episodes
         self.episode_steps = 0
         self.game_over = False
+        self._are_timer: float = 0.0
+        self._irs_pending: int = 0
+        self._ihs_pending: bool = False
         self.paused = False
         self.drop_time: float = 0.0
         self._action_timer: float = 0.0
