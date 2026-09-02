@@ -39,7 +39,7 @@ VISIBLE_ROWS = 20  # rows rendered on screen (rows 0-1 are hidden)
 HIDDEN_ROWS = BOARD_HEIGHT - VISIBLE_ROWS  # 2 buffer rows above the visible field
 
 # Board rendering offset (top-left pixel of playfield)
-BOARD_OFFSET_X = 250
+BOARD_OFFSET_X = 290
 BOARD_OFFSET_Y = 50
 
 # --- Tetrominos --------------------------------------------------------
@@ -120,15 +120,15 @@ HUD_POSITIONS = {
     "hold": (20, 420),  # "HOLD:" label
     "hold_panel": (20, 450),  # hold piece drawing position
     "debug_holes_overhang": (20, 540),  # hole/overhang debug count readout
-    "next": (570, 50),  # "NEXT:" label
-    "next_panel": (570, 80),  # next pieces drawing (30px below label)
-    "ai_stats": (570, 350),
+    "next": (610, 50),  # "NEXT:" label
+    "next_panel": (610, 80),  # next pieces drawing (30px below label)
+    "ai_stats": (610, 350),
     "mode": (20, 680),
     "generator": (20, 720),
     "speed_mode": (20, 760),
-    "ai_moves": (800, 120),
-    "debug_bag": (800, 50),  # bag/weights debug panel
-    "mcp_hud": (570, 450),
+    "ai_moves": (840, 120),
+    "debug_bag": (840, 50),  # bag/weights debug panel
+    "mcp_hud": (610, 450),
     "pause": (400, 350),
 }
 
