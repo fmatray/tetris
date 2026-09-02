@@ -85,6 +85,8 @@ SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy python -m pytest tests/ --cov=tetris
 
 **Test suite:** `tests/` with pytest. The full suite must pass; no pre-existing failures.
 
+**CI:** GitHub Actions (`.github/workflows/ci.yml`) runs `ruff check`, `zuban check`, and the headless pytest suite on every push and pull request (`ubuntu-latest`, Python 3.14).
+
 ---
 
 ## Code Conventions

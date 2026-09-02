@@ -48,12 +48,12 @@ current behavior stays the default until a replacement proves out.
 | # | Improvement | Effort | Why |
 |---|-------------|--------|-----|
 | 1 | **Retrain AI model** | Low | Current `ai_model.pt` was trained on buggy pre-BFS features. Run `python -m tetris.verify_training`; target best_score > 10k, avg_score > 1k. Pure re-run, zero code risk. |
-| 2 | **Performance re-profiling** | Low | Re-run cProfile/py-spy with widened network, BFS path recording, look-ahead depth 3. Informs items 3–5; no user-visible change. |
+| 2 | **Performance re-profiling** | Low | ✅ **Done (v3.5)** — Round 4 baseline added to `docs/performance.md` (§Round 4 Baseline): 500-frame cProfile on the post-redesign architecture — 17.4 s (~28 FPS under profiler, ~69 FPS clean), 15.1 M calls (−38% vs Round 3). Look-ahead `best_next_placement` is the dominant cost (~60% of `update` cumulative time; ~2.2× FPS cost at depth 1); TensorBoard writer measured as noise. py-spy requires root on macOS, so cProfile + A/B runs used instead. |
 | 3 | **Vectorized simulation** | Medium | Numpy/bitboard board ops for candidate evaluation (arXiv 2603.26765 reports ~53× faster engines). Cuts wall-clock per episode; same placements, same rewards. |
 | 4 | **Dueling network head** | Medium | Split V into value + advantage streams over DT-20 features (Rainbow-family). Architecture flag; current V-network stays default until the dueling model beats baseline in `verify_training`. |
 | 5 | **Imitation warm-start** | Medium | Pre-train V-network on placements from `human_stats.json` before RL. Addresses cold-start; gated behind existing `ai_warm_start` setting. |
 | 6 | **Visual regression harness** | Medium | Headless `SDL_VIDEODRIVER=dummy` screenshot-diff of menus/HUD states. Catches layout regressions like the FR/ES HUD overflow (fixed d33393f) before they ship. |
-| 7 | **CI pipeline** | Low | GitHub Actions: `ruff check`, `zuban check`, headless pytest on every push. Codifies the pre-commit ritual already documented in AGENTS.md. |
+| 7 | **CI pipeline** | Low | ✅ **Done (v3.5)** — GitHub Actions `.github/workflows/ci.yml`: `ruff check`, `zuban check`, headless pytest (`ubuntu-latest`, Python 3.14, pip cache) on every push/PR. Mirrors the pre-commit ritual from AGENTS.md. |
 | 8 | **Fix pre-existing test debt** | Low | ✅ **Done (v3.4)** — Root-caused and fixed: (1) `MenuState.__init__` no longer mutates global i18n state (persisted language now applied once at app boot in `TetrisApp.__init__`), fixing 6 order-dependent failures in `test_i18n.py`/`test_keybind.py`; (2) stale `_toggle_indices` updated for the Language entry insertion (Debug now index 9), fixing debug event-toggle; (3) `_draw_hole_overhang_markers` call restored in `render_frame` (dropped in i18n refactor). All previously failing tests now pass; `mcp_server.py` zuban clean (was stale entry). |
 | 9 | **MCTS look-ahead** | High | Combine DQN value with Monte Carlo Tree Search for deeper-than-3 search at play time. Optional mode; greedy V-eval stays default. |
 | 10 | **Self-play tournament** | High | Population of agents competing, evolutionary selection. Reuses `verify_training` harness; new experiment, no change to shipped agent. |
@@ -69,6 +69,7 @@ current behavior stays the default until a replacement proves out.
 - **v3.2** — Rule engine centralization (`tetris/game/rules.py`), human/AI alignment
 - **v3.3** — El-Tetris adoption, BFS path replay fix (survival bug), AI network widening
 - **v3.4** — Test debt repayment: i18n global-state leak fixed (language applied at app boot), debug toggle index repaired, hole/overhang markers render restored; ARE entry delay with IRS/IHS
+- **v3.5** — CI pipeline (GitHub Actions: ruff + zuban + headless pytest), Round 4 performance re-profile, zuban baseline fully clean
 
 ---
 

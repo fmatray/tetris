@@ -118,6 +118,35 @@ graph TD
 - 469K `iter_column_positions` generator invocations
 - 65K `np.pad` allocations
 
+## Round 4 Baseline (v3.4 Re-Profile)
+
+Re-profiled on the post-redesign architecture (widened network, BFS path recording, depth-1 look-ahead in learning mode). Same recipe as Rounds 1–3: cProfile, 500 training frames, `lookahead_depth=1`, `preview_count=1`, `warm_start=True`, `learn_per_action=2`, headless.
+
+| Metric | Round 3 | Round 4 (v3.4) | Change |
+|--------|---------|----------------|--------|
+| Total time (500 frames) | 23.6 s | 17.4 s | −26% |
+| Frames per second (under cProfile) | ~21 FPS | ~28 FPS | +33% |
+| Clean FPS (no profiler) | — | ~69 FPS | Measured with A/B runs |
+| Function calls | 24.4 M | 15.1 M | −38% |
+
+### Top Hotspots After Round 4 (Self-Time)
+
+| Rank | Function | Self-Time | Calls | Notes |
+|------|----------|-----------|-------|-------|
+| 1 | `_compute_board_metrics_batch` | 1.34 s | 14.5 K | El-Tetris feature metrics per candidate |
+| 2 | `shape_fits` | 0.98 s | 805 K | BFS grid access; halved vs Round 3 |
+| 3 | `place_and_clear_batch` | 0.98 s | 14.2 K | Called once per candidate batch |
+| 4 | `hard_drop_y_batch` | 0.68 s | 14.0 K | Vectorized landing heights |
+| 5 | `best_next_placement` | 0.57 s self / 9.1 s cumulative | 14.0 K | Look-ahead: 60% of `update` cumulative time |
+| 6 | `is_occupied` | 0.68 s | 3.0 M | BFS grid access |
+| 7 | `try_rotation` | 0.46 s | 304 K | SRS wall kicks |
+
+### A/B Findings
+
+- **Look-ahead depth 1 costs ~2.2×**: identical loop without look-ahead (`lookahead=False`) runs at ~153 FPS vs ~69 FPS. `best_next_placement` accounts for 9.1 s of 15.0 s cumulative `update` time in the cProfile run. This is the dominant cost and the top target for roadmap item #3 (vectorized simulation).
+- **TensorBoard writer is not a bottleneck**: disabling `agent._tb_writer` changed throughput by ~±5% (noise). The heavy `record_writer.write` entries in cProfile output are profiler overhead on file syscalls, not real cost.
+- **py-spy cannot run unprivileged on macOS** (requires root since OS X 10.11). cProfile + clean FPS A/B runs were used instead for this round. The py-spy recipe remains valid on Linux (e.g. CI runners).
+
 ## Remaining Bottlenecks (Future Review)
 
 | Bottleneck | Self-Time | Calls | Notes |
@@ -129,14 +158,14 @@ graph TD
 
 ## AI Redesign Impact (Post-Profiling)
 
-The profiling benchmarks above were recorded **before** the AI redesign (v3.3). The following changes affect comparability but were not re-profiled:
+The Round 1–3 benchmarks were recorded **before** the AI redesign (v3.3). The redesign changes are:
 
 - **Network widened** from 17→128→64→1 to 17→256→128→1. The forward/backward pass per `learn()` step is ~3–4× more compute. `learn()` is called `learn_per_action=2` times per piece lock, so per-frame impact is modest.
 - **El-Tetris evaluation in warm-start**: `select_action` uses `dellacherie_value_batch` + softmax instead of random. Adds ~15 ms/frame during warm-start (first 50 episodes).
 - **BFS path recording**: `soft_drop_placements` stores move lists per visited state. Small constant overhead.
 - **Look-ahead depth 3 (playing mode)**: Candidate count triples; `dellacherie_value_batch` scales linearly.
 
-**Benchmarks should be re-run with the new architecture.** The vectorization optimizations (Rounds 1–3) target the candidate-generation and feature-extraction pipeline, which is unchanged by the redesign.
+The post-redesign numbers are recorded in [Round 4 Baseline](#round-4-baseline-v34-re-profile).
 
 ## Profiling Commands
 

@@ -400,9 +400,9 @@ class TestOnEpisodeEnd:
         before = len(ai.log.episodes)
         ai.game_over = True
         ai._on_episode_end()
-        assert ai.game_over is False
         # Playing mode writes exactly one entry to the playing log.
         assert len(ai.log.episodes) == before + 1
+        assert ai.game_over is False
 
 
 class TestLogAndLearn:
