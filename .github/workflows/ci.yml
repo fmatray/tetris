@@ -14,7 +14,7 @@ jobs:
           cache: pip
 
       - name: Install dependencies
-        run: pip install -r requirements.txt ruff zuban
+        run: pip install -r requirements.txt ruff zuban pytest
 
       - name: Lint (ruff)
         run: ruff check .
