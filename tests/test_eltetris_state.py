@@ -194,6 +194,7 @@ class TestBotMenu:
 
     def test_player_cycle_includes_bot(self):
         menu = self._make_menu()
+        menu.player = "Humain"  # pin: data/settings.json may persist any player
         menu.selection = 1
         menu._toggle(1)
         assert menu.player == "IA"

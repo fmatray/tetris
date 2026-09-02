@@ -14,8 +14,9 @@ import sys
 import pygame
 
 from tetris.audio import AudioManager
+from tetris.i18n import set_language
 from tetris.logger import configure_logging, get_logger
-from tetris.settings import DATA_DIR, SCREEN_HEIGHT, SCREEN_WIDTH
+from tetris.settings import DATA_DIR, SCREEN_HEIGHT, SCREEN_WIDTH, SETTINGS_PATH
 from tetris.states.base import State
 from tetris.states.menu import MenuState
 from tetris.visuals.fonts import get_small_font
@@ -38,6 +39,7 @@ class TetrisApp:
         self.font = get_small_font()
         self.audio = AudioManager()
         self.particles = ParticleSystem()
+        _apply_persisted_language()
         self.state: State = MenuState(self.screen, self.font, self.audio)
 
     def run(self) -> None:
@@ -74,3 +76,19 @@ class TetrisApp:
 def run() -> None:
     """Public entry point — create and run the Tetris app."""
     TetrisApp().run()
+
+
+def _apply_persisted_language() -> None:
+    """Apply the persisted language preference before the menu is built.
+
+    Menu construction no longer mutates i18n state, so the persisted
+    preference must be applied once at application boot.
+    """
+    import json
+
+    try:
+        with open(SETTINGS_PATH) as f:
+            data = json.load(f)
+        set_language(data.get("language", "en"))
+    except (OSError, json.JSONDecodeError):
+        set_language("en")

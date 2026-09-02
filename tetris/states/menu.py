@@ -18,7 +18,7 @@ from tetris.settings import (
     MODEL_PATH,
     SETTINGS_PATH,
 )
-from tetris.i18n import set_language, tr
+from tetris.i18n import tr
 from tetris.states.base import State
 from tetris.states.menu_base import MenuBase
 
@@ -48,7 +48,7 @@ class MenuState(MenuBase):
         "Quit",  # 11
     )
     _GENERATOR_CYCLE: ClassVar[tuple[str, ...]] = ("random", "7bag", "35bag", "weighted")
-    _toggle_indices = frozenset({1, 8})  # Player, Debug
+    _toggle_indices = frozenset({1, 9})  # Player, Debug
     _title = "TETRIS"
     _instructions = "Arrows: Navigate | Enter: Select | Esc: Back"
 
@@ -98,7 +98,6 @@ class MenuState(MenuBase):
 
         self.keybinds: dict[str, int] = dict(DEFAULT_KEYBINDS)
         self._load_settings()
-        set_language(self.language)
         configure_logging(self.debug)
 
     def training_in_progress(self) -> bool:

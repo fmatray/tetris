@@ -109,6 +109,7 @@ def test_menu_option_text_translates_on_the_fly():
 
 def test_main_menu_player_value_display():
     menu = _make_menu()
+    menu.player = "Humain"  # pin: data/settings.json may persist any player
     assert menu.player == "Humain"  # internal value untouched
     assert "Human" in menu._option_text(1, False)  # display translated
     set_language("fr")

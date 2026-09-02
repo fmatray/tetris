@@ -1211,7 +1211,7 @@ def test_menu_save_persists_keybinds():
 def test_menu_toggle_debug_via_event():
     """Toggling debug via K_LEFT/K_RIGHT persists."""
     menu = _make_menu()
-    menu.selection = 8  # Débogage (shifted +1)
+    menu.selection = 9  # Debug
     menu.handle_event(_key(pygame.K_RIGHT))
     assert menu.debug is True
     menu.handle_event(_key(pygame.K_LEFT))

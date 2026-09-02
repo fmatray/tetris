@@ -83,7 +83,7 @@ SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy python -m pytest tests/ --cov=tetris
 
 **Runtime:** Python 3.14.5rc1 (any 3.9+ works), pygame-ce 2.5.x, macOS arm64.
 
-**Test suite:** `tests/` with pytest. Pre-existing failures to ignore: `test_mcp_states.py`, `test_menus.py`, `test_player_cycle_includes_bot`, `zuban` errors in `tetris/mcp_server.py`.
+**Test suite:** `tests/` with pytest. The full suite must pass; no pre-existing failures.
 
 ---
 
@@ -239,4 +239,3 @@ See `docs/ai.md` for the complete AI design document.
 - Use the `version-control` skill for all git operations
 - Always commit and push after modifications with comprehensive messages
 - `main` branch = stable; `v3` branch = current development
-- Pre-existing test failures are documented and excluded from CI expectations

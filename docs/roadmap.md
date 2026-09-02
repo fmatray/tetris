@@ -54,7 +54,7 @@ current behavior stays the default until a replacement proves out.
 | 5 | **Imitation warm-start** | Medium | Pre-train V-network on placements from `human_stats.json` before RL. Addresses cold-start; gated behind existing `ai_warm_start` setting. |
 | 6 | **Visual regression harness** | Medium | Headless `SDL_VIDEODRIVER=dummy` screenshot-diff of menus/HUD states. Catches layout regressions like the FR/ES HUD overflow (fixed d33393f) before they ship. |
 | 7 | **CI pipeline** | Low | GitHub Actions: `ruff check`, `zuban check`, headless pytest on every push. Codifies the pre-commit ritual already documented in AGENTS.md. |
-| 8 | **Fix pre-existing test debt** | Low | Repair failing `test_mcp_states.py`/`test_menus.py` cases and `zuban` type errors in `mcp_server.py` (Technical Debt table). No behavior change. |
+| 8 | **Fix pre-existing test debt** | Low | ✅ **Done (v3.4)** — Root-caused and fixed: (1) `MenuState.__init__` no longer mutates global i18n state (persisted language now applied once at app boot in `TetrisApp.__init__`), fixing 6 order-dependent failures in `test_i18n.py`/`test_keybind.py`; (2) stale `_toggle_indices` updated for the Language entry insertion (Debug now index 9), fixing debug event-toggle; (3) `_draw_hole_overhang_markers` call restored in `render_frame` (dropped in i18n refactor). All previously failing tests now pass; `mcp_server.py` zuban clean (was stale entry). |
 | 9 | **MCTS look-ahead** | High | Combine DQN value with Monte Carlo Tree Search for deeper-than-3 search at play time. Optional mode; greedy V-eval stays default. |
 | 10 | **Self-play tournament** | High | Population of agents competing, evolutionary selection. Reuses `verify_training` harness; new experiment, no change to shipped agent. |
 
@@ -68,6 +68,7 @@ current behavior stays the default until a replacement proves out.
 - **v3.1** — Full Guideline compliance (22-row board, SRS, hold, lock delay, T-spin, B2B, DAS, 3+ preview)
 - **v3.2** — Rule engine centralization (`tetris/game/rules.py`), human/AI alignment
 - **v3.3** — El-Tetris adoption, BFS path replay fix (survival bug), AI network widening
+- **v3.4** — Test debt repayment: i18n global-state leak fixed (language applied at app boot), debug toggle index repaired, hole/overhang markers render restored; ARE entry delay with IRS/IHS
 
 ---
 
@@ -89,8 +90,6 @@ AI model retraining and performance re-profiling are tracked as TOP 10 Technical
 
 | Item | Location | Priority |
 |------|----------|----------|
-| Pre-existing test failures | `test_mcp_states.py`, `test_menus.py`, `test_player_cycle_includes_bot` | Low (unrelated to core logic) |
-| `zuban` errors in `mcp_server.py` | `tetris/mcp_server.py` | Low (type hints only) |
 | French UI strings hardcoded in states | Various `draw()` methods | Low (UI labels intentionally French) |
 | No automated visual regression tests | N/A | Medium |
 
