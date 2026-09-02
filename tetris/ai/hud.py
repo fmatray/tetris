@@ -62,8 +62,8 @@ def draw_ai_hud(ai_state: AIState) -> None:
     # --- Statistics table ---
     # Columns: [Tetromino, Lines, Score, Level] — right-aligned
     # Rows: [Current, Total, Best, Average, Last 100]
-    label_w = 130
-    margin = 20
+    label_w = 100
+    margin = 10
     col_w = (SCREEN_WIDTH - x0 - label_w - margin) // 4
     col_x = [x0 + label_w + i * col_w for i in range(5)]
 

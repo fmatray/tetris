@@ -137,6 +137,7 @@ def test_language_menu_toggle_cycles_languages():
     assert state._value_label(2) == "[*]"
     assert state._value_label(1) == ""
 
+
 def test_language_menu_select_sets_language_and_menu():
     from tetris.states.language_menu import LanguageMenuState
 
@@ -181,3 +182,16 @@ def test_menu_state_select_language_navigates():
     menu.selection = 10
     result = menu._on_select()
     assert isinstance(result, LanguageMenuState)
+
+
+def test_ai_hud_training_labels_fit_columns():
+    """FR/ES 'Epsilon decay' labels must fit the 3-column training grid (296px)."""
+    from tetris.settings import HUD_POSITIONS, SCREEN_WIDTH
+
+    font = pygame.font.SysFont("Arial", 24)
+    col_w = (SCREEN_WIDTH - HUD_POSITIONS["ai_stats"][0]) // 3
+    for lang in ("fr", "es", "sl"):
+        set_language(lang)
+        label = f"{tr('Epsilon decay')}: 0.9990"
+        width = font.size(label)[0]
+        assert width <= col_w, f"{lang} overflows: {label!r} is {width}px > {col_w}px"
