@@ -96,7 +96,7 @@ state = MenuState(screen, font, audio)
 ```bash
 python -m tetris.verify_training
 ```
-Success criteria: best_score > 10000, avg_score > 1000. Duration and loss are reported as information.
+Success criteria: see [AI documentation](docs/ai.md).
 
 ## Controls
 

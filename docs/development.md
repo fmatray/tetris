@@ -156,7 +156,7 @@ pygame.event.Event(pygame.KEYDOWN, key=pygame.K_x)
 ```bash
 python -m tetris.verify_training
 ```
-Success criteria: `best_score > 10000`, `avg_score > 1000`. Duration and loss are reported as information only.
+Success criteria: see [AI documentation](ai.md).
 
 ### Code Duplication (jscpd)
 ```bash
