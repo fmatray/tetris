@@ -227,6 +227,11 @@ class AIState(BotMovesMixin, GameState):
                 self.agent.load(MODEL_PATH)
             except (OSError, RuntimeError, KeyError) as e:
                 logger.error("Failed to load AI model: %s", e)
+            except ValueError as e:
+                # Architecture mismatch (e.g. Dueling toggled off but the
+                # checkpoint is dueling): keep the freshly built agent of
+                # the configured architecture instead of crashing startup.
+                logger.warning("Model architecture mismatch — starting fresh: %s", e)
         if ai_config.imitation and ai_config.ai_mode == "learning":
             from tetris.ai.imitation import imitation_pretrain
 

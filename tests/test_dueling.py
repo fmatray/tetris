@@ -152,3 +152,62 @@ def test_aiconfig_dueling_field():
 
     assert make().dueling is False
     assert make(dueling=True).dueling is True
+
+
+def test_ai_state_survives_checkpoint_mismatch(tmp_path, monkeypatch):
+    """Dueling toggled OFF against a dueling checkpoint must not crash
+    AIState startup: the mismatch is logged and the fresh plain agent is
+    kept (roadmap #4 regression guard)."""
+    import os
+
+    import pygame
+
+    import tetris.states.ai as ai_mod
+    from tetris.ai.agent import DQNAgent
+    from tetris.states.ai import AIConfig, AIState
+    from tests.helpers import make_audio, make_game_config
+
+    # Save a dueling checkpoint where AIState expects the model.
+    monkeypatch.setattr(ai_mod, "MODEL_PATH", str(tmp_path / "model.pt"))
+    dueling_agent = DQNAgent(dueling=True, seed=1)
+    dueling_agent.save(str(tmp_path / "model.pt"))
+    assert os.path.exists(str(tmp_path / "model.pt"))
+
+    pygame.init()
+    screen = pygame.Surface((800, 600))
+    font = pygame.font.Font(None, 20)
+    ai_config = AIConfig(
+        epsilon_decay=0.999,
+        epsilon_end=0.1,
+        lr=1e-3,
+        gamma=0.97,
+        batch_size=64,
+        buffer_size=1000,
+        ai_mode="learning",
+        curriculum=False,
+        curriculum_freq=50,
+        curriculum_epsilon="reset",
+        warm_start=True,
+        learn_per_action=2,
+        lookahead=False,
+        lookahead_depth=1,
+        dueling=False,
+    )
+    state = AIState(
+        screen,
+        font,
+        make_audio(),
+        make_game_config(),
+        ai_config,
+        _make_provider(),
+        speed="fast",
+        menu=None,
+    )
+    # Fresh plain agent kept: forward pass runs and is plain architecture.
+    assert state.agent.online_net.dueling is False
+
+
+def _make_provider():
+    from tetris.game.piece_provider import PieceProvider
+
+    return PieceProvider(generator="7bag")
