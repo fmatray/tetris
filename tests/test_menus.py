@@ -18,6 +18,7 @@ from tetris.settings import GENERATOR_LABELS, LOG_PATH, MODEL_PATH
 from tetris.states.ai_menu import AIMenuState
 from tetris.states.audio_menu import AudioMenuState
 from tetris.states.game_rules_menu import GameRulesMenuState
+from tetris.states.tournament_menu import TournamentMenuState
 from tetris.states.human_menu import HumanMenuState
 from tetris.states.hyperparam_menu import HyperparamMenuState
 from tetris.states.leaderboard import LeaderboardState
@@ -175,6 +176,7 @@ def test_ai_menu_options():
         "Mode",
         "Speed",
         "Training",
+        "Tournament",
         "Statistics",
         "Reset AI",
         "Back",
@@ -299,15 +301,23 @@ def test_ai_menu_select_apprentissage_navigates():
 def test_ai_menu_select_stats_navigates():
     menu = _make_menu()
     state = _make_state(AIMenuState, menu)
-    state.selection = 3
+    state.selection = 4
     result = state._on_select()
     assert isinstance(result, AIStatsState)
+
+
+def test_ai_menu_select_tournament_navigates():
+    menu = _make_menu()
+    state = _make_state(AIMenuState, menu)
+    state.selection = 3
+    result = state._on_select()
+    assert isinstance(result, TournamentMenuState)
 
 
 def test_ai_menu_select_reset_first_press_confirms():
     menu = _make_menu()
     state = _make_state(AIMenuState, menu)
-    state.selection = 4
+    state.selection = 5
     result = state._on_select()
     assert result is None
     assert state._confirm_reset is True
@@ -316,7 +326,7 @@ def test_ai_menu_select_reset_first_press_confirms():
 def test_ai_menu_select_reset_second_press_deletes():
     menu = _make_menu()
     state = _make_state(AIMenuState, menu)
-    state.selection = 4
+    state.selection = 5
     state._confirm_reset = True
     # Create dummy files to test deletion
     from pathlib import Path
@@ -331,7 +341,7 @@ def test_ai_menu_select_reset_second_press_deletes():
 def test_ai_menu_select_reset_no_files_no_error():
     menu = _make_menu()
     state = _make_state(AIMenuState, menu)
-    state.selection = 4
+    state.selection = 5
     state._confirm_reset = True
     # Ensure files don't exist
     for path in [MODEL_PATH, LOG_PATH]:
@@ -343,7 +353,7 @@ def test_ai_menu_select_reset_no_files_no_error():
 def test_ai_menu_select_retour_returns_menu():
     menu = _make_menu()
     state = _make_state(AIMenuState, menu)
-    state.selection = 5
+    state.selection = 6
     result = state._on_select()
     assert result is menu
 
@@ -358,7 +368,7 @@ def test_ai_menu_option_text_confirm_reset():
     menu = _make_menu()
     state = _make_state(AIMenuState, menu)
     state._confirm_reset = True
-    text = state._option_text(4, True)
+    text = state._option_text(5, True)
     assert "Confirm" in text
 
 
@@ -373,7 +383,7 @@ def test_ai_menu_option_color_confirm_reset():
     menu = _make_menu()
     state = _make_state(AIMenuState, menu)
     state._confirm_reset = True
-    color = state._option_color(4, True, False)
+    color = state._option_color(5, True, False)
     assert color == (255, 0, 0)
 
 

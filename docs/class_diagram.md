@@ -101,6 +101,12 @@ classDiagram
             +ai_mcts_iterations: int
             +mcp_port: int
             +bot_lookahead: str
+            +tournament_loops: int
+            +tournament_generations: int
+            +tournament_episodes: int
+            +tournament_population: int
+            +tournament_sigma: float
+            +tournament_seed: int
             +speed_mode: str
             +language: str
             +are: bool
@@ -233,6 +239,65 @@ classDiagram
             # _save() None
             # _on_back() State | None
             # _on_select() State | None
+        }
+
+        class TournamentMenuState {
+            # _OPTIONS: tuple~str, ...~ ClassVar
+            # _header_indices: frozenset~int~ ClassVar
+            # _toggle_indices: frozenset~int~ ClassVar
+            # _title: str ClassVar
+            # _instructions: str ClassVar
+            # _PARAM_META: ClassVar~tuple~ ClassVar
+            +ai_menu: AIMenuState
+            +menu: MenuState
+            - _confirm_restore: bool
+            +__init__(screen, font, audio, ai_menu) None
+            # _value_label(i: int) str
+            # _is_disabled(i: int) bool
+            # _toggle(direction: int) None
+            # _save() None
+            # _on_navigate() None
+            # _on_back() State | None
+            # _on_select() State | None
+            # _option_text(i: int, is_sel: bool) str
+            # _option_color(i: int, is_sel: bool, disabled: bool) tuple~int, int, int~
+            +draw(screen: pygame.Surface, particles: ParticleSystem | None) None
+        }
+
+        class TournamentState {
+            +screen: pygame.Surface
+            +font: pygame.font.Font
+            +audio: AudioManager
+            +tournament_menu: TournamentMenuState
+            - _loops: int
+            - _generations: int
+            - _progress: dict
+            - _should_stop: bool
+            - _result: dict | None
+            - _error: bool
+            - _thread: threading.Thread
+            +__init__(screen, font, audio, tournament_menu) None
+            - _worker() None
+            +handle_event(event: pygame.event.Event) State | None
+            +update(dt: float, particles: ParticleSystem) State | None
+            +draw(screen: pygame.Surface, particles: ParticleSystem | None) None
+        }
+
+        class TournamentStatsState {
+            +screen: pygame.Surface
+            +font: pygame.font.Font
+            +audio: AudioManager
+            +tournament_menu: TournamentMenuState
+            - _surface: pygame.Surface | None
+            - _built_lang: str | None
+            - _entries: list~dict~
+            +__init__(screen, font, audio, tournament_menu) None
+            - _load_entries() list~dict~
+            - _stat_values() list~str~
+            - _build_surface() None
+            +handle_event(event: pygame.event.Event) State | None
+            +update(dt: float, particles: ParticleSystem) State | None
+            +draw(screen: pygame.Surface, particles: ParticleSystem | None) None
         }
 
         class GameRulesMenuState {
@@ -1103,6 +1168,9 @@ classDiagram
     MenuBase <|-- AudioMenuState
     MenuBase <|-- GameRulesMenuState
     MenuBase <|-- MCPMenuState
+    MenuBase <|-- TournamentMenuState
+    State <|-- TournamentState
+    State <|-- TournamentStatsState
 
     GameState <|-- HumanState
     GameState <|-- AIState

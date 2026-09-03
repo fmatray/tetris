@@ -96,6 +96,12 @@ class MenuState(MenuBase):
         self.ai_mcts_iterations = 200
         self.ai_lookahead_depth = 1
         self.mcp_port = MCP_SERVER_PORT
+        self.tournament_loops = 2
+        self.tournament_generations = 5
+        self.tournament_episodes = 3
+        self.tournament_population = 6
+        self.tournament_sigma = 0.02
+        self.tournament_seed = 1
         self.bot_lookahead = "preview"  # "none" or "preview"
         # DEFAULT_KEYBINDS imported locally to avoid circular import at module load.
         from tetris.settings import DEFAULT_KEYBINDS
@@ -145,6 +151,12 @@ class MenuState(MenuBase):
         "bot_lookahead": "bot_lookahead",
         "seed": "seed",
         "language": "language",
+        "tournament_loops": "tournament_loops",
+        "tournament_generations": "tournament_generations",
+        "tournament_episodes": "tournament_episodes",
+        "tournament_population": "tournament_population",
+        "tournament_sigma": "tournament_sigma",
+        "tournament_seed": "tournament_seed",
     }
 
     def _load_settings(self) -> None:

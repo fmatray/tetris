@@ -24,7 +24,7 @@ class AIMenuState(MenuBase):
     Learning submenu is disabled when Mode = Game (playing).
     """
 
-    _OPTIONS = ("Mode", "Speed", "Training", "Statistics", "Reset AI", "Back")
+    _OPTIONS = ("Mode", "Speed", "Training", "Tournament", "Statistics", "Reset AI", "Back")
     _toggle_indices = frozenset({0, 1})  # Mode, Speed
     _title = "AI"
 
@@ -45,10 +45,12 @@ class AIMenuState(MenuBase):
                 return ""
 
     def _is_disabled(self, i: int) -> bool:
-        # Training (2): locked while training is ongoing (a trained
-        # checkpoint exists) — hyperparams would alter a run in progress.
-        # "Reset AI" deletes the checkpoint and unlocks it again.
-        return bool(i == 2 and (self.menu.ai_mode == "playing" or self.menu.training_in_progress()))
+        # Training (2) and Tournament (3): locked while training is ongoing
+        # (a trained checkpoint exists) — hyperparams or evolution would
+        # alter a run in progress. "Reset AI" deletes the checkpoint and
+        # unlocks them again.
+        locked = self.menu.ai_mode == "playing" or self.menu.training_in_progress()
+        return bool(i in {2, 3} and locked)
 
     def _toggle(self, direction: int) -> None:
         match self.selection:
@@ -75,28 +77,32 @@ class AIMenuState(MenuBase):
                 from tetris.states.hyperparam_menu import HyperparamMenuState
 
                 return HyperparamMenuState(self.screen, self.font, self.audio, self)
-            case 3:  # Statistics
+            case 3:  # Tournament submenu
+                from tetris.states.tournament_menu import TournamentMenuState
+
+                return TournamentMenuState(self.screen, self.font, self.audio, self)
+            case 4:  # Statistics
                 from tetris.states.ai_stats import AIStatsState
 
                 return AIStatsState(self.screen, self.font, self.audio, self)
-            case 4:  # Reset AI
+            case 5:  # Reset AI
                 if not self._confirm_reset:
                     self._confirm_reset = True
                 else:
                     self._reset_ai()
                     self._confirm_reset = False
-            case 5:  # Back
+            case 6:  # Back
                 return self.menu
         return None
 
     def _option_text(self, i: int, is_sel: bool) -> str:
-        if i == 4 and self._confirm_reset:
+        if i == 5 and self._confirm_reset:
             prefix = "> " if is_sel else "  "
             return f"{prefix}{tr('Confirm reset?')} (Enter)"
         return super()._option_text(i, is_sel)
 
     def _option_color(self, i: int, is_sel: bool, disabled: bool) -> tuple[int, int, int]:
-        if i == 4 and self._confirm_reset:
+        if i == 5 and self._confirm_reset:
             return RED
         return super()._option_color(i, is_sel, disabled)
 

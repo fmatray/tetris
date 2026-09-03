@@ -34,7 +34,7 @@ Returning a new `State` from `handle_event`/`update` transitions the app; `None`
 MenuState (root, owns settings)
 ├── GameRulesMenuState (generator, preview, handicap, speed, ghost piece)
 ├── HumanMenuState → { SeedEntryState, KeybindState, HumanStatsState }
-├── AIMenuState → { TrainingMenuState → { HyperparamMenuState, PlaceholderState }, AIStatsState }
+├── AIMenuState → { TrainingMenuState → { HyperparamMenuState, PlaceholderState }, TournamentMenuState → { TournamentState, TournamentStatsState }, AIStatsState }
 ├── BotMenuState (El-Tetris lookahead)
 ├── MCPMenuState (port, retour)
 ├── AudioMenuState
@@ -55,9 +55,9 @@ MenuState (root, owns settings)
 | Directory | Purpose |
 |---|---|
 | `tetris/game/` | Pure domain: `Board`, `Tetromino`, `shapes` (`SHAPES` rotation data + `SHAPES_TYPES` + helpers), `PieceProvider` facade + `PieceGenerator` hierarchy (`RandomGenerator`, `BagGenerator`→`SevenBagGenerator`/`ThirtyFiveBagGenerator`, `WeightedGenerator`, `ReplayGenerator`), `ScoreEngine`, `GameStats`, `rules` (grid-agnostic game-rule functions + SRS kick data) |
-| `tetris/states/` | FSM states (`State` base + 15 concrete states) |
+| `tetris/states/` | FSM states (`State` base + 18 concrete states) |
 | `tetris/ai/` | V-network DQN: `DQNetwork` (V-function), `DQNAgent` (per-candidate eval), `PrioritizedReplayBuffer`, DT-20 features + PBRS reward, `TrainingLog`, `candidates.py` (placement generation + soft-drop BFS), `mcts.py` (PUCT tree search), `hud.py` (AI HUD rendering). Game-rule functions (SRS kicks) extracted to `tetris/game/rules.py` |
-| `tetris/tournament.py` | Evolutionary self-play tournament: Gaussian mutants, uniform crossover, headless playing-mode fitness, CLI entry point |
+| `tetris/tournament.py` | Evolutionary self-play tournament: Gaussian mutants, uniform crossover, headless playing-mode fitness, in-game loop mode (`run_tournament_loops`), CLI entry point |
 | `tetris/visuals/` | `Renderer`, `ParticleSystem`, leaderboard/graph views |
 | `tetris/audio/` | `AudioManager` — NumPy SFX synthesis + MIDI parsing for polyphonic music; `midi_gen` generates `.mid` files |
 | `tetris/storage/` | JSON load/save for leaderboard and human game history |
@@ -122,6 +122,9 @@ python -m tetris.verify_training
 | `tetris/states/game.py` | `GameState` abstract base: board, pieces, gravity, lock delay, movement primitives; `GameConfig` dataclass (shared gameplay settings) |
 | `tetris/states/human.py` | `HumanState` — human gameplay: keyboard, DAS, pause, keybind setup |
 | `tetris/states/ai.py` | AI gameplay state + RL training integration (candidate generation and HUD rendering extracted to `tetris/ai/candidates.py` and `tetris/ai/hud.py`); `AIConfig` dataclass (DQN hyperparameters) |
+| `tetris/states/tournament_menu.py` | `TournamentMenuState` — tournament sub-menu: loop params, stats, restore checkpoint (two-press confirm), start |
+| `tetris/states/tournament.py` | `TournamentState` — runs tournament loops in a daemon thread, draws live progress, Esc = coarse cancel (current generation finishes first) |
+| `tetris/states/tournament_stats.py` | `TournamentStatsState` — tournament stats table + best-score-per-loop graph from `data/tournament/loops.json` |
 | `tetris/states/seed_entry.py` | `SeedEntryState` — numeric text input for game seed (empty = random) |
 | `tetris/states/bot_menu.py` | `BotMenuState` — El-Tetris bot sub-menu: lookahead toggle (Non / Comme aperçu) |
 | `tetris/states/eltetris.py` | `ElTetrisState` — El-Tetris bot gameplay state (`BotMovesMixin` + `GameState`); `BotConfig` dataclass. No learning, no logs, game over returns to menu |
@@ -288,16 +291,15 @@ All in `data/` (gitignored via blanket `data/` rule):
 | `tournament/tournament_report.json` | — | JSON | Tournament generations report (best/mean scores) |
 | `tournament/tournament_best.pt` | — | PyTorch | Best tournament weights per run |
 | `tournament/playing_log.json` | — | JSON | Tournament-redirected playing log (never the real one) |
-| `human_placements.jsonl` | `PLACEMENTS_PATH` | JSONL | Per-move human placements (piece, rotation, column, hold) for AI imitation warm-start; written by `HumanState` only |
-
-## Media Files
+| `ai_model.pre_tournament.pt` | `PRE_TOURNAMENT_PATH` | PyTorch | Pre-tournament checkpoint of `ai_model.pt` (overwritten each run; restore via Tournament menu) |
+| `tournament/loops.json` | `TOURNAMENT_LOOPS_PATH` | JSON | Per-loop tournament results (loop, seed, best, mean, elapsed_s, timestamp) |
 
 | File | Path constant | Format | Purpose |
 |---|---|---|---|
 | `media/korobeiniki.mid` | `MUSIC_SONG_PATHS["korobeiniki"]` | MIDI | Korobeiniki music (melody + bass) |
 | `media/kalinka.mid` | `MUSIC_SONG_PATHS["kalinka"]` | MIDI | Kalinka music (melody + bass) |
 
-**`settings.json` schema**: `player` ("Humain"/"IA"/"Bot"/"MCP"), `mode` ("Normal"/"Replay"), `handicap` (0-5), `sound` (int 0-3), `music` (int 0-3), `song` ("korobeiniki"/"kalinka"), `debug` (bool), `ghost_piece` (bool), `preview_count` (int 0/1/3), `piece_generator` ("random"/"7bag"/"35bag"/"weighted"), `speed_mode` ("none"/"easy"/"normal"/"medium"/"hard"/"crazy"/"insane"), `are` (bool), `ai_speed` ("normal"/"fast"), `ai_epsilon_decay` (float), `ai_epsilon_end` (float), `ai_lr` (float), `ai_gamma` (float), `ai_batch_size` (int), `ai_buffer_size` (int), `ai_mode` ("learning"/"playing"), `ai_curriculum` (bool), `ai_curriculum_freq` (int), `ai_curriculum_epsilon` (str), `ai_warm_start` (bool), `ai_learn_per_action` (int), `ai_lookahead` (bool), `ai_lookahead_depth` (int 1-3), `ai_dueling` (bool), `ai_imitation` (bool), `ai_mcts` (bool), `ai_mcts_iterations` (int 20-2000), `mcp_port` (int), `bot_lookahead` ("none"/"preview"), `seed` (int|null), `keybinds` (dict: action→pygame keycode, includes `mute` and `hold`)
+**`settings.json` schema**: `player` ("Humain"/"IA"/"Bot"/"MCP"), `mode` ("Normal"/"Replay"), `handicap` (0-5), `sound` (int 0-3), `music` (int 0-3), `song` ("korobeiniki"/"kalinka"), `debug` (bool), `ghost_piece` (bool), `preview_count` (int 0/1/3), `piece_generator` ("random"/"7bag"/"35bag"/"weighted"), `speed_mode` ("none"/"easy"/"normal"/"medium"/"hard"/"crazy"/"insane"), `are` (bool), `ai_speed` ("normal"/"fast"), `ai_epsilon_decay` (float), `ai_epsilon_end` (float), `ai_lr` (float), `ai_gamma` (float), `ai_batch_size` (int), `ai_buffer_size` (int), `ai_mode` ("learning"/"playing"), `ai_curriculum` (bool), `ai_curriculum_freq` (int), `ai_curriculum_epsilon` (str), `ai_warm_start` (bool), `ai_learn_per_action` (int), `ai_lookahead` (bool), `ai_lookahead_depth` (int 1-3), `ai_dueling` (bool), `ai_imitation` (bool), `ai_mcts` (bool), `ai_mcts_iterations` (int 20-2000), `mcp_port` (int), `bot_lookahead` ("none"/"preview"), `tournament_loops` (int 1-20), `tournament_generations` (int 1-20), `tournament_episodes` (int 1-5), `tournament_population` (int 2-12), `tournament_sigma` (float 0.005-0.10), `tournament_seed` (int), `seed` (int|null), `keybinds` (dict: action→pygame keycode, includes `mute` and `hold`)
 
 ## DQN AI Specifics
 
@@ -314,7 +316,8 @@ All in `data/` (gitignored via blanket `data/` rule):
 - **Observability** (5 tiers): Tier 1 enriches per-episode JSON log with 26 new fields (LR, TD errors, grad norm, buffer fill, target syncs, PER beta, V-value spread/margin, candidate count, random/greedy ratio, hold rate, move-sequence length, avg reward, curriculum level, 9 reward components). Tier 2 writes per-`learn()`-call JSONL to `STEP_LOG_PATH` (rotates at 100K lines). Tier 3 writes per-episode behavioral JSONL to `BEHAVIOR_LOG_PATH` (column histogram 10 bins, rotation histogram 4 bins, placement success rate). Tier 4 decomposes reward via `compute_reward_components()` in `rewards.py` (9 components: lines, holes_delta, overhangs, height, bumpiness, wells, survival, pbrs, game_over — sum equals `compute_reward()`). Tier 5 writes TensorBoard scalars via `SummaryWriter` in `DQNAgent.learn()` to `TB_LOG_DIR` (runtime-guarded by `ImportError`). `DQNAgent.training_metrics()` snapshots dynamics; `flush_logs()` flushes TB writer; `AIState._write_behavior_log()` writes behavioral JSONL. `last_action_was_random` flag tracks actual exploration rate. `target_syncs` persisted in checkpoint. All logs are best-effort (I/O errors never crash training). Playing mode disables step log and TB writer.
 - **Cooking-state indicator** (`tetris/ai/hud.py`): `_cooking_status()` uses a 4-signal health scoring system: (1) score trend (`log._trend("score")`: up=+1, down=-1), (2) TD error trend (50-ep window ratio: <0.9=+1 converging, >1.5=-1 diverging), (3) V-margin (`agent.last_v_margin > 0.01` = +1, network discriminates top-2 candidates), (4) epsilon (`< 0.2` = +1, exploration winding down). Health score range -1 to +3: <=0 "Trop cuit" (red), 1 "Pas assez cuit" (blue `(100,180,255)`), >=2 "Bien cuit" (green). `_draw_thermometer()` renders a 12x20px vertical bar with fill proportional to training progress (`max(eps_progress, ep_maturity)` clamped 0..1). Shown in `draw_ai_hud()` only in learning mode. Color + label encode cooking health; thermometer level encodes training progress.
 - **MCTS look-ahead** (`ai_mcts`, default OFF): `mcts_select()` in `tetris/ai/mcts.py` runs AlphaZero-style PUCT search over placements; V-network evaluates leaves, no rollouts. Root priors = softmax over El-Tetris pick values; deeper levels use hard-drop enumeration; deeper piece types sampled from a per-episode `rng`. `ai_mcts_iterations` (20–2000, default 200) sets the budget. When ON, the greedy look-ahead chain is disabled. Tests: `tests/test_mcts.py`.
-- **Self-play tournament** (`tetris/tournament.py`): evolutionary weight search from the shipped checkpoint. CLI `python -m tetris.tournament --generations N --episodes N --population N --sigma F --piece-cap N`. Fitness = playing-mode episode score to first game-over, capped at `piece_cap` pieces. Deterministic (same seed + weights → same score); path-isolated (logs to `data/tournament/`, never writes `ai_model.pt`). Tests: `tests/test_tournament.py`.
+- **Self-play tournament** (`tetris/tournament.py`): evolutionary weight search from the shipped checkpoint. CLI `python -m tetris.tournament --generations N --episodes N --population N --sigma F --piece-cap N`. Fitness = playing-mode episode score to first game-over, capped at `piece_cap` pieces. Deterministic (same seed + weights → same score); path-isolated in CLI mode (logs to `data/tournament/`, never writes `ai_model.pt`). Tests: `tests/test_tournament.py`.
+- **In-game tournament loop**: menu path AI → Tournament (`TournamentMenuState` → `TournamentState`, background thread). Each loop re-seeds `ai_model.pt` with the winner; the base model is checkpointed to `data/ai_model.pre_tournament.pt` before loop 0; per-loop results append to `data/tournament/loops.json`. See [docs/menus.md](docs/menus.md) (menu surface) and [docs/ai.md](docs/ai.md) (loop semantics). Tests: `tests/test_tournament_menu.py`, `tests/test_tournament_loops.py`, `tests/test_tournament_stats.py`.
 
 ## Documentation Rules
 

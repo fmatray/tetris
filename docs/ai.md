@@ -358,6 +358,18 @@ The tournament works as follows:
 4. The top half of the population survives. Mutated survivors and uniform-crossover pairs refill the population.
 5. It writes the report to `data/tournament/tournament_report.json` and the best weights to `data/tournament/tournament_best.pt`.
 
+### In-Game Loop Mode
+
+The game also exposes the tournament as a menu: **AI → Tournament**. See [menus.md](menus.md#tournament) for the option table, entry conditions, and cancel behavior.
+
+The loop mode repeats the tournament and chains the winners:
+
+1. Before the first loop, the base model `data/ai_model.pt` is copied to `data/ai_model.pre_tournament.pt` (a checkpoint, overwritten each run).
+2. Each loop `k` (0-based) runs one tournament with seed `tournament_seed + k`.
+3. After each loop, the winner (`tournament_best.pt`) replaces `ai_model.pt` — the winner re-seeds the model, so the next loop (and any later training session) starts from it.
+4. One entry is appended per loop to `data/tournament/loops.json`: `{loop, seed, best, mean, elapsed_s, timestamp}`.
+
+After the run, `tournament_seed` advances by the number of loops and is persisted in `settings.json`, so consecutive runs never reuse a seed.
 
 ## Future Enhancements
 

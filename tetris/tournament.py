@@ -13,6 +13,10 @@ shipped model checkpoint is never written.
 Outputs:
 - ``data/tournament_report.json`` — per-generation fitness statistics.
 - ``data/tournament_best.pt`` — best weights (never ``MODEL_PATH``).
+- ``run_tournament_loops`` additionally writes:
+  ``data/ai_model.pre_tournament.pt`` (base checkpoint), copies each loop's
+  winner over ``MODEL_PATH``, and appends per-loop history to
+  ``data/tournament/loops.json``.
 """
 
 from __future__ import annotations
@@ -21,7 +25,10 @@ import argparse
 import json
 import os
 import random
+import shutil
+import time
 from collections.abc import Callable, Sequence
+from datetime import datetime
 from typing import Any
 
 import numpy as np
@@ -29,7 +36,7 @@ import torch
 
 from tetris.ai.agent import DQNAgent
 from tetris.logger import get_logger
-from tetris.settings import MODEL_PATH
+from tetris.settings import MODEL_PATH, PRE_TOURNAMENT_PATH, TOURNAMENT_LOOPS_PATH
 
 logger = get_logger(__name__)
 
@@ -210,6 +217,7 @@ def run_tournament(
     report_path: str = REPORT_PATH,
     best_path: str = BEST_PATH,
     evaluate: Callable[[DQNAgent, int], float] | None = None,
+    should_stop: Callable[[], bool] | None = None,
 ) -> dict[str, Any]:
     """Full evolutionary loop; returns and persists the report."""
     import tetris.states.ai as ai_mod
@@ -248,6 +256,8 @@ def run_tournament(
         best_ckpt = base_ckpt
         best_score = float("-inf")
         for gen in range(generations):
+            if should_stop and should_stop():
+                break
             fitness = evaluate_population(checkpoints, episodes, seed, dueling, piece_cap, evaluate)
             gen_best = int(np.argmax(fitness))
             if fitness[gen_best] > best_score:
@@ -287,6 +297,81 @@ def run_tournament(
         return report
     finally:
         ai_mod.PLAYING_LOG_PATH, ai_mod.PLAYING_BEHAVIOR_LOG_PATH = orig_log, orig_beh
+
+
+def run_tournament_loops(
+    loops: int,
+    generations: int,
+    episodes: int,
+    population: int,
+    sigma: float,
+    seed: int,
+    model_path: str = MODEL_PATH,
+    piece_cap: int = PIECE_CAP,
+    report_path: str = REPORT_PATH,
+    best_path: str = BEST_PATH,
+    loops_path: str = TOURNAMENT_LOOPS_PATH,
+    progress: dict | None = None,
+    should_stop: Callable[[], bool] | None = None,
+) -> dict[str, Any]:
+    """Run the full tournament loop N times, re-seeding from each winner.
+
+    Before the first loop the base model is checkpointed to
+    ``PRE_TOURNAMENT_PATH``. After each loop the winner (``best_path``)
+    replaces ``model_path`` and one entry is appended to ``loops_path``
+    (JSON list). Seed increments per loop; the next unused seed is returned.
+    """
+    if not os.path.exists(model_path):
+        raise FileNotFoundError(f"no checkpoint at {model_path} — train the agent before running a tournament")
+    shutil.copyfile(model_path, PRE_TOURNAMENT_PATH)
+
+    loops_run = 0
+    for k in range(loops):
+        if should_stop and should_stop():
+            break
+        if progress is not None:
+            progress["loop"] = k
+            progress["gen"] = -1
+        start = time.monotonic()
+        report = run_tournament(
+            generations=generations,
+            episodes=episodes,
+            population=population,
+            sigma=sigma,
+            seed=seed + k,
+            model_path=model_path,
+            piece_cap=piece_cap,
+            report_path=report_path,
+            best_path=best_path,
+            should_stop=should_stop,
+        )
+        elapsed = time.monotonic() - start
+        shutil.copyfile(best_path, model_path)
+        last = report["generations"][-1]
+        try:
+            with open(loops_path) as f:
+                entries = json.load(f)
+        except (OSError, json.JSONDecodeError):
+            entries = []
+        if not isinstance(entries, list):
+            entries = []
+        entries.append(
+            {
+                "loop": k,
+                "seed": seed + k,
+                "best": float(last["best"]),
+                "mean": float(last["mean"]),
+                "elapsed_s": elapsed,
+                "timestamp": datetime.now().isoformat(),
+            }
+        )
+        os.makedirs(os.path.dirname(loops_path) or ".", exist_ok=True)
+        with open(loops_path, "w") as f:
+            json.dump(entries, f, indent=2)
+        loops_run += 1
+        if progress is not None:
+            progress["done"] = loops_run
+    return {"loops_run": loops_run, "next_seed": seed + loops_run}
 
 
 def main(argv: Sequence[str] | None = None) -> int:
