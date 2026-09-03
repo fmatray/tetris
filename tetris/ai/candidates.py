@@ -14,6 +14,7 @@ from tetris.ai.rewards import (
     el_tetris_value_batch,
     extract_features_batch,
     place_and_clear_batch,
+    place_and_clear_pairs_batch,
 )
 from tetris.game import rules
 from tetris.game.rules import try_rotation
@@ -156,6 +157,79 @@ def best_next_placement(grid: np.ndarray, piece_type: str) -> np.ndarray:
     return sim_grids[best_idx]
 
 
+def _hard_drop_y_multi(
+    grids: np.ndarray,
+    shapes: list[list[tuple[int, int]]],
+    x_positions: list[int],
+) -> np.ndarray:
+    """Batch hard-drop landing y for M positions across N grids.
+
+    Returns ``(N, M)`` int array. Matches :func:`hard_drop_y_batch`
+    semantics per grid: invalid column → clamped to 0, never negative.
+    """
+    mask = grids > 0  # (N, H, W)
+    col_tops = np.argmax(mask, axis=1).astype(np.int32)  # (N, W)
+    col_tops[~mask.any(axis=1)] = BOARD_HEIGHT
+    all_bx = np.array([[bx for bx, _ in s] for s in shapes], dtype=np.int32)  # (M, 4)
+    all_by = np.array([[by for _, by in s] for s in shapes], dtype=np.int32)  # (M, 4)
+    cx = np.asarray(x_positions, dtype=np.int32)[:, None] + all_bx  # (M, 4)
+    valid = (cx >= 0) & (cx < BOARD_WIDTH)
+    # cell_y for all (grid, position, cell); invalid cells → -1 (min poisons)
+    cell_y = np.where(
+        valid,
+        col_tops[:, np.clip(cx, 0, BOARD_WIDTH - 1)] - all_by[None] - 1,
+        -1,
+    )  # (N, M, 4)
+    results = np.minimum.reduce(cell_y, axis=2)  # min over cells
+    return np.maximum(results, 0)
+
+
+def best_next_placements_batch(grids: np.ndarray, piece_type: str) -> np.ndarray:
+    """Simulate the best hard-drop placement of ``piece_type`` on N grids at once.
+
+    Batched cross-candidate look-ahead — one vectorized pass per depth
+    level replaces N calls to :func:`best_next_placement`. Iteration
+    order (rotation-major, column-minor) and first-wins ``argmax`` match
+    the scalar tie-break exactly. Returns ``(N, H, W)``.
+    """
+    grids = np.asarray(grids)
+    N = grids.shape[0]
+    if N == 0:
+        return grids
+    shapes: list[list[tuple[int, int]]] = []
+    x_positions: list[int] = []
+    for shape, _rot, px in iter_column_positions(piece_type):
+        shapes.append(shape)
+        x_positions.append(px)
+    M = len(shapes)
+    if M == 0:
+        return grids
+    # hard_drop clamps to ≥ 0, so every position is "valid" (matches scalar,
+    # whose py_batch >= 0 filter never triggers — iter_column_positions
+    # pre-filters width).
+    pys = _hard_drop_y_multi(grids, shapes, x_positions)  # (N, M)
+    bases = np.repeat(grids[:, None], M, axis=1).reshape(N * M, *grids.shape[1:])
+    sim, lines = place_and_clear_pairs_batch(
+        bases,
+        shapes * N,
+        x_positions * N,
+        pys.reshape(-1).tolist(),
+    )
+    # Landing height per pair: centroids for M shapes, tiled N times.
+    centroids = np.array(
+        [(min(by for _, by in s) + max(by for _, by in s) + 1) / 2 for s in shapes],
+        dtype=np.float64,
+    )  # (M,)
+    landing = BOARD_HEIGHT - pys.reshape(-1).astype(np.float64) - np.tile(centroids, N)
+    vals = el_tetris_value_batch(
+        sim,
+        landing,
+        lines,
+    ).reshape(N, M)
+    best = np.argmax(vals, axis=1)
+    return sim.reshape(N, M, *grids.shape[1:])[np.arange(N), best]
+
+
 def soft_drop_placements(
     grid,
     piece_type: str,
@@ -293,11 +367,10 @@ def get_candidate_states(
     all_pys = [p.py for p in all_placements]
     sim_grids, lines_cleared = place_and_clear_batch(base_grid, all_shapes, all_pxs, all_pys)
 
-    # Lookahead (per-candidate — each depends on its own sim_grid)
+    # Lookahead: one batched call per depth level across all candidates
     if lookahead:
-        for i in range(len(all_placements)):
-            for pt in upcoming_types[:lookahead_depth]:
-                sim_grids[i] = best_next_placement(sim_grids[i], pt)
+        for pt in upcoming_types[:lookahead_depth]:
+            sim_grids = best_next_placements_batch(sim_grids, pt)
 
     # Batch feature extraction + El-Tetris selection values
     candidates = extract_features_batch(sim_grids, lines_cleared, all_next_piece_types)

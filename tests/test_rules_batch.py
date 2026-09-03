@@ -14,6 +14,8 @@ from tetris.ai.rewards import (
 )
 from tetris.ai.candidates import (
     _landing_heights,
+    best_next_placement,
+    best_next_placements_batch,
     el_tetris_value_batch,
     hard_drop_y_batch,
     soft_drop_placements,
@@ -376,3 +378,66 @@ def test_soft_drop_placements_empty_board():
         assert len(placements) > 0, f"{piece_type}: no placements on empty board"
         for p in placements:
             assert shape_fits(grid, p.shape, p.px, p.py)
+
+
+# --- best_next_placements_batch (cross-candidate) -------------------
+
+
+def test_best_next_placements_batch_matches_scalar():
+    """Cross-candidate batch: N grids at once match N scalar calls, all pieces."""
+    rng = np.random.default_rng(777)
+    for piece_type in SHAPES_TYPES:
+        grids = np.array([_random_grid(rng) for _ in range(12)])
+        scalar = np.array([best_next_placement(g, piece_type) for g in grids])
+        batch = best_next_placements_batch(grids.copy(), piece_type)
+        assert batch.shape == scalar.shape, f"{piece_type}: shape mismatch"
+        assert np.array_equal(batch, scalar), f"{piece_type}: grid mismatch"
+
+
+def test_best_next_placements_batch_preserves_input():
+    """Input grids are not mutated."""
+    rng = np.random.default_rng(778)
+    grids = np.array([_random_grid(rng) for _ in range(6)])
+    grids_copy = grids.copy()
+    best_next_placements_batch(grids, "T")
+    assert np.array_equal(grids, grids_copy)
+
+
+def test_best_next_placements_batch_single_grid():
+    """N=1 batch equals a scalar call (edge case)."""
+    rng = np.random.default_rng(779)
+    grid = _random_grid(rng)
+    scalar = best_next_placement(grid, "L")
+    batch = best_next_placements_batch(grid[np.newaxis].copy(), "L")
+    assert batch.shape == (1, *scalar.shape)
+    assert np.array_equal(batch[0], scalar)
+
+
+def test_best_next_placements_batch_lookahead_stack():
+    """Two stacked depth levels (lookahead_depth=2) match scalar stacking."""
+    rng = np.random.default_rng(780)
+    grids = np.array([_random_grid(rng) for _ in range(8)])
+    scalar = grids.copy()
+    for g_ref in scalar:
+        g = best_next_placement(g_ref, "T")
+        g = best_next_placement(g, "S")
+        g_ref[:] = g
+    batch = best_next_placements_batch(best_next_placements_batch(grids.copy(), "T"), "S")
+    assert np.array_equal(batch, scalar)
+
+
+def test_best_next_placements_batch_speed():
+    """Informational: cross-candidate batch is faster than N scalar calls."""
+    import time
+
+    rng = np.random.default_rng(781)
+    grids = np.array([_random_grid(rng) for _ in range(100)])
+    t0 = time.perf_counter()
+    scalar = np.array([best_next_placement(g, "T") for g in grids])
+    scalar_ms = (time.perf_counter() - t0) * 1000
+    t0 = time.perf_counter()
+    batch = best_next_placements_batch(grids.copy(), "T")
+    batch_ms = (time.perf_counter() - t0) * 1000
+    assert np.array_equal(batch, scalar)
+    # Informational only — assert equivalence, print the ratio.
+    print(f"\nbest_next_placements_batch: scalar {scalar_ms:.1f}ms vs batch {batch_ms:.1f}ms")

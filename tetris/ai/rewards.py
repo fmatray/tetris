@@ -501,19 +501,17 @@ def place_and_clear(grid: np.ndarray, shape: list[tuple[int, int]], px: int, py:
     return new_grid, lines_cleared
 
 
-def place_and_clear_batch(
-    grid: np.ndarray,
+def scatter_cells_batch(
+    batch: np.ndarray,
     shapes: list[list[tuple[int, int]]],
     x_positions: list[int],
     y_positions: list[int],
-) -> tuple[np.ndarray, np.ndarray]:
-    """Batch place + line-clear for N placements on the same base grid.
+) -> None:
+    """Scatter K shapes into ``batch`` (K, H, W) in place (cell value 1.0).
 
-    Returns ``(grids[N, H, W], lines_cleared[N])``.
+    Out-of-bounds cells are silently skipped, matching :func:`place_cells`.
     """
     N = len(shapes)
-    batch = np.repeat(grid[np.newaxis], N, axis=0)
-    # Vectorized scatter: build (N, 4) arrays — each shape has exactly 4 cells
     all_bx = np.array([[bx for bx, _ in s] for s in shapes], dtype=np.int32)  # (N, 4)
     all_by = np.array([[by for _, by in s] for s in shapes], dtype=np.int32)  # (N, 4)
     xs = np.array(x_positions, dtype=np.int32)[:, None]  # (N, 1)
@@ -525,18 +523,59 @@ def place_and_clear_batch(
         batch_idx = np.repeat(np.arange(N, dtype=np.int32), 4)
         valid_flat = valid.ravel()
         batch[batch_idx[valid_flat], all_cy.ravel()[valid_flat], all_cx.ravel()[valid_flat]] = 1.0
-    mask = batch > 0
-    full = mask.all(axis=2)  # (N, H)
-    lines = full.sum(axis=1).astype(np.int32)  # (N,)
-    grids_out = np.empty_like(batch)
-    for i in range(N):
-        if lines[i] == 0:
-            grids_out[i] = batch[i]
-        else:
-            keep = ~full[i]
-            grids_out[i, : int(lines[i])] = 0.0
-            grids_out[i, int(lines[i]) :] = batch[i][keep]
-    return grids_out, lines
+
+
+def clear_lines_batch(batch: np.ndarray, full: np.ndarray, lines: np.ndarray) -> np.ndarray:
+    """Remove full rows from K placed grids, vectorized (no Python row loop).
+
+    ``full`` (K, H) marks full rows; ``lines`` (K,) counts them. Each grid's
+    non-full rows keep their order and shift down by ``lines[k]``; the top
+    ``lines[k]`` rows are zeroed. Matches the scalar ``place_and_clear``
+    vstack semantics.
+    """
+    nonfull = ~full
+    # pos[y] = index of row y among this grid's non-full rows
+    pos = np.cumsum(nonfull, axis=1) - nonfull
+    dst = lines[:, None] + pos
+    out = np.zeros_like(batch)
+    kk, rr = np.nonzero(nonfull)
+    out[kk, dst[kk, rr], :] = batch[kk, rr, :]
+    return out
+
+
+def place_and_clear_pairs_batch(
+    bases: np.ndarray,
+    shapes: list[list[tuple[int, int]]],
+    x_positions: list[int],
+    y_positions: list[int],
+) -> tuple[np.ndarray, np.ndarray]:
+    """Batch place + line-clear for K pairs, pair ``k`` placed on ``bases[k]``.
+
+    ``bases`` (K, H, W) is scattered into in place — pass a fresh array
+    (e.g. an ``np.repeat`` result). Returns ``(grids[K, H, W], lines_cleared[K])``.
+    """
+    scatter_cells_batch(bases, shapes, x_positions, y_positions)
+    full = (bases > 0).all(axis=2)  # (K, H)
+    lines = full.sum(axis=1).astype(np.int32)  # (K,)
+    return clear_lines_batch(bases, full, lines), lines
+
+
+def place_and_clear_batch(
+    grid: np.ndarray,
+    shapes: list[list[tuple[int, int]]],
+    x_positions: list[int],
+    y_positions: list[int],
+) -> tuple[np.ndarray, np.ndarray]:
+    """Batch place + line-clear for N placements on the same base grid.
+
+    Returns ``(grids[N, H, W], lines_cleared[N])``.
+    """
+    N = len(shapes)
+    if N == 0:
+        empty = np.empty((0, *np.asarray(grid).shape), dtype=np.asarray(grid).dtype)
+        return empty, np.zeros(0, dtype=np.int32)
+    bases = np.repeat(grid[np.newaxis], N, axis=0)
+    return place_and_clear_pairs_batch(bases, shapes, x_positions, y_positions)
 
 
 # --- Reward (AI.md §4) -----------------------------------------------

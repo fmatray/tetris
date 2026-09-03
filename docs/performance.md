@@ -147,6 +147,30 @@ Re-profiled on the post-redesign architecture (widened network, BFS path recordi
 - **TensorBoard writer is not a bottleneck**: disabling `agent._tb_writer` changed throughput by ~±5% (noise). The heavy `record_writer.write` entries in cProfile output are profiler overhead on file syscalls, not real cost.
 - **py-spy cannot run unprivileged on macOS** (requires root since OS X 10.11). cProfile + clean FPS A/B runs were used instead for this round. The py-spy recipe remains valid on Linux (e.g. CI runners).
 
+
+## Round 5: Cross-Candidate Batched Look-Ahead (Roadmap #3)
+
+`best_next_placements_batch` replaces the per-candidate Python loop over
+scalar `best_next_placement` with one vectorized pass per look-ahead depth
+level, across all N candidate grids at once. The N×M placement simulation
+scatters cells by flat index and removes full rows without a Python row
+loop (`clear_lines_batch`). Landing-height centroids are computed once
+for the M unique positions and tiled, not recomputed per pair.
+
+Outputs are bit-identical to the scalar path: iteration order
+(rotation-major, column-minor) and first-wins `np.argmax` preserve the
+scalar tie-break. Equivalence is asserted for all 7 piece types in
+`tests/test_rules_batch.py` (`test_best_next_placements_batch_matches_scalar`,
+plus input-preservation, N=1, and depth-2 stacking tests).
+
+Measured on random boards (N=200, piece "T", Apple M1): 80.8 ms scalar
+vs 38.1 ms batched — **2.1× on the look-ahead stage**. The scalar path
+already batches positions internally, so the win is amortization of
+per-call setup (`hard_drop_y_batch` column tops, `_landing_heights`
+centroids, metrics) across N candidates instead of N separate passes.
+`BotMovesMixin` and `ElTetrisState` inherit the speedup through
+`get_candidate_states` unchanged.
+
 ## Remaining Bottlenecks (Future Review)
 
 | Bottleneck | Self-Time | Calls | Notes |
