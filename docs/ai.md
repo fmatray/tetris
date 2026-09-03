@@ -205,7 +205,7 @@ The ARE entry delay and its IRS/IHS buffering follow the shared rule in [game_ru
 | Buffer size | 50,000 | 1,000–200,000 | 2× |
 | Curriculum | OFF | OFF/ON | — |
 | Curriculum freq | 50 | 10–500 | 10 |
-| Curriculum ε | reset | reset/boost/decay | — |
+| Curriculum ε | boost | reset/boost/decay | — |
 | Warm start | ON | OFF/ON | — |
 | Learn per action | 2 | 1–8 | 1 |
 | Look-ahead | ON | OFF/ON | — |
@@ -224,6 +224,8 @@ The ARE entry delay and its IRS/IHS buffering follow the shared rule in [game_ru
 | `seed` | None | Reproducibility seed |
 
 ### Curriculum Learning
+
+Order: O → I → L → J → T → S → Z (easy → hard). First piece of each game restricted to I, J, L, T (`FIRST_PIECE_TYPES`) to avoid forced overhangs on empty board.
 
 Curriculum state (`curriculum_level`, `curriculum_episode_count`) lives in `DQNAgent`, persisted in checkpoint. `advance_curriculum(max_level, freq)` advances level every `freq` episodes. `_reset_episode` re-applies `set_allowed_types` on the new `PieceProvider`.
 

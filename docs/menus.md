@@ -119,9 +119,8 @@ flowchart TD
 | Buffer Size | 1,000–200,000 | 50,000 | 2× |
 | Curriculum | OFF/ON | OFF | — |
 | Curriculum Frequency | 10–500 | 50 | 10 |
-| Curriculum Epsilon | reset / boost / decay | reset | — |
+| Curriculum Epsilon | reset / boost / decay | boost | — |
 | Warm Start | OFF/ON | ON | — |
-| Updates per Piece | 1–8 | 2 | 1 |
 | Look-ahead Depth | 1–3 | 1 | 1 |
 | Dueling | OFF/ON | OFF | — |
 | Imitation | OFF/ON | OFF | — |
@@ -256,9 +255,8 @@ All menu settings are persisted to `data/settings.json` via `MenuState.save_sett
   "ai_batch_size": 64,
   "ai_buffer_size": 50000,
   "ai_mode": "learning",                // "learning" / "playing"
-  "ai_curriculum": false,
+  "ai_curriculum_epsilon": "boost",
   "ai_curriculum_freq": 50,
-  "ai_curriculum_epsilon": "reset",
   "ai_warm_start": true,
   "ai_learn_per_action": 2,
   "ai_lookahead": true,

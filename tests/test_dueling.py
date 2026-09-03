@@ -107,10 +107,13 @@ def test_dueling_learns_per_candidate_equivalence():
     assert torch.allclose(batched, singles, atol=1e-6)
 
 
-def test_settings_plumbing():
+def test_settings_plumbing(tmp_path, monkeypatch):
     """MenuState must expose ai_dueling and persist it under 'ai_dueling'."""
+    import tetris.states.menu as menu_mod
     from tetris.states.menu import MenuState
 
+    # Isolate from the real data/settings.json (other tests mutate it).
+    monkeypatch.setattr(menu_mod, "SETTINGS_PATH", str(tmp_path / "settings.json"))
     screen = pygame.Surface((100, 100))
     font = pygame.font.Font(None, 20)
     from tetris.audio import AudioManager
@@ -123,9 +126,6 @@ def test_settings_plumbing():
     menu.save_settings()
     menu2 = MenuState(screen, font, audio)
     assert menu2.ai_dueling is True
-    # cleanup: restore persisted default
-    menu2.ai_dueling = False
-    menu2.save_settings()
 
 
 def test_aiconfig_dueling_field():

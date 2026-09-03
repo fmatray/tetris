@@ -61,7 +61,7 @@ def run_training(n_episodes: int) -> None:
         ai_mode="learning",
         curriculum=False,
         curriculum_freq=50,
-        curriculum_epsilon="reset",
+        curriculum_epsilon="boost",
         warm_start=True,
         learn_per_action=2,
         lookahead=True,

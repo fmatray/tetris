@@ -235,7 +235,7 @@ config = GameConfig(handicap=0, sound_volume=0, music_volume=0, music_song='koro
     debug=False, ghost_piece=True, preview_count=1, speed_mode='normal')
 ai_config = AIConfig(epsilon_decay=0.999, epsilon_end=0.1, lr=1e-3, gamma=0.97,
     batch_size=64, buffer_size=50_000, ai_mode='learning', curriculum=False,
-    curriculum_freq=50, curriculum_epsilon='reset', warm_start=True,
+    curriculum_epsilon='boost', warm_start=True,
     learn_per_action=2, lookahead=True, lookahead_depth=1)
 state = AIState(screen=screen, font=font, audio=audio, config=config, ai_config=ai_config,
     piece_provider=PieceProvider(generator='7bag'), speed='fast')

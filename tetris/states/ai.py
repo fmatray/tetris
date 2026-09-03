@@ -236,7 +236,13 @@ class AIState(BotMovesMixin, GameState):
             from tetris.ai.imitation import imitation_pretrain
 
             n = imitation_pretrain(self.agent)
-            logger.info("Imitation warm-start: trained on %d moves", n)
+            if n:
+                logger.info("Imitation warm-start: trained on %d moves", n)
+            else:
+                logger.warning(
+                    "Imitation warm-start: no usable data in data/human_placements.jsonl"
+                    " — play a human game to record placements"
+                )
         # In playing mode: always greedy (no exploration, no learning)
         if self.ai_mode == "playing":
             self.agent.epsilon = 0.0

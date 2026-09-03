@@ -48,7 +48,7 @@ def imitation_pretrain(
     """
     records = read_placements() if path is None else read_placements(path)
     if not records:
-        _logger.debug("No placement records — imitation warm-start skipped")
+        _logger.info("No placement records — imitation warm-start skipped")
         return 0
 
     games = _split_games(records)

@@ -97,7 +97,7 @@ class HyperparamMenuState(MenuBase):
         "ai_buffer_size": 50_000,
         "ai_curriculum": False,
         "ai_curriculum_freq": 50,
-        "ai_curriculum_epsilon": "reset",
+        "ai_curriculum_epsilon": "boost",
         "ai_warm_start": True,
         "ai_lookahead": True,
         "ai_dueling": False,

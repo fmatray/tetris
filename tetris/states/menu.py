@@ -86,7 +86,7 @@ class MenuState(MenuBase):
         self.ai_mode = "learning"  # "learning" or "playing"
         self.ai_curriculum = False
         self.ai_curriculum_freq = 50
-        self.ai_curriculum_epsilon = "reset"
+        self.ai_curriculum_epsilon = "boost"
         self.ai_warm_start = True
         self.ai_learn_per_action = 2
         self.ai_lookahead = True
