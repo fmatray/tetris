@@ -328,10 +328,39 @@ python scripts/analyze_training.py --charts
 ```
 Outputs `[OK]`/`[ATTN]`/`[CRIT]` flags. Optional `--charts` saves PNGs to `data/analysis/` (score curve, column heatmap, dynamics 4-panel, reward decomposition). Replicates `_trend`, `_moving_average`, and `_cooking_status` logic from game code for consistency. TensorBoard loading disabled (event files too large; step log JSONL covers same metrics).
 
+## MCTS Look-Ahead
+
+`tetris/ai/mcts.py` adds an AlphaZero-style tree search over piece placements. The V-network evaluates leaf boards; the module does no random rollouts. The search works as follows:
+
+1. The root uses the soft-drop candidate placements from `get_candidate_states`.
+2. Root priors come from a softmax over the El-Tetris values (`pick_values`). This makes the priors scale-free.
+3. Deeper levels use cheap hard-drop enumeration only. This is the same approximation as the greedy look-ahead.
+4. The search selects children with the PUCT formula (`C_PUCT = 1.5`).
+5. A terminal leaf (top-out) keeps the value `TERMINAL_VALUE = -1.0` forever.
+
+Piece types beyond the preview queue are sampled from the injected `rng`. This keeps searches reproducible. Nodes are plain dicts, so `docs/class_diagram.md` stays untouched.
+
+Enable it with the **MCTS** option in the AI hyperparameter menu (`ai_mcts` in `settings.json`). **MCTS iterations** sets the search budget (`ai_mcts_iterations`, 20 to 2000, default 200). When MCTS is on, the greedy look-ahead chain is off. This prevents the cost of two searches.
+
+## Self-Play Tournament
+
+`tetris/tournament.py` evolves the checkpoint weights without gradient descent. It runs from the CLI:
+
+```bash
+python -m tetris.tournament --generations 3 --episodes 2 --population 8 --sigma 0.02 --seed 7
+```
+
+The tournament works as follows:
+
+1. It loads the checkpoint at `data/ai_model.pt`.
+2. It builds a population from the base checkpoint plus Gaussian mutants (`sigma` = noise scale).
+3. Each generation evaluates every checkpoint in headless playing-mode episodes. The episode score up to a piece cap is the fitness.
+4. The top half of the population survives. Mutated survivors and uniform-crossover pairs refill the population.
+5. It writes the report to `data/tournament/tournament_report.json` and the best weights to `data/tournament/tournament_best.pt`.
+
+
 ## Future Enhancements
 
-- **MCTS** — combine DQN with tree search for deeper look-ahead
-- **Self-Play Tournament** — population of agents competing
 - **Human Replay (Imitation Learning)** — pre-train on human game replays
 - **Double DQN** — already implemented (V-network DQN)
 - **Dueling Network** — separate value/advantage streams

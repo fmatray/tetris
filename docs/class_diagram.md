@@ -97,6 +97,8 @@ classDiagram
             +ai_lookahead_depth: int
             +ai_dueling: bool
             +ai_imitation: bool
+            +ai_mcts: bool
+            +ai_mcts_iterations: int
             +mcp_port: int
             +bot_lookahead: str
             +speed_mode: str
@@ -467,8 +469,10 @@ classDiagram
             +curriculum: bool
             +warm_start: bool
             +curriculum_freq: int
-            +curriculum_epsilon: str
             - _curriculum_types: list~str~ | None
+            - _mcts_rng: random.Random
+            +mcts: bool
+            +mcts_iterations: int
             +__init__(screen, font, audio, config, ai_config, piece_provider, speed, menu, seed, device) None
             - _lock_and_spawn(hard_drop: bool) tuple~int, list~
             +update(dt: float, particles: ParticleSystem) State | None
@@ -481,6 +485,10 @@ classDiagram
             - _apply_epsilon_policy() None
             +draw(screen: pygame.Surface, particles: ParticleSystem | None) None
             - _on_exit() None
+        }
+        class _EvalState {
+            +final_score: float | None
+            - _on_episode_end() None
         }
         %% Module-level function: iter_column_positions(piece_type: str) -> Iterator
         %% Module-level function: best_next_placement(grid: np.ndarray, piece_type: str) -> np.ndarray
@@ -819,9 +827,9 @@ classDiagram
             +target_syncs: int
             +last_v_spread: float
             +last_v_margin: float
-            +last_action_was_random: bool
-            +__init__(state_size, lr, gamma, epsilon_start, epsilon_end, epsilon_decay, batch_size, buffer_size, device, seed, step_log_path, tb_log_dir) None
+            +values(states: np.ndarray) np.ndarray
             +select_action(candidate_states: np.ndarray, prior_values: np.ndarray | None) int
+            +__init__(state_size, lr, gamma, epsilon_start, epsilon_end, epsilon_decay, batch_size, buffer_size, device, seed, step_log_path, tb_log_dir) None
             +store(state: np.ndarray, action: int, reward: float, next_state: np.ndarray, done: bool) None
             - _push_n_step() None
             +flush_n_step() None
@@ -1099,6 +1107,7 @@ classDiagram
     GameState <|-- HumanState
     GameState <|-- AIState
     GameState <|-- MCPState
+    AIState <|-- _EvalState
 
     nn_Module <|-- DQNetwork
     PieceGenerator <|-- RandomGenerator

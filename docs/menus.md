@@ -121,9 +121,10 @@ flowchart TD
 | Curriculum Frequency | 10–500 | 50 | 10 |
 | Curriculum Epsilon | reset / boost / decay | boost | — |
 | Warm Start | OFF/ON | ON | — |
-| Look-ahead Depth | 1–3 | 1 | 1 |
 | Dueling | OFF/ON | OFF | — |
 | Imitation | OFF/ON | OFF | — |
+| MCTS | OFF/ON | OFF | — |
+| MCTS Iterations | 20–2000 | 200 | 20 |
 
 **Constructor-only parameters** (for `verify_training` / programmatic use):
 - `ai_mode`: "learning" / "playing"
