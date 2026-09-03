@@ -246,6 +246,15 @@ Displays persistent game history from `data/human_stats.json`:
 - `AIState` has its own `_on_episode_end()` and never creates `GameOverState`
 - Separate log files: `ai_training_log.json` / `ai_playing_log.json`
 
+### Placement Recording (Imitation Data)
+
+Every human game also records each locked placement (piece type, rotation,
+column, hold flag) to `data/human_placements.jsonl` via `PlacementsLog`
+(`tetris/game/imitation.py`). The [AI imitation warm-start](ai.md) replays
+these records to pre-train the V-network. The same architectural guarantee
+holds: only `HumanState` attaches a recorder, so AI/bot games never write
+to the placement log. Writes are best-effort and never crash gameplay.
+
 ---
 
 ## Game Over

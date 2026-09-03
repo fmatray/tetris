@@ -96,6 +96,7 @@ classDiagram
             +ai_lookahead: bool
             +ai_lookahead_depth: int
             +ai_dueling: bool
+            +ai_imitation: bool
             +mcp_port: int
             +bot_lookahead: str
             +speed_mode: str
@@ -315,6 +316,17 @@ classDiagram
             +holes_overhangs_help: str
             +seed: int | None
         }
+        class PlacementsLog {
+            +path: str
+            - _fh: IO~str~ | None
+            +__init__(path: str) None
+            +__enter__() PlacementsLog
+            +__exit__(exc_type, exc, tb) None
+            - _write(entry: dict) None
+            +start_game(seed: int | None, handicap: int) None
+            +record(piece: str, rot: int, x: int, hold: bool) None
+            +close() None
+        }
         class GameState {
             +screen: pygame.Surface
             +font: pygame.font.Font
@@ -349,6 +361,8 @@ classDiagram
             - _irs_pending: int
             - _ihs_pending: bool
             - _mute_key: int
+            - _placement_recorder: PlacementsLog | None
+            - _used_hold_since_lock: bool
             +player_type: str
             +__init__(screen, font, audio, config, piece_provider, menu) None
             - _move_left() None
@@ -359,7 +373,7 @@ classDiagram
             - _hard_drop() None
             - _hold() None
             - _advance_piece_pipeline() None
-            - _lock_and_spawn(hard_drop: bool) tuple~int, list~
+            - _lock_and_spawn(hard_drop: bool) tuple~int, list~  %% records placement if _placement_recorder set
             - _finalize_spawn() None
             - are_active: bool <<property>>
             - _on_piece_moved() None
@@ -384,10 +398,12 @@ classDiagram
             - _left_key: int
             - _right_key: int
             - _hold_key: int
+            - _placement_recorder: PlacementsLog | None
             +__init__(screen, font, audio, config, piece_provider, menu) None
             - _setup_keybinds(menu) None
             +handle_event(event: pygame.event.Event) State | None
             +update(dt: float, particles: ParticleSystem) State | None
+            - _on_exit() None
         }
         %% Module-level functions: _drop_interval(level: int, drop_step: float) -> float
         %% Module-level functions: _music_speed_for_level(level: int) -> float
@@ -419,6 +435,8 @@ classDiagram
             +learn_per_action: int
             +lookahead: bool
             +lookahead_depth: int
+            +dueling: bool
+            +imitation: bool
         }
 
         class BotMovesMixin {

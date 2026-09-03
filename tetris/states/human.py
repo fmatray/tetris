@@ -61,6 +61,11 @@ class HumanState(GameState):
             menu,
         )
         self._setup_keybinds(menu)
+        # Imitation data: record placements for AI warm-start (roadmap #5).
+        from tetris.game.imitation import PlacementsLog
+
+        self._placement_recorder = PlacementsLog()
+        self._placement_recorder.start_game(seed=self.seed, handicap=config.handicap)
         self._das_held: dict[int, float] = {}
 
     def _setup_keybinds(self, menu: MenuState | None) -> None:
@@ -122,3 +127,10 @@ class HumanState(GameState):
                         self._das_held[key] = DAS_DELAY_MS
                         self.input_map[key]()
         return super().update(dt, particles)
+
+    def _on_exit(self) -> None:
+        """Close the imitation placement recorder before leaving the state."""
+        if self._placement_recorder is not None:
+            self._placement_recorder.close()
+            self._placement_recorder = None
+        super()._on_exit()

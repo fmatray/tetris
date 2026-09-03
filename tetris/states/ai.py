@@ -40,6 +40,7 @@ class AIConfig:
     lookahead: bool
     lookahead_depth: int
     dueling: bool = False
+    imitation: bool = False
 
 
 from typing import TYPE_CHECKING, NamedTuple
@@ -226,7 +227,11 @@ class AIState(BotMovesMixin, GameState):
                 self.agent.load(MODEL_PATH)
             except (OSError, RuntimeError, KeyError) as e:
                 logger.error("Failed to load AI model: %s", e)
+        if ai_config.imitation and ai_config.ai_mode == "learning":
+            from tetris.ai.imitation import imitation_pretrain
 
+            n = imitation_pretrain(self.agent)
+            logger.info("Imitation warm-start: trained on %d moves", n)
         # In playing mode: always greedy (no exploration, no learning)
         if self.ai_mode == "playing":
             self.agent.epsilon = 0.0

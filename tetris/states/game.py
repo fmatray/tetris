@@ -34,6 +34,7 @@ import pygame
 
 from tetris.audio import AudioManager
 from tetris.game.board import Board, ClearedRow, LineClearResult
+from tetris.game.imitation import PlacementsLog
 from tetris.game.piece_provider import PieceProvider
 from tetris.game.stats import GameStats
 from tetris.game.tetromino import Tetromino
@@ -147,6 +148,11 @@ class GameState(State):
         # Hold piece state
         self.hold_piece: Tetromino | None = None
         self._can_hold = True
+        # Imitation-data recorder. None by default; only HumanState sets it
+        # (same architectural guarantee as human stats: AI/bot states never
+        # pollute the human placement log).
+        self._placement_recorder: PlacementsLog | None = None
+        self._used_hold_since_lock = False
         # Locked-piece history. Populated by _lock_and_spawn; the simulator
         # resets/restores it around each call. Harmless in real play.
         self.locked_pieces: list[str] = []
@@ -244,6 +250,7 @@ class GameState(State):
         self._can_hold = False
         self._lock_timer = 0.0
         self._lock_resets = 0
+        self._used_hold_since_lock = True
         self._grounded = False
         self.drop_time = 0
         self.down_pressed = False
@@ -314,6 +321,14 @@ class GameState(State):
             self.audio.play("hard_drop")
             _logger.debug("Top out: %s locked above visible field", self.current_piece.type)
             return LineClearResult(0, [])
+        if self._placement_recorder is not None:
+            self._placement_recorder.record(
+                self.current_piece.type,
+                self.current_piece.rotation,
+                self.current_piece.x,
+                hold=self._used_hold_since_lock,
+            )
+            self._used_hold_since_lock = False
         tspin = self.board.is_tspin(self.current_piece)
         cleared, rows_data = self.board.lock_tetromino(self.current_piece)
         locked_type = self.current_piece.type

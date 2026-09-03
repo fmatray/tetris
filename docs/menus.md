@@ -42,6 +42,7 @@ flowchart TD
     Training --> Lookahead[Look-ahead ON/OFF]
     Training --> LookaheadDepth[Look-ahead Depth: 1-3]
     Training --> Dueling[Dueling: ON/OFF]
+    Training --> Imitation[Imitation: ON/OFF]
     Training --> ResetDefaults[Reset to Defaults]
     Training --> BackT[Back]
 
@@ -123,6 +124,7 @@ flowchart TD
 | Updates per Piece | 1–8 | 2 | 1 |
 | Look-ahead Depth | 1–3 | 1 | 1 |
 | Dueling | OFF/ON | OFF | — |
+| Imitation | OFF/ON | OFF | — |
 
 **Constructor-only parameters** (for `verify_training` / programmatic use):
 - `ai_mode`: "learning" / "playing"

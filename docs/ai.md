@@ -159,6 +159,24 @@ An episode runs from game start to game over. One placement per piece:
 7. Learn: `learn_per_action` (default 2) gradient updates per locked piece
 8. Repeat until game over
 
+### Imitation Warm-Start (optional, default OFF)
+
+With `ai_imitation` ON (learning mode only), the agent pre-trains from
+recorded human gameplay before the first episode:
+
+1. Human games record each locked placement to `data/human_placements.jsonl`
+   (piece, rotation, column, hold flag) — see [Human Gameplay](human.md).
+2. At AI startup, `imitation_pretrain()` (`tetris/ai/imitation.py`) replays
+   each game on a reconstructed board, enumerates the candidate placements
+   the AI would consider, and applies a softmax cross-entropy ranking loss
+   so `V(human-chosen board)` outranks all alternatives.
+3. The pretrainer uses the same `get_candidate_states` enumerator as live
+   play, so reachability matches exactly. Un-replayable moves are skipped;
+   a missing log is a no-op; failures never crash AI startup.
+
+The effect: the V-network starts already preferring human-shaped placements,
+so early RL episodes explore from a stronger prior instead of noise.
+
 ### Learning Mode vs Playing Mode
 
 | Aspect | Learning Mode | Playing Mode |
@@ -194,6 +212,7 @@ The ARE entry delay and its IRS/IHS buffering follow the shared rule in [game_ru
 | Look-ahead depth | 1 | 1–3 | 1 |
 | Speed | normal | normal/fast | — |
 | Dueling | OFF | OFF/ON | — |
+| Imitation | OFF | OFF/ON | — |
 
 ### Constructor-Only Parameters (for `verify_training` / programmatic use)
 
