@@ -91,7 +91,7 @@ python -m tetris.verify_training
 
 **Runtime:** Python 3.14.5rc1, pygame-ce 2.5.x, macOS arm64.
 
-**Test suite**: `tests/` directory with pytest tests for rewards, agent (n-step, PER), board, tetromino, scoring, stats, piece provider, curriculum, trainer, keybind, game-over, visuals, menus, AI states. Run with `SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy python -m pytest tests/ -q`. Coverage: `SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy python -m pytest tests/ --cov=tetris --cov-report=term-missing -q`.
+**Test suite**: `tests/` directory with pytest tests for rewards, agent (n-step, PER), board, tetromino, scoring, stats, piece provider, curriculum, trainer, keybind, game-over, visuals, menus, AI states, dueling, imitation, layout regression (`tests/layout_harness.py` — `RecordingFont`/`RecordingScreen` assert in-bounds, non-overlapping text across EN/FR/ES/SL state draws). Run with `SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy python -m pytest tests/ -q`. Coverage: `SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy python -m pytest tests/ --cov=tetris --cov-report=term-missing -q`.
 
 ## Code Conventions & Common Patterns
 

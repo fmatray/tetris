@@ -158,6 +158,29 @@ python -m tetris.verify_training
 ```
 Success criteria: see [AI documentation](ai.md).
 
+### Layout Regression Harness
+
+`tests/layout_harness.py` asserts layout invariants on real state draws —
+no pixel goldens (font rasterization is not deterministic across
+platforms). It catches the bug class where translated text (FR/ES/SL)
+overflows the screen or overlaps other HUD text.
+
+Components:
+
+- `RecordingFont` — `pygame.font.Font` subclass (the C type cannot be
+  monkeypatched, but subclassing works). Each `render()` logs the text
+  metrics to a registry keyed by surface id.
+- `RecordingScreen` — `pygame.Surface` subclass that records every text
+  blit (text, position, size) while passing drawing through unchanged.
+- `assert_layout_in_bounds()` — every text blit fits inside the screen.
+- `assert_no_text_overlap()` — no two text rects overlap; identical
+  same-position re-renders (HUD refresh) are tolerated.
+
+`tests/test_visual_regression.py` drives `MenuState`, `HumanState`, and
+`AIState` (learning + playing HUD) through `draw()` in all four languages.
+To add a state: construct it with a `RecordingFont` + `RecordingScreen`,
+call `draw()`, then run both assertions.
+
 ### Code Duplication (jscpd)
 ```bash
 # Check duplication via CLI
