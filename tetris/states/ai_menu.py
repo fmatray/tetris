@@ -45,12 +45,11 @@ class AIMenuState(MenuBase):
                 return ""
 
     def _is_disabled(self, i: int) -> bool:
-        # Training (2) and Tournament (3): locked while training is ongoing
-        # (a trained checkpoint exists) — hyperparams or evolution would
-        # alter a run in progress. "Reset AI" deletes the checkpoint and
-        # unlocks them again.
-        locked = self.menu.ai_mode == "playing" or self.menu.training_in_progress()
-        return bool(i in {2, 3} and locked)
+        if i == 2:  # Training — locked while a checkpoint exists or in playing mode
+            return self.menu.ai_mode == "playing" or self.menu.training_in_progress()
+        if i == 3:  # Tournament — needs a trained checkpoint to evolve
+            return not os.path.exists(MODEL_PATH)
+        return False
 
     def _toggle(self, direction: int) -> None:
         match self.selection:

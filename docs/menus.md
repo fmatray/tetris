@@ -143,7 +143,7 @@ flowchart TD
 
 #### Tournament
 
-Reached from **AI → Tournament**. This menu runs the post-training evolution loop in the game. It needs a trained checkpoint (`data/ai_model.pt`), so it is locked in the same cases as **Training**: while Mode = Playing or while a training run is in progress. See [ai.md](ai.md#self-play-tournament) for the loop semantics.
+Reached from **AI → Tournament**. This menu runs the post-training evolution loop in the game. It is available when a trained checkpoint (`data/ai_model.pt`) exists. "Reset AI" deletes the checkpoint and locks this entry again. See [ai.md](ai.md#self-play-tournament) for the loop semantics.
 
 | Option | Type | Range | Default | Step | Description |
 |--------|------|-------|---------|------|-------------|

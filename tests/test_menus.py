@@ -231,6 +231,30 @@ def test_ai_menu_disabled_when_playing():
     assert state._is_disabled(0) is False
 
 
+def test_ai_menu_tournament_available_when_model_exists(monkeypatch, tmp_path):
+    """Tournament opens when ai_model.pt exists — even in playing mode."""
+    import tetris.states.ai_menu as ai_menu_mod
+
+    model = tmp_path / "model.pt"
+    model.write_bytes(b"checkpoint")
+    monkeypatch.setattr(ai_menu_mod, "MODEL_PATH", str(model))
+    menu = _make_menu()
+    state = _make_state(AIMenuState, menu)
+    assert state._is_disabled(3) is False
+    menu.ai_mode = "playing"
+    assert state._is_disabled(3) is False  # available in playing mode too
+
+
+def test_ai_menu_tournament_locked_without_model(monkeypatch, tmp_path):
+    """No checkpoint — Tournament locked."""
+    import tetris.states.ai_menu as ai_menu_mod
+
+    monkeypatch.setattr(ai_menu_mod, "MODEL_PATH", str(tmp_path / "model.pt"))
+    menu = _make_menu()
+    state = _make_state(AIMenuState, menu)
+    assert state._is_disabled(3) is True
+
+
 def test_ai_menu_not_disabled_when_learning(no_training_checkpoint):
     menu = _make_menu()
     state = _make_state(AIMenuState, menu)
