@@ -40,7 +40,8 @@ flowchart TD
     Training --> WarmStart[Warm Start]
     Training --> LearnPerAction[Updates per Piece]
     Training --> Lookahead[Look-ahead ON/OFF]
-    Training --> SoftDrop[Soft-drop BFS ON/OFF]
+    Training --> LookaheadDepth[Look-ahead Depth: 1-3]
+    Training --> Dueling[Dueling: ON/OFF]
     Training --> ResetDefaults[Reset to Defaults]
     Training --> BackT[Back]
 
@@ -120,8 +121,8 @@ flowchart TD
 | Curriculum Epsilon | reset / boost / decay | reset | — |
 | Warm Start | OFF/ON | ON | — |
 | Updates per Piece | 1–8 | 2 | 1 |
-| Look-ahead | OFF/ON | ON | — |
-| Soft-drop BFS | OFF/ON | ON | — |
+| Look-ahead Depth | 1–3 | 1 | 1 |
+| Dueling | OFF/ON | OFF | — |
 
 **Constructor-only parameters** (for `verify_training` / programmatic use):
 - `ai_mode`: "learning" / "playing"

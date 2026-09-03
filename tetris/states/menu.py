@@ -90,6 +90,7 @@ class MenuState(MenuBase):
         self.ai_warm_start = True
         self.ai_learn_per_action = 2
         self.ai_lookahead = True
+        self.ai_dueling = False
         self.ai_lookahead_depth = 1
         self.mcp_port = MCP_SERVER_PORT
         self.bot_lookahead = "preview"  # "none" or "preview"
@@ -127,6 +128,7 @@ class MenuState(MenuBase):
         "ai_warm_start": "ai_warm_start",
         "ai_learn_per_action": "ai_learn_per_action",
         "ai_lookahead": "ai_lookahead",
+        "ai_dueling": "ai_dueling",
         "ai_lookahead_depth": "ai_lookahead_depth",
         "preview_count": "preview_count",
         "debug": "debug",
@@ -328,6 +330,7 @@ class MenuState(MenuBase):
                 learn_per_action=self.ai_learn_per_action,
                 lookahead=self.ai_lookahead,
                 lookahead_depth=self.ai_lookahead_depth,
+                dueling=self.ai_dueling,
             ),
             ai_provider,
             self.ai_speed,

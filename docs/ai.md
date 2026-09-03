@@ -129,6 +129,21 @@ Input(17, normalized) → Dense(256, ReLU) → Dense(128, ReLU) → Output(1, Li
 - **Online net**: `eval()` during `select_action`, `train()` during `learn` (future-proofs for dropout/BN)
 - **Gradient clipping**: max_norm=1.0
 
+### Dueling Head (optional, default OFF)
+
+With `ai_dueling` ON, the trunk stays 17→256→128 and the output splits into
+two streams: a value head `V(s)` and an advantage head `A(s)`, each a
+`Linear(128, 1)`. The forward output is `V(s) + A(s)` — a function of the
+state alone. There is **no batch-mean advantage centering**: this agent
+evaluates each candidate placement as a single sample, so the output must
+not depend on which other candidates share the batch.
+
+Checkpoints record a `dueling` flag. Loading a dueling checkpoint into a
+plain agent (or the reverse) raises `ValueError("checkpoint architecture
+mismatch")` instead of a cryptic state-dict error. Non-dueling checkpoints
+from older versions (no `dueling` key) load as plain agents unchanged — the
+non-dueling layout keeps the original `net.0/2/4` state-dict keys.
+
 ## Training Pipeline
 
 ### Episode = One Game
@@ -178,6 +193,7 @@ The ARE entry delay and its IRS/IHS buffering follow the shared rule in [game_ru
 | Look-ahead | ON | OFF/ON | — |
 | Look-ahead depth | 1 | 1–3 | 1 |
 | Speed | normal | normal/fast | — |
+| Dueling | OFF | OFF/ON | — |
 
 ### Constructor-Only Parameters (for `verify_training` / programmatic use)
 

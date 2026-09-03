@@ -65,9 +65,10 @@ class DQNAgent:
         batch_size: int = 64,
         buffer_size: int = 50_000,
         device: str = "auto",
-        seed: int | None = None,
+        dueling: bool = False,
         step_log_path: str | None = None,
         tb_log_dir: str | None = None,
+        seed: int | None = None,
     ) -> None:
         """Initialize the DQN agent: network, target network, optimizer, buffer.
 
@@ -101,8 +102,8 @@ class DQNAgent:
             device = "cuda" if torch.cuda.is_available() else "cpu"
         self.device = torch.device(device)
 
-        self.online_net = DQNetwork(state_size).to(self.device)
-        self.target_net = DQNetwork(state_size).to(self.device)
+        self.online_net = DQNetwork(state_size, dueling=dueling).to(self.device)
+        self.target_net = DQNetwork(state_size, dueling=dueling).to(self.device)
         self.target_net.load_state_dict(self.online_net.state_dict())
         self.target_net.eval()
 
@@ -381,6 +382,7 @@ class DQNAgent:
                 "steps": self.steps,
                 "state_size": self.state_size,
                 "curriculum_level": self.curriculum_level,
+                "dueling": self.online_net.dueling,
                 "curriculum_episode_count": self.curriculum_episode_count,
                 "beta": self.buffer.beta,
                 "target_syncs": self.target_syncs,
@@ -391,6 +393,11 @@ class DQNAgent:
     def load(self, path: str) -> None:
         """Load model weights and resume training from checkpoint."""
         checkpoint = torch.load(path, map_location=self.device, weights_only=True)
+        if checkpoint.get("dueling", False) != self.online_net.dueling:
+            raise ValueError(
+                f"checkpoint architecture mismatch: checkpoint dueling="
+                f"{checkpoint.get('dueling', False)}, agent dueling={self.online_net.dueling}"
+            )
         self.online_net.load_state_dict(checkpoint["online_net"])
         self.target_net.load_state_dict(checkpoint["target_net"])
         self.optimizer.load_state_dict(checkpoint["optimizer"])

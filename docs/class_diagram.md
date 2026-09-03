@@ -95,6 +95,7 @@ classDiagram
             +ai_learn_per_action: int
             +ai_lookahead: bool
             +ai_lookahead_depth: int
+            +ai_dueling: bool
             +mcp_port: int
             +bot_lookahead: str
             +speed_mode: str
@@ -819,8 +820,12 @@ classDiagram
         %% Module-level function: _softmax(x: np.ndarray) -> np.ndarray
         %% Module-level constants: WARM_START_TEMP, N_STEP
         class DQNetwork {
+            +dueling: bool
             +net: nn.Sequential
-            +__init__(state_size: int) None
+            +trunk: nn.Sequential
+            +value_head: nn.Linear
+            +advantage_head: nn.Linear
+            +__init__(state_size: int, dueling: bool) None
             +forward(x: torch.Tensor) torch.Tensor
         }
 

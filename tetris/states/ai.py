@@ -39,6 +39,7 @@ class AIConfig:
     learn_per_action: int
     lookahead: bool
     lookahead_depth: int
+    dueling: bool = False
 
 
 from typing import TYPE_CHECKING, NamedTuple
@@ -174,6 +175,7 @@ class AIState(BotMovesMixin, GameState):
             gamma=ai_config.gamma,
             batch_size=ai_config.batch_size,
             buffer_size=ai_config.buffer_size,
+            dueling=ai_config.dueling,
             device=device,
             seed=seed,
             step_log_path=STEP_LOG_PATH if ai_config.ai_mode == "learning" else None,

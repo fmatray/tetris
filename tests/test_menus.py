@@ -477,11 +477,11 @@ def _make_hyperparam(ai_menu=None):
 
 
 def test_hyperparam_options_count():
-    assert len(HyperparamMenuState._OPTIONS) == 19
+    assert len(HyperparamMenuState._OPTIONS) == 20
 
 
 def test_hyperparam_toggle_indices():
-    assert HyperparamMenuState._toggle_indices == frozenset({1, 2, 3, 5, 6, 7, 8, 9, 11, 12, 13, 15, 16})
+    assert HyperparamMenuState._toggle_indices == frozenset({1, 2, 3, 5, 6, 7, 8, 9, 11, 12, 13, 15, 16, 17})
 
 
 def test_hyperparam_value_labels():
@@ -494,8 +494,9 @@ def test_hyperparam_value_labels():
     assert state._value_label(11) == "OFF"
     assert state._value_label(3) == "ON"
     assert state._value_label(15) == "ON"
-    assert state._value_label(17) == ""  # Reset
-    assert state._value_label(18) == ""  # Back
+    assert state._value_label(17) == "OFF"  # Dueling (default OFF)
+    assert state._value_label(18) == ""  # Reset
+    assert state._value_label(19) == ""  # Back
 
 
 def test_hyperparam_toggle_epsilon_decay_up():
@@ -653,7 +654,7 @@ def test_hyperparam_toggle_lookahead_depth_clamp():
 def test_hyperparam_select_retour_returns_ai_menu():
     ai_menu = _make_ai_menu()
     state = _make_hyperparam(ai_menu)
-    state.selection = 18
+    state.selection = 19
     result = state._on_select()
     assert result is ai_menu
 
@@ -665,7 +666,7 @@ def test_hyperparam_select_reset_restores_defaults():
     state.menu.ai_epsilon_decay = 0.990
     state.menu.ai_batch_size = 8
     state.menu.ai_curriculum = True
-    state.selection = 17
+    state.selection = 18
     state._on_select()
     assert state.menu.ai_epsilon_decay == HyperparamMenuState._DEFAULTS["ai_epsilon_decay"]
     assert state.menu.ai_batch_size == HyperparamMenuState._DEFAULTS["ai_batch_size"]
