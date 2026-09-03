@@ -47,7 +47,7 @@ current behavior stays the default until a replacement proves out.
 
 | # | Improvement | Effort | Why |
 |---|-------------|--------|-----|
-| 1 | **Retrain AI model** | Low | Current `ai_model.pt` was trained on buggy pre-BFS features. Run `python -m tetris.verify_training`; target best_score > 10k, avg_score > 1k. Pure re-run, zero code risk. |
+| 1 | **Retrain AI model** | Low | ✅ **Done (v3.5)** — 164-episode background run from the existing checkpoint via `python -m tetris.verify_training`. New-window results: best_score 1.15B, avg_score 35.9M (criteria: best > 10k, avg > 1k). Info: avg duration 349 s/episode, max loss 86.8, epsilon 0.248 → 0.211. |
 | 2 | **Performance re-profiling** | Low | ✅ **Done (v3.5)** — Round 4 baseline added to `docs/performance.md` (§Round 4 Baseline): 500-frame cProfile on the post-redesign architecture — 17.4 s (~28 FPS under profiler, ~69 FPS clean), 15.1 M calls (−38% vs Round 3). Look-ahead `best_next_placement` is the dominant cost (~60% of `update` cumulative time; ~2.2× FPS cost at depth 1); TensorBoard writer measured as noise. py-spy requires root on macOS, so cProfile + A/B runs used instead. |
 | 3 | **Vectorized simulation** | Medium | Numpy/bitboard board ops for candidate evaluation (arXiv 2603.26765 reports ~53× faster engines). Cuts wall-clock per episode; same placements, same rewards. |
 | 4 | **Dueling network head** | Medium | Split V into value + advantage streams over DT-20 features (Rainbow-family). Architecture flag; current V-network stays default until the dueling model beats baseline in `verify_training`. |
@@ -69,7 +69,7 @@ current behavior stays the default until a replacement proves out.
 - **v3.2** — Rule engine centralization (`tetris/game/rules.py`), human/AI alignment
 - **v3.3** — El-Tetris adoption, BFS path replay fix (survival bug), AI network widening
 - **v3.4** — Test debt repayment: i18n global-state leak fixed (language applied at app boot), debug toggle index repaired, hole/overhang markers render restored; ARE entry delay with IRS/IHS
-- **v3.5** — CI pipeline (GitHub Actions: ruff + zuban + headless pytest), Round 4 performance re-profile, zuban baseline fully clean
+- **v3.5** — CI pipeline (GitHub Actions: ruff + zuban + headless pytest), Round 4 performance re-profile, AI model retrained (164 background episodes, criteria passed), zuban baseline fully clean
 
 ---
 
