@@ -92,6 +92,8 @@ class MenuState(MenuBase):
         self.ai_lookahead = True
         self.ai_dueling = False
         self.ai_imitation = False
+        self.ai_mcts = False
+        self.ai_mcts_iterations = 200
         self.ai_lookahead_depth = 1
         self.mcp_port = MCP_SERVER_PORT
         self.bot_lookahead = "preview"  # "none" or "preview"
@@ -128,9 +130,11 @@ class MenuState(MenuBase):
         "ai_curriculum_epsilon": "ai_curriculum_epsilon",
         "ai_warm_start": "ai_warm_start",
         "ai_learn_per_action": "ai_learn_per_action",
+        "ai_imitation": "ai_imitation",
         "ai_lookahead": "ai_lookahead",
         "ai_dueling": "ai_dueling",
-        "ai_imitation": "ai_imitation",
+        "ai_mcts": "ai_mcts",
+        "ai_mcts_iterations": "ai_mcts_iterations",
         "ai_lookahead_depth": "ai_lookahead_depth",
         "preview_count": "preview_count",
         "debug": "debug",
@@ -334,10 +338,10 @@ class MenuState(MenuBase):
                 lookahead_depth=self.ai_lookahead_depth,
                 dueling=self.ai_dueling,
                 imitation=self.ai_imitation,
+                mcts=self.ai_mcts,
+                mcts_iterations=self.ai_mcts_iterations,
             ),
             ai_provider,
-            self.ai_speed,
-            self,
             seed=self.seed,
         )
 

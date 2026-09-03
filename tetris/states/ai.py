@@ -41,6 +41,8 @@ class AIConfig:
     lookahead_depth: int
     dueling: bool = False
     imitation: bool = False
+    mcts: bool = False
+    mcts_iterations: int = 200
 
 
 from typing import TYPE_CHECKING, NamedTuple
@@ -55,6 +57,7 @@ import torch
 from tetris.ai.candidates import NUM_ROTATIONS, Placement  # noqa: F401
 from tetris.ai.hud import draw_ai_hud
 from tetris.ai.agent import DQNAgent
+from tetris.ai.mcts import mcts_select
 from tetris.ai.rewards import (
     board_to_grid,
     compute_reward,
@@ -122,6 +125,9 @@ class AIState(BotMovesMixin, GameState):
     AI HUD overlay.
     """
 
+    _mcts_rng: random.Random
+    mcts: bool
+    mcts_iterations: int
     _curriculum_types: list[str] | None
 
     def __init__(
@@ -247,6 +253,14 @@ class AIState(BotMovesMixin, GameState):
         if self.ai_mode == "playing":
             self.agent.epsilon = 0.0
 
+        # MCTS: PUCT search supersedes the greedy look-ahead chain (avoids
+        # double search cost); selection is still epsilon-gated in learning.
+        self.mcts: bool = ai_config.mcts
+        self.mcts_iterations: int = ai_config.mcts_iterations
+        if self.mcts:
+            self.lookahead = False
+        # Piece-sampling RNG for tree search beyond the preview queue
+        self._mcts_rng: random.Random = random.Random(self._episode_seed)
         # Curriculum learning: restrict piece pool in learning mode
         self.curriculum: bool = ai_config.curriculum
         self.warm_start: bool = ai_config.warm_start
@@ -359,7 +373,25 @@ class AIState(BotMovesMixin, GameState):
             candidates, actions, eval_values = self._get_candidate_states()
             if len(candidates) > 0:
                 prior_values = eval_values if self.warm_start else None
-                chosen_idx = self.agent.select_action(candidates, prior_values)
+                if self.mcts and self.agent.epsilon > 0 and random.random() < self.agent.epsilon:
+                    # Exploration branch unchanged — epsilon-greedy semantics
+                    # in learning mode are preserved (warm-start softmax etc).
+                    chosen_idx = self.agent.select_action(candidates, prior_values)
+                elif self.mcts:
+                    # Greedy branch: PUCT tree search replaces the V argmax.
+                    self.agent.last_action_was_random = False
+                    chosen_idx = mcts_select(
+                        values_fn=self.agent.values,
+                        base_grid=board_to_grid(self.board),
+                        placements=self._candidate_placements,
+                        pick_values=eval_values,
+                        upcoming_types=[self.next_piece.type] + [pp.type for pp in self.preview_pieces],
+                        hold_piece_type=self.hold_piece.type if self.hold_piece else None,
+                        iterations=self.mcts_iterations,
+                        rng=self._mcts_rng,
+                    )
+                else:
+                    chosen_idx = self.agent.select_action(candidates, prior_values)
                 self._prev_action = actions[chosen_idx]
                 self.episode_steps += 1
                 p = self._candidate_placements[chosen_idx]
@@ -541,6 +573,8 @@ class AIState(BotMovesMixin, GameState):
         random.seed(self._episode_seed)
         np.random.seed(self._episode_seed)
         torch.manual_seed(self._episode_seed)
+
+        self._mcts_rng = random.Random(self._episode_seed)
 
         rng = random.Random(self._episode_seed)
 

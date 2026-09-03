@@ -55,11 +55,13 @@ class HyperparamMenuState(MenuBase):
         "Look-ahead depth",  # 16 toggle
         "Dueling",  # 17 toggle
         "Imitation",  # 18 toggle
-        "Reset",  # 19 select
-        "Back",  # 20 select
+        "MCTS",  # 19 toggle
+        "MCTS iterations",  # 20 toggle
+        "Reset",  # 21 select
+        "Back",  # 22 select
     )
     _header_indices: ClassVar[frozenset[int]] = frozenset({0, 4, 10, 14})
-    _toggle_indices = frozenset({1, 2, 3, 5, 6, 7, 8, 9, 11, 12, 13, 15, 16, 17, 18})
+    _toggle_indices = frozenset({1, 2, 3, 5, 6, 7, 8, 9, 11, 12, 13, 15, 16, 17, 18, 19, 20})
     _instructions = "Left/Right: Adjust | Enter: Select | Esc: Back"
 
     # Per-param metadata: (min, max, step, explanation). Headers and
@@ -84,6 +86,8 @@ class HyperparamMenuState(MenuBase):
         ("1", "3", "1", "Number of next pieces evaluated."),
         ("OFF", "ON", "ON/OFF", "Split the V-network into value + advantage streams."),
         ("OFF", "ON", "ON/OFF", "Pre-train from recorded human placements before learning."),
+        ("OFF", "ON", "ON/OFF", "PUCT tree search guided by the V-network at play time."),
+        ("20", "2000", "20", "Tree-search iterations per placement (budget)."),
         ("", "", "", ""),  # Reset
         ("", "", "", ""),  # Back
     )
@@ -102,6 +106,8 @@ class HyperparamMenuState(MenuBase):
         "ai_lookahead": True,
         "ai_dueling": False,
         "ai_imitation": False,
+        "ai_mcts": False,
+        "ai_mcts_iterations": 200,
     }
 
     def __init__(self, screen, font, audio, ai_menu) -> None:
@@ -136,8 +142,10 @@ class HyperparamMenuState(MenuBase):
         ("ai_lookahead_depth", str),
         ("ai_dueling", lambda v: "ON" if v else "OFF"),
         ("ai_imitation", lambda v: "ON" if v else "OFF"),
-        None,  # 19: Reset
-        None,  # 20: Back
+        ("ai_mcts", lambda v: "ON" if v else "OFF"),
+        ("ai_mcts_iterations", str),
+        None,  # 21: Reset
+        None,  # 22: Back
     ]
 
     def _is_disabled(self, i: int) -> bool:
@@ -194,6 +202,10 @@ class HyperparamMenuState(MenuBase):
                 m.ai_dueling = not m.ai_dueling
             case 18:  # Imitation
                 m.ai_imitation = not m.ai_imitation
+            case 19:  # MCTS
+                m.ai_mcts = not m.ai_mcts
+            case 20:  # MCTS iterations
+                m.ai_mcts_iterations = max(20, min(2000, m.ai_mcts_iterations + direction * 20))
 
     def _save(self) -> None:
         self.menu.save_settings()
@@ -202,12 +214,12 @@ class HyperparamMenuState(MenuBase):
         return self.ai_menu
 
     def _on_select(self) -> State | None:
-        if self.selection == 19:  # Reset
+        if self.selection == 21:  # Reset
             for attr, val in self._DEFAULTS.items():
                 setattr(self.menu, attr, val)
             self.menu.save_settings()
             return None
-        if self.selection == 20:  # Back
+        if self.selection == 22:  # Back
             return self.ai_menu
         return None
 

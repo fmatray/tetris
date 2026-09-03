@@ -172,23 +172,36 @@ class DQNAgent:
                 return int(np.random.choice(n, p=probs))
             return random.randint(0, n - 1)
         self.last_action_was_random = False
+        vals_np = self.values(candidate_states)
+        idx = int(np.argmax(vals_np))
+        if len(vals_np) >= 2:
+            sorted_vals = np.sort(vals_np)
+            self.last_v_spread = float(sorted_vals[-1] - sorted_vals[0])
+            self.last_v_margin = float(sorted_vals[-1] - sorted_vals[-2])
+        else:
+            self.last_v_spread = 0.0
+            self.last_v_margin = 0.0
+        if self._tb_writer is not None and self.steps > 0:
+            self._tb_writer.add_scalar("agent/v_spread", self.last_v_spread, self.steps)
+            self._tb_writer.add_scalar("agent/v_margin", self.last_v_margin, self.steps)
+        return idx
+
+    def values(self, states: np.ndarray) -> np.ndarray:
+        """Batched no-grad V evaluation of candidate feature vectors.
+
+        Shared by greedy ``select_action`` and the PUCT tree search
+        (:func:`tetris.ai.mcts.mcts_select`). Leaves the network in eval
+        mode; the caller owns train/eval transitions during learning.
+
+        Args:
+            states: ``(N, 17)`` array of feature vectors.
+        Returns:
+            ``(N,)`` float array of V values.
+        """
         self.online_net.eval()
         with torch.no_grad():
-            states = torch.from_numpy(candidate_states).float().to(self.device)
-            values = self.online_net(states).squeeze(-1)
-            idx = values.argmax(dim=0).item()
-            vals_np = values.cpu().numpy()
-            if len(vals_np) >= 2:
-                sorted_vals = np.sort(vals_np)
-                self.last_v_spread = float(sorted_vals[-1] - sorted_vals[0])
-                self.last_v_margin = float(sorted_vals[-1] - sorted_vals[-2])
-            else:
-                self.last_v_spread = 0.0
-                self.last_v_margin = 0.0
-            if self._tb_writer is not None and self.steps > 0:
-                self._tb_writer.add_scalar("agent/v_spread", self.last_v_spread, self.steps)
-                self._tb_writer.add_scalar("agent/v_margin", self.last_v_margin, self.steps)
-            return idx
+            batch = torch.from_numpy(np.asarray(states)).float().to(self.device)
+            return self.online_net(batch).squeeze(-1).cpu().numpy()
 
     # --- Learning --------------------------------------------------------
 
