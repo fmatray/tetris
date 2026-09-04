@@ -246,7 +246,7 @@ class HyperparamMenuState(MenuBase):
         # Left-aligned: Param, Explanation. Right-aligned: Current, Min, Max, Step.
         headers = ("Parameter", "Current", "Min", "Max", "Step", "Explanation")
         margin = 40
-        left_w = 180  # Param
+        left_w = 320  # Param — widest translated label is ~312px (es)
         num_w = 100  # Current, Min, Max, Step (right-aligned)
         gap = 15
         expl_w = SCREEN_WIDTH - margin * 2 - left_w - num_w * 4 - gap
@@ -255,33 +255,37 @@ class HyperparamMenuState(MenuBase):
         x_num = [margin + left_w + c * num_w for c in range(4)]
         x_expl = margin + left_w + num_w * 4 + gap
 
-        y = CONTENT_Y
         lh = LINE_HEIGHT_SMALL
 
-        # --- Header row (bold via large font? no — use small, white) ---
+        # --- Header row ---
         for c in range(4):
             surf = self.font.render(tr(headers[c + 1]), True, GRAY)
-            screen.blit(surf, (x_num[c] + num_w - surf.get_width(), y))
+            screen.blit(surf, (x_num[c] + num_w - surf.get_width(), CONTENT_Y))
         surf = self.font.render(tr(headers[0]), True, GRAY)
-        screen.blit(surf, (x_left, y))
+        screen.blit(surf, (x_left, CONTENT_Y))
         surf = self.font.render(tr(headers[5]), True, GRAY)
-        screen.blit(surf, (x_expl, y))
-        y += lh
+        screen.blit(surf, (x_expl, CONTENT_Y))
 
+        rows_top = CONTENT_Y + lh
         # --- Separator line ---
-        pygame.draw.line(screen, GRAY, (margin, y - 6), (SCREEN_WIDTH - margin, y - 6))
+        pygame.draw.line(screen, GRAY, (margin, rows_top - 6), (SCREEN_WIDTH - margin, rows_top - 6))
 
-        # --- Data rows ---
-        for i, option in enumerate(self._OPTIONS):
+        # --- Data rows (scroll window: selection always visible, table
+        # stays above the bottom navigation legend) ---
+        bottom_limit = INSTRUCTIONS_Y - 12
+        n_visible = max(1, (bottom_limit - rows_top) // lh)
+        first = max(0, min(self.selection - n_visible + 1, len(self._OPTIONS) - n_visible))
+        for i in range(first, min(len(self._OPTIONS), first + n_visible)):
+            option = self._OPTIONS[i]
             is_sel = i == self.selection
             is_header = i in self._header_indices
             meta = self._PARAM_META[i]
+            y = rows_top + (i - first) * lh
 
             if is_header:
                 # Category header: render in white, slightly indented, no table columns
                 surf = self.font.render(tr(option), True, WHITE)
                 screen.blit(surf, (x_left, y))
-                y += lh
                 continue
 
             color = WHITE if is_sel else GRAY
@@ -309,8 +313,6 @@ class HyperparamMenuState(MenuBase):
                         text = text[:-1]
                         surf = self.font.render(text + "…", True, color)
                 screen.blit(surf, (x_expl, y))
-
-            y += lh
 
         # --- Instructions ---
         instr = self.font.render(tr(self._instructions), True, GRAY)

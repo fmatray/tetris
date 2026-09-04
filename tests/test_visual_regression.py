@@ -114,6 +114,24 @@ def test_human_hud_layout(lang):
 
 
 @pytest.mark.parametrize("lang", LANGUAGES)
+@pytest.mark.parametrize("selection", (0, 8, 14, 20, 22))
+def test_hyperparam_menu_layout(lang, selection):
+    set_language(lang)
+    from tetris.states.ai_menu import AIMenuState
+    from tetris.states.hyperparam_menu import HyperparamMenuState
+
+    screen = RecordingScreen()
+    font = RecordingFont(None, 24)
+    menu = MenuState(screen, font, make_audio())
+    ai = AIMenuState(screen, font, make_audio(), menu)
+    state = HyperparamMenuState(screen, font, make_audio(), ai)
+    state.selection = selection
+    state.draw(screen)
+    assert_layout_in_bounds(screen)
+    assert_no_text_overlap(screen)
+
+
+@pytest.mark.parametrize("lang", LANGUAGES)
 @pytest.mark.parametrize("mode", ("learning", "playing"))
 def test_ai_hud_layout(lang, mode):
     set_language(lang)
