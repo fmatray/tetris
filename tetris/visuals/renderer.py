@@ -109,6 +109,12 @@ class Renderer:
                 pause_text,
                 (HUD_POSITIONS["pause"][0] - pause_text.get_width() // 2, HUD_POSITIONS["pause"][1]),
             )
+        elif getattr(game, "quit_pending", False):
+            hint = get_large_font().render(tr("Quit after game over"), True, WHITE)
+            self.screen.blit(
+                hint,
+                (HUD_POSITIONS["pause"][0] - hint.get_width() // 2, HUD_POSITIONS["pause"][1]),
+            )
         particles.draw(self.screen)
 
     def _draw_text(self, text: str, pos: tuple[int, int]) -> None:

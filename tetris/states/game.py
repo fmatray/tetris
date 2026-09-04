@@ -170,6 +170,7 @@ class GameState(State):
         kb = menu.keybinds if menu is not None else dict(DEFAULT_KEYBINDS)
         self._mute_key: int = kb["mute"]
         self.player_type: str = "Humain"
+        self.quit_pending: bool = False
 
     # --- Input handlers (SLAP: one operation each) ---------------------
     def _move_left(self) -> None:
@@ -377,7 +378,12 @@ class GameState(State):
         return self._are_timer > 0
 
     def _do_game_over(self) -> State:
-        """Stop music, save, and transition to GameOverState."""
+        """Stop music, save, and transition to GameOverState (or menu on q-quit)."""
+        if self.quit_pending:
+            self.audio.stop_music()
+            self.pieces.save()
+            self._on_exit()
+            return self._return_to_menu()
         self.audio.stop_music()
         _logger.debug(
             "Game over | score=%d, lines=%d, level=%d",
@@ -416,6 +422,8 @@ class GameState(State):
                 self.audio.toggle_mute()
             elif event.key == pygame.K_d:
                 self.debug = not self.debug
+            elif event.key == pygame.K_q and self.player_type != "Humain":
+                self.quit_pending = True
             elif event.key == pygame.K_ESCAPE:
                 self.audio.stop_music()
                 self.pieces.save()

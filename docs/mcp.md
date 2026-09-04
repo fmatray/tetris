@@ -304,7 +304,8 @@ def update(self, dt: float, particles: ParticleSystem) -> State | None:
 **Game Over Handling:**
 - Top-out does **not** leave MCP — snapshot reports `game_over: true`
 - Client calls `start_game` to reset
-- Only explicit `quit` action returns to menu
+- Only explicit `quit` action — or the `q` key, which quits after the current
+  game's game over — returns to the menu
 
 ---
 

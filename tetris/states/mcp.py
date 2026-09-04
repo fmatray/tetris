@@ -233,7 +233,7 @@ class MCPState(GameState):
             self._last_tool_call = {"actions": actions, "frames": frames, "results": action_results}
             self._last_snapshot = snapshot
             result_queue.put(snapshot)
-        if quit_requested:
+        if quit_requested or (self.quit_pending and self.game_over):
             return self._do_game_over()
         return None
 

@@ -112,6 +112,7 @@ Keys are configurable via the menu (**Human > Keys**). Default bindings:
 | `P` / `Escape` | Pause | Back |
 | `M` | Mute audio | — |
 | `D` | Toggle debug overlay | — |
+| `Q` | Quit to menu after game over (AI, Bot, MCP) | — |
 | `Return` | — | Select |
 | `Backspace` | — | Back |
 

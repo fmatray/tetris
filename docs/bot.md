@@ -86,7 +86,8 @@ Literature benchmark: ~16M lines average (vs ~5M for classic Dellacherie). The b
 
 The bot returns to the menu on game over. It never writes to the
 leaderboard, human stats, AI training logs, or any `data/` file beyond
-the piece provider's own record/replay path.
+the piece provider's own record/replay path. Press `q` during play to
+return to the menu after the current game ends.
 
 ## Benchmark expectations
 

@@ -112,6 +112,7 @@ Les touches sont configurables via le menu (**Humain > Touches**). Valeurs par d
 | `P` / `Échap` | Pause | Retour |
 | `M` | Muet audio | — |
 | `D` | Basculer overlay debug | — |
+| `Q` | Quitter au menu après le game over (IA, Bot, MCP) | — |
 | `Entrée` | — | Sélectionner |
 | `Retour` | — | Retour |
 

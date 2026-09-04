@@ -172,6 +172,7 @@ class AIState(BotMovesMixin, GameState):
             piece_provider,
             menu,
         )
+        self.player_type = "IA"
         self._handicap = config.handicap
         self.seed: int | None = seed
         self._episode_seed: int = seed if seed is not None else random.randint(0, 999_999_999)
@@ -432,13 +433,18 @@ class AIState(BotMovesMixin, GameState):
     # --- Episode management ---------------------------------------------
 
     def _on_episode_end(self) -> State | None:
-        """Log episode, save model, and restart a new episode."""
+        """Log episode, save model, and restart a new episode (or quit to menu on q)."""
         if not self.game_over:
             return None
         if self.ai_mode == "learning":
             self._log_and_learn()
         else:
             self._log_playing()
+        if self.quit_pending:
+            self.audio.stop_music()
+            self.pieces.save()
+            self._on_exit()
+            return self._return_to_menu()
         self._reset_episode()
         return None
 

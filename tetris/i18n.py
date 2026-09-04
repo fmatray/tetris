@@ -168,6 +168,7 @@ _FR: dict[str, str] = {
     "Hard drop": "Chute rapide",
     "Hold": "Réserve",
     "Pause": "Pause",
+    "Quit after game over": "Quitter après la fin de partie",
     "Mute": "Muet",
     # Renderer HUD
     "SCORE": "SCORE",
@@ -385,6 +386,7 @@ _ES: dict[str, str] = {
     "Hard drop": "Caída rápida",
     "Hold": "Reserva",
     "Pause": "Pausa",
+    "Quit after game over": "Salir al terminar la partida",
     "Mute": "Silencio",
     "SCORE": "PUNTOS",
     "TETROMINOS": "TETROMINOS",
@@ -593,6 +595,7 @@ _SL: dict[str, str] = {
     "Hard drop": "Trd pad",
     "Hold": "Rezerva",
     "Pause": "Premor",
+    "Quit after game over": "Zapri po koncu igre",
     "Mute": "Utišaj",
     "SCORE": "TOČKE",
     "TETROMINOS": "TETROMINI",

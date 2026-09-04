@@ -158,6 +158,9 @@ An episode runs from game start to game over. One placement per piece:
 6. Store transition: `(state, action, reward, next_state, done)` in PER buffer
 7. Learn: `learn_per_action` (default 2) gradient updates per locked piece
 8. Repeat until game over
+Press `q` during play to return to the menu when the current episode ends.
+The episode is logged and the model saved as usual; no new episode starts
+(unlike Esc, which abandons the in-progress episode without logging it).
 
 ### Imitation Warm-Start (optional, default OFF)
 

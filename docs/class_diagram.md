@@ -512,6 +512,7 @@ classDiagram
         }
         class AIState {
             +ghost_piece: bool
+            +player_type: str
             +agent: DQNAgent
             +log: TrainingLog
             - _behavior_log_path: str
