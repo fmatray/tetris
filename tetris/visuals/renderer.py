@@ -103,6 +103,20 @@ class Renderer:
         self._draw_text(f"{tr('GENERATOR')}: {gen}", HUD_POSITIONS["generator"])
         speed_label = tr(SPEED_MODE_LABELS.get(game.speed_mode, "Normal"))
         self._draw_text(f"{tr('SPEED')}: {speed_label}", HUD_POSITIONS["speed_mode"])
+        game_mode = getattr(game, "game_mode", "marathon")
+        if game_mode in ("sprint", "blitz"):
+            elapsed = getattr(game, "elapsed_ms", 0.0)
+            if game_mode == "sprint":
+                total = max(elapsed, 0.0) / 1000.0
+                minutes, seconds = divmod(int(total), 60)
+                text = f"{tr('TIME')}: {minutes}:{seconds:02d}.{int(total * 10) % 10}"
+            else:
+                from tetris.settings import BLITZ_DURATION_MS
+
+                remaining = max(BLITZ_DURATION_MS - elapsed, 0.0) / 1000.0
+                minutes, seconds = divmod(int(remaining), 60)
+                text = f"{tr('TIME LEFT')}: {minutes}:{seconds:02d}"
+            self._draw_text(text, HUD_POSITIONS["timer"])
         if game.paused:
             pause_text = get_large_font().render(tr("PAUSE"), True, WHITE)
             self.screen.blit(

@@ -107,6 +107,17 @@ class HumanStatsState(State):
         y += 10
         games_played = self.font.render(tr("Games played: {}").format(len(self._games)), True, WHITE)
         screen.blit(games_played, (col_label, y))
+        y += LINE_HEIGHT_SMALL
+        # Efficiency summary (games recorded with these fields only).
+        with_time = [g for g in self._games if g.get("time_s") is not None and g["time_s"] > 0]
+        if with_time:
+            avg_pps = sum(g["tetrominos"] / g["time_s"] for g in with_time) / len(with_time)
+            pps_line = self.font.render(tr("Avg PPS: {}").format(f"{avg_pps:.2f}"), True, WHITE)
+            screen.blit(pps_line, (col_label, y))
+            y += LINE_HEIGHT_SMALL
+        total_faults = sum(g.get("finesse_faults", 0) for g in self._games)
+        finesse_line = self.font.render(tr("Finesse faults: {}").format(total_faults), True, WHITE)
+        screen.blit(finesse_line, (col_label, y))
 
         # --- Recent games (right) ---
         # Fixed pixel columns — no format-string alignment, no overflow.

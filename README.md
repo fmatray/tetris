@@ -10,6 +10,7 @@ A complete Tetris game built in Python with Pygame, featuring an embedded Deep Q
 - ✅ **Multiple piece generators** — Random, 7-bag, 35-bag, weighted, replay
 - ✅ **Configurable rules** — Ghost piece, preview count (0/1/3), handicap (0–5), speed modes (none/insane)
 - ✅ **Reproducible seeds** — Numeric seed entry for deterministic piece sequences
+- ✅ **Game modes** — Marathon (default), Sprint (40-line race with timer), Blitz (2-minute score attack with countdown)
 - ✅ **ARE entry delay** — 100ms appearance delay with IRS/IHS input buffering (configurable)
 
 ### AI Player (DQN)
@@ -51,8 +52,8 @@ A complete Tetris game built in Python with Pygame, featuring an embedded Deep Q
 
 ### Persistence & Logging
 - ✅ **Settings** — `data/settings.json` (all menu prefs, keybinds, AI hyperparams)
-- ✅ **Leaderboard** — Top 10 scores (`data/leaderboard.json`)
-- ✅ **Human stats** — Unbounded game history (`data/human_stats.json`)
+- ✅ **Leaderboard** — Top 10 scores per game mode: marathon, sprint (ranked by time), blitz (`data/leaderboard.json`)
+- ✅ **Human stats** — Unbounded game history incl. PPS + finesse faults (`data/human_stats.json`)
 - ✅ **AI model** — PyTorch checkpoint (`data/ai_model.pt`: weights, optimizer, epsilon, curriculum state)
 - ✅ **Training logs** — 5-tier observability (see AI Player section)
 - ✅ **Centralized logging** — `tetris.logger` module, debug mode writes to `data/debug.log`

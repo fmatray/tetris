@@ -15,6 +15,7 @@ class HumanMenuState(MenuBase):
     """
 
     _OPTIONS = ("Mode", "Seed", "Keys", "Statistics", "Back")
+    _MODE_CYCLE = ("Normal", "Replay", "Sprint", "Blitz")
     _toggle_indices = frozenset({0})
     _title = "Human"
 
@@ -36,7 +37,8 @@ class HumanMenuState(MenuBase):
     def _toggle(self, direction: int) -> None:
         match self.selection:
             case 0:  # Mode
-                self.menu.mode = "Replay" if self.menu.mode == "Normal" else "Normal"
+                cycle = self._MODE_CYCLE
+                self.menu.mode = cycle[(cycle.index(self.menu.mode) + direction) % len(cycle)]
 
     def _save(self) -> None:
         self.menu.save_settings()

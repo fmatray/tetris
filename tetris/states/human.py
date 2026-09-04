@@ -14,6 +14,7 @@ if TYPE_CHECKING:
 
 import pygame
 
+from tetris.game.board import LineClearResult
 from tetris.audio import AudioManager
 from tetris.game.piece_provider import PieceProvider
 from tetris.settings import DAS_DELAY_MS, DAS_REPEAT_MS
@@ -67,6 +68,53 @@ class HumanState(GameState):
         self._placement_recorder = PlacementsLog()
         self._placement_recorder.start_game(seed=self.seed, handicap=config.handicap)
         self._das_held: dict[int, float] = {}
+        # Special modes (Sprint/Blitz) and efficiency accounting. AI/Bot/MCP
+        # states never set these: they stay marathon with no timer/finesse.
+        self.game_mode: str = {
+            "Sprint": "sprint",
+            "Blitz": "blitz",
+        }.get(menu.mode if menu is not None else "Normal", "marathon")
+        self.elapsed_ms: float = 0.0
+        # Finesse accounting: lateral/rotation inputs for the current piece.
+        self._piece_inputs: int = 0
+        self._spawn_x: int | None = self.current_piece.x if self.current_piece is not None else None
+        self.finesse_faults: int = 0
+        # Wrap movement/rotation handlers to count finesse inputs.
+        for key, action in list(self.input_map.items()):
+            if action in (self._move_left, self._move_right, self._rotate_cw, self._rotate_ccw):
+                self.input_map[key] = self._counted(action)
+
+    def _counted(self, action: Callable[[], None]) -> Callable[[], None]:
+        """Wrap an input handler so it also counts as a finesse input."""
+
+        def wrapper() -> None:
+            self._piece_inputs += 1
+            action()
+
+        return wrapper
+
+    def _note_spawn(self) -> None:
+        """Record spawn position and reset the per-piece input counter."""
+        self._piece_inputs = 0
+        piece = self.current_piece
+        self._spawn_x = piece.x if piece is not None else None
+
+    def _check_finesse(self) -> None:
+        """Charge a finesse fault if inputs exceeded the theoretical minimum.
+
+        # ponytail: approximate finesse — ignores SRS kick lateral credit and
+        # overhang detours; upgrade to BFS shortest-path if the metric needs
+        # to be exact.
+        """
+        if self._spawn_x is None or self.current_piece is None:
+            return
+        piece = self.current_piece
+        from tetris.game.shapes import num_shape_rot
+
+        min_rot = min(piece.rotation, num_shape_rot(piece.type) - piece.rotation)
+        min_inputs = min_rot + abs(piece.x - self._spawn_x)
+        if self._piece_inputs > min_inputs:
+            self.finesse_faults += 1
 
     def _setup_keybinds(self, menu: MenuState | None) -> None:
         """Build key → action map from the menu's keybindings (or defaults)."""
@@ -118,6 +166,7 @@ class HumanState(GameState):
         Returns a new :class:`State` on game-over, or ``None`` to stay.
         """
         if not self.game_over and not self.paused:
+            self.elapsed_ms += dt
             for key in list(self._das_held):
                 self._das_held[key] += dt
                 held = self._das_held[key]
@@ -126,7 +175,34 @@ class HumanState(GameState):
                     if since_last >= DAS_REPEAT_MS:
                         self._das_held[key] = DAS_DELAY_MS
                         self.input_map[key]()
-        return super().update(dt, particles)
+        result = super().update(dt, particles)
+        if result is not None or self.game_over:
+            return result
+        return self._check_mode_end()
+
+    def _check_mode_end(self) -> State | None:
+        """End Sprint on 40 lines and Blitz when the 2-minute budget runs out."""
+        from tetris.settings import BLITZ_DURATION_MS, SPRINT_TARGET_LINES
+
+        if self.game_mode == "sprint" and self.stats.total_lines >= SPRINT_TARGET_LINES:
+            self.game_over = True
+            return self._do_game_over()
+        if self.game_mode == "blitz" and self.elapsed_ms >= BLITZ_DURATION_MS:
+            self.game_over = True
+            return self._do_game_over()
+        return None
+
+    def _hold(self) -> None:
+        """Hold piece swap, then reset finesse accounting for the swapped piece."""
+        super()._hold()
+        self._note_spawn()
+
+    def _lock_and_spawn(self, hard_drop: bool = False) -> LineClearResult:
+        """Lock with finesse fault check before the piece leaves the field."""
+        self._check_finesse()
+        result = super()._lock_and_spawn(hard_drop)
+        self._note_spawn()
+        return result
 
     def _on_exit(self) -> None:
         """Close the imitation placement recorder before leaving the state."""

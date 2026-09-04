@@ -37,6 +37,40 @@ The human player mode provides a complete Tetris Guideline-compliant experience 
 | **Weighted** | Custom weights (S/Z/O less frequent) |
 | **Replay** | Pre-recorded sequence from `data/replay_pieces.json` |
 
+### Special Modes (Sprint & Blitz)
+
+The Mode option in the human menu cycles `Normal → Replay → Sprint → Blitz`.
+Sprint and Blitz only change win/lose conditions and add a timer; all other
+gameplay (SRS, hold, lock delay, scoring) is identical to Marathon. AI, Bot,
+and MCP players always play Marathon.
+
+| Mode | Goal | End condition | HUD timer |
+|------|------|---------------|-----------|
+| **Marathon** | Score as much as possible | Top-out | — |
+| **Sprint** | Clear 40 lines as fast as possible | 40 lines reached (win) or top-out | Elapsed (`TIME:`) |
+| **Blitz** | Score as much as possible in 2 minutes | 120 s elapsed (time out) or top-out | Remaining (`TIME LEFT:`) |
+
+Timer constants: `SPRINT_TARGET_LINES = 40`, `BLITZ_DURATION_MS = 120_000`
+(`tetris/settings.py`). End conditions are checked in
+`HumanState._check_mode_end` after each update, so the line clear or lock of
+that frame counts before the game ends. Sprint results only enter the
+leaderboard on a completed 40-line run.
+
+### Efficiency Stats (PPS & Finesse)
+
+Every finished human game records:
+
+- **PPS** (pieces per second): `piece_count / elapsed_seconds`, computed in
+  `GameOverState` and stored as `pps` in `human_stats.json`.
+- **Finesse faults**: inputs beyond the theoretical minimum per piece
+  (one rotation at most plus lateral distance from spawn). The counter is an
+  approximation — it ignores SRS kick lateral credit and overhang detours.
+
+Both are optional keyword-only fields of `save_human_game()`; records saved
+before v3.7 simply lack them, and the stats screen aggregates with `.get()`.
+The stats screen shows average PPS and total finesse faults below the
+summary table.
+
 ---
 
 ## Input System

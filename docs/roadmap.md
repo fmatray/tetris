@@ -28,12 +28,12 @@ existing modes, tests, or behavior. Each ships behind its own menu entry.
 
 | # | Feature | Effort | Why |
 |---|---------|--------|-----|
-| 1 | **Sprint (40 Lines)** | Low | Race to clear 40 lines with a live timer. Reuses `GameStats.lines` + existing `GameState`; adds win condition + timer HUD only. Standard modern mode. |
-| 2 | **Blitz (2-minute Ultra)** | Low | Max score in 120 s. Reuses `ScoreEngine`; adds countdown + end condition. Same skeleton as Sprint — build both together. |
+| 1 | ~~**Sprint (40 Lines)**~~ **Done (v3.7)** | Low | Race to clear 40 lines with a live timer. Implemented inside `HumanState` (`game_mode`, `elapsed_ms`); timer HUD at `HUD_POSITIONS["timer"]`. |
+| 2 | ~~**Blitz (2-minute Ultra)**~~ **Done (v3.7)** | Low | Max score in 120 s. Shares the Sprint skeleton: countdown HUD + end condition in `HumanState._check_mode_end`. |
 | 3 | **VS AI with garbage** | High | Local versus: human vs El-Tetris bot; garbage rows per clear with combo + B2B bonuses (Guideline). New `GarbageQueue` domain class in `tetris/game/`; bot side reuses `ElTetrisState`. |
 | 4 | **Replay viewer** | Medium | Scrub recorded human games. `ReplayGenerator` + `replay_pieces.json` already store piece sequences — extend to render board states per frame. |
-| 5 | **Per-mode leaderboards** | Low | Separate top-10 tables for Marathon/Sprint/Blitz in `leaderboard.json` (new `mode` field, backward-compatible read). |
-| 6 | **Efficiency stats (PPS, finesse)** | Low | Post-game PPS + finesse-error count (Galactoid-style feedback) in `human_stats.json` and stats screen. Pure accounting, no gameplay change. |
+| 5 | ~~**Per-mode leaderboards**~~ **Done (v3.7)** | Low | Single `leaderboard.json`, per-entry `game_mode` field (legacy entries read as marathon); top-10 per mode, sprint ranked by time. LEFT/RIGHT tabs in `LeaderboardState`. |
+| 6 | ~~**Efficiency stats (PPS, finesse)**~~ **Done (v3.7)** | Low | Post-game PPS + finesse-fault count in `human_stats.json` (keyword-only fields, legacy-safe) and summary lines on the stats screen. |
 | 7 | **Daily challenge** | Medium | Seeded run (date-derived seed) with one leaderboard entry per day. Seed machinery already exists (`SeedEntryState`). |
 | 8 | **Human-AI co-op hints** | Medium | Optional overlay showing the DQN agent's best placement for the human's current piece. Read-only; uses existing candidate generation. |
 | 9 | **Custom rule sets** | Medium | Configurable guideline subsets (starting garbage rows, inverted colors, gravity curves) via a rules menu entry persisted in `settings.json`. |
@@ -72,6 +72,7 @@ current behavior stays the default until a replacement proves out.
 - **v3.4** — Test debt repayment: i18n global-state leak fixed (language applied at app boot), debug toggle index repaired, hole/overhang markers render restored; ARE entry delay with IRS/IHS
 - **v3.5** — CI pipeline (GitHub Actions: ruff + zuban + headless pytest), Round 4 performance re-profile, AI model retrained (164 background episodes, criteria passed), zuban baseline fully clean
 - **v3.6** — Vectorized look-ahead simulation (`best_next_placements_batch`), dueling network head, imitation warm-start, visual layout regression harness, MCTS look-ahead (PUCT + V-network), self-play tournament (CLI + in-game loops), `q` quit-after-game-over key (AI/Bot/MCP)
+- **v3.7** — Sprint (40 lines) and Blitz (2-minute) human modes with timer HUD, per-game-mode leaderboards (LEFT/RIGHT tabs, sprint ranked by time), efficiency stats (PPS + approximate finesse faults) on the stats screen
 
 ---
 
@@ -103,6 +104,6 @@ This project uses a simple versioning scheme:
 - `main` branch — stable, all development lands here
 - `v3` branch — alias of `main` (kept for history; not separately maintained)
 - `old-main`, `AIv2` — historical branches, kept for reference
-- Milestones (v1–v3.6) are documented above; no git tags are maintained
+- Milestones (v1–v3.7) are documented above; no git tags are maintained
 
 No formal release process — `main` is always deployable.

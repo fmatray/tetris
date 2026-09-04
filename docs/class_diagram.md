@@ -469,6 +469,13 @@ classDiagram
             +__init__(screen, font, audio, config, piece_provider, menu) None
             - _setup_keybinds(menu) None
             +handle_event(event: pygame.event.Event) State | None
+            - _setup_keybinds(menu) None
+            - _counted(action: Callable[[], None]) Callable[[], None]
+            - _note_spawn() None
+            - _check_finesse() None
+            - _check_mode_end() State | None
+            - _hold() None
+            - _lock_and_spawn(hard_drop: bool = False) LineClearResult
             +update(dt: float, particles: ParticleSystem) State | None
             - _on_exit() None
         }
@@ -605,6 +612,8 @@ classDiagram
             +step: str
             - _scores: list~dict~
             - _highlight_index: int | None
+            - _game_mode() str
+            - _elapsed_s() float | None
             +__init__(screen, font, audio, game, menu) None
             - _score_qualifies() bool
             +update(dt: float, particles) State | None

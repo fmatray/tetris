@@ -279,8 +279,8 @@ All in `data/` (gitignored via blanket `data/` rule):
 | File | Path constant | Format | Purpose |
 |---|---|---|---|
 | `settings.json` | `SETTINGS_PATH` | JSON | Menu prefs, AI hyperparams, keybinds, debug flag |
-| `leaderboard.json` | `LEADERBOARD_PATH` | JSON | Top 10 scores (capped) |
-| `human_stats.json` | `HUMAN_STATS_PATH` | JSON | Unbounded human game history |
+| `leaderboard.json` | `LEADERBOARD_PATH` | JSON | Top 10 scores per game mode (marathon/sprint/blitz; per-entry `game_mode` field, sprint entries carry `time_s`) |
+| `human_stats.json` | `HUMAN_STATS_PATH` | JSON | Unbounded human game history (optional `time_s`/`pps`/`finesse_faults` fields on new records) |
 | `ai_model.pt` | `MODEL_PATH` | PyTorch | DQN weights + optimizer + epsilon |
 | `ai_training_log.json` | `LOG_PATH` | JSON | Per-episode training metrics (35 fields: 9 original + 26 observability) |
 | `ai_step_log.jsonl` | `STEP_LOG_PATH` | JSONL | Per-`learn()`-call metrics (loss, TD error, grad norm, LR, buffer fill); rotates at 100K lines |
@@ -299,7 +299,7 @@ All in `data/` (gitignored via blanket `data/` rule):
 | `media/korobeiniki.mid` | `MUSIC_SONG_PATHS["korobeiniki"]` | MIDI | Korobeiniki music (melody + bass) |
 | `media/kalinka.mid` | `MUSIC_SONG_PATHS["kalinka"]` | MIDI | Kalinka music (melody + bass) |
 
-**`settings.json` schema**: `player` ("Humain"/"IA"/"Bot"/"MCP"), `mode` ("Normal"/"Replay"), `handicap` (0-5), `sound` (int 0-3), `music` (int 0-3), `song` ("korobeiniki"/"kalinka"), `debug` (bool), `ghost_piece` (bool), `preview_count` (int 0/1/3), `piece_generator` ("random"/"7bag"/"35bag"/"weighted"), `speed_mode` ("none"/"easy"/"normal"/"medium"/"hard"/"crazy"/"insane"), `are` (bool), `ai_speed` ("normal"/"fast"), `ai_epsilon_decay` (float), `ai_epsilon_end` (float), `ai_lr` (float), `ai_gamma` (float), `ai_batch_size` (int), `ai_buffer_size` (int), `ai_mode` ("learning"/"playing"), `ai_curriculum` (bool), `ai_curriculum_freq` (int), `ai_curriculum_epsilon` (str), `ai_warm_start` (bool), `ai_learn_per_action` (int), `ai_lookahead` (bool), `ai_lookahead_depth` (int 1-3), `ai_dueling` (bool), `ai_imitation` (bool), `ai_mcts` (bool), `ai_mcts_iterations` (int 20-2000), `mcp_port` (int), `bot_lookahead` ("none"/"preview"), `tournament_loops` (int 1-20), `tournament_generations` (int 1-20), `tournament_episodes` (int 1-5), `tournament_population` (int 2-12), `tournament_sigma` (float 0.005-0.10), `tournament_seed` (int), `seed` (int|null), `keybinds` (dict: action→pygame keycode, includes `mute` and `hold`)
+**`settings.json` schema**: `player` ("Humain"/"IA"/"Bot"/"MCP"), `mode` ("Normal"/"Replay"/"Sprint"/"Blitz"), `handicap` (0-5), `sound` (int 0-3), `music` (int 0-3), `song` ("korobeiniki"/"kalinka"), `debug` (bool), `ghost_piece` (bool), `preview_count` (int 0/1/3), `piece_generator` ("random"/"7bag"/"35bag"/"weighted"), `speed_mode` ("none"/"easy"/"normal"/"medium"/"hard"/"crazy"/"insane"), `are` (bool), `ai_speed` ("normal"/"fast"), `ai_epsilon_decay` (float), `ai_epsilon_end` (float), `ai_lr` (float), `ai_gamma` (float), `ai_batch_size` (int), `ai_buffer_size` (int), `ai_mode` ("learning"/"playing"), `ai_curriculum` (bool), `ai_curriculum_freq` (int), `ai_curriculum_epsilon` (str), `ai_warm_start` (bool), `ai_learn_per_action` (int), `ai_lookahead` (bool), `ai_lookahead_depth` (int 1-3), `ai_dueling` (bool), `ai_imitation` (bool), `ai_mcts` (bool), `ai_mcts_iterations` (int 20-2000), `mcp_port` (int), `bot_lookahead` ("none"/"preview"), `tournament_loops` (int 1-20), `tournament_generations` (int 1-20), `tournament_episodes` (int 1-5), `tournament_population` (int 2-12), `tournament_sigma` (float 0.005-0.10), `tournament_seed` (int), `seed` (int|null), `keybinds` (dict: action→pygame keycode, includes `mute` and `hold`)
 
 ## DQN AI Specifics
 

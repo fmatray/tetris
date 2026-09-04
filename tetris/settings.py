@@ -131,7 +131,14 @@ HUD_POSITIONS = {
     "debug_bag": (840, 50),  # bag/weights debug panel
     "mcp_hud": (610, 450),
     "pause": (400, 350),
+    "timer": (840, 20),  # Sprint/Blitz timer (elapsed or remaining)
 }
+
+
+# --- Special modes -------------------------------------------------------
+SPRINT_TARGET_LINES = 40  # Sprint: clear this many lines to win
+BLITZ_DURATION_MS = 120_000  # Blitz: game ends after this many ms
+LEADERBOARD_MODES = ("marathon", "sprint", "blitz")  # leaderboard tabs
 
 # --- Game-over animation -----------------------------------------------
 GAME_OVER_DURATION_MS = 4000

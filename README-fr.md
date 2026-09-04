@@ -10,6 +10,7 @@ Un jeu Tetris complet développé en Python avec Pygame, incluant un agent IA De
 - ✅ **Générateurs de pièces multiples** — Aléatoire, sac 7-bag, sac 35-bag, pondéré, replay
 - ✅ **Règles configurables** — Pièce fantôme, nombre d'aperçus (0/1/3), handicap (0–5), modes de vitesse (aucun/insane)
 - ✅ **Graines reproductibles** — Saisie numérique de graine pour séquences de pièces déterministes
+- ✅ **Modes de jeu** — Marathon (défaut), Sprint (course 40 lignes avec chronomètre), Blitz (attaque de score 2 minutes avec compte à rebours)
 - ✅ **Délai d'apparition ARE** — 100 ms avec mise en mémoire IRS/IHS (configurable)
 
 ### IA Joueur (DQN)
@@ -51,8 +52,8 @@ Un jeu Tetris complet développé en Python avec Pygame, incluant un agent IA De
 
 ### Persistance & Logs
 - ✅ **Réglages** — `data/settings.json` (tous prefs menus, keybinds, hyperparams IA)
-- ✅ **Classement** — Top 10 scores (`data/leaderboard.json`)
-- ✅ **Stats humain** — Historique parties non borné (`data/human_stats.json`)
+- ✅ **Classement** — Top 10 par mode de jeu : marathon, sprint (classé au temps), blitz (`data/leaderboard.json`)
+- ✅ **Stats humain** — Historique parties non borné, incluant PPS + fautes de finesse (`data/human_stats.json`)
 - ✅ **Modèle IA** — Checkpoint PyTorch (`data/ai_model.pt`: poids, optimiseur, epsilon, état curriculum)
 - ✅ **Logs entraînement** — Observabilité 5 niveaux (voir section IA Joueur)
 - ✅ **Logging centralisé** — Module `tetris.logger`, mode debug écrit dans `data/debug.log`

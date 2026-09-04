@@ -16,7 +16,7 @@ flowchart TD
     Menu --> Debug[Debug ON/OFF]
     Menu --> Quit[Quit]
 
-    Human --> Mode[Mode: Normal / Replay]
+    Human --> Mode[Mode: Normal / Replay / Sprint / Blitz]
     Human --> Keys[Keybinds]
     Human --> Stats[Human Stats]
     Human --> Back1[Back]
@@ -84,7 +84,7 @@ flowchart TD
 | 4 | **Bot** | Submenu | El-Tetris bot settings (enabled only when Player=Bot) |
 | 5 | **MCP** | Submenu | MCP server settings (enabled only when Player=MCP) |
 | 6 | **Game Rules** | Submenu | Game rule configuration |
-| 7 | **Leaderboard** | Submenu | Top 10 scores display |
+| 7 | **Leaderboard** | Submenu | Top 10 scores per mode (Marathon / Sprint / Blitz, LEFT/RIGHT tabs) |
 | 8 | **Audio** | Submenu | Sound/music volume and song selection |
 | 9 | **Debug** | Toggle | Debug mode ON/OFF (persisted) |
 | 10 | **Language** | Submenu | Select UI language: English, Français, Español, Slovenščina (persisted, on-the-fly) |
@@ -98,9 +98,9 @@ flowchart TD
 
 | Option | Type | Values | Description |
 |--------|------|--------|-------------|
-| **Mode** | Toggle | Normal / Replay | Normal: new game with current generator. Replay: plays recorded piece sequence from `data/replay_pieces.json` |
+| **Mode** | Toggle | Normal / Replay / Sprint / Blitz | Normal: new game with current generator. Replay: plays recorded piece sequence from `data/replay_pieces.json`. Sprint: 40-line race with elapsed timer. Blitz: 2-minute score attack with countdown |
 | **Keybinds** | Submenu | — | Configure all action-to-key mappings |
-| **Statistics** | Submenu | — | View human game history, clear counts, session stats |
+| **Statistics** | Submenu | — | View human game history, clear counts, session stats, average PPS, finesse faults |
 | **Back** | Action | — | Returns to Main Menu |
 
 ### AI Submenu (Player = AI)

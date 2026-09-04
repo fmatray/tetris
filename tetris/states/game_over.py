@@ -12,7 +12,15 @@ import pygame
 
 from tetris.audio import AudioManager
 from tetris.i18n import tr
-from tetris.settings import BLACK, GRAY, LEADERBOARD_SIZE, MAX_NAME_LENGTH, SCREEN_WIDTH, WHITE
+from tetris.settings import (
+    BLACK,
+    GRAY,
+    LEADERBOARD_SIZE,
+    MAX_NAME_LENGTH,
+    SCREEN_WIDTH,
+    SPRINT_TARGET_LINES,
+    WHITE,
+)
 from tetris.states.base import State
 from tetris.states.game import GameState
 from tetris.storage import load_leaderboard, save_human_game, save_score
@@ -49,11 +57,29 @@ class GameOverState(State):
         self._highlight_index: int | None = None
         self.step = "ANIMATION"
 
+    @property
+    def _game_mode(self) -> str:
+        """Game mode of the finished run (marathon for non-human players)."""
+        return getattr(self.game, "game_mode", "marathon")
+
+    @property
+    def _elapsed_s(self) -> float | None:
+        """Elapsed seconds of the finished run, if the game tracked time."""
+        elapsed = getattr(self.game, "elapsed_ms", None)
+        return elapsed / 1000.0 if elapsed is not None else None
+
     def _score_qualifies(self) -> bool:
-        """True if the current score would enter the top-10 leaderboard."""
-        scores = load_leaderboard()
+        """True if the finished game would enter its game-mode top-10."""
+        gm = self._game_mode
+        if gm == "sprint" and self.game.stats.total_lines < SPRINT_TARGET_LINES:
+            return False  # sprint records only count a completed 40-line run
+        scores = load_leaderboard(gm)
         if len(scores) < LEADERBOARD_SIZE:
             return True
+        if gm == "sprint":
+            worst = scores[-1].get("time_s")
+            time_s = self._elapsed_s
+            return time_s is not None and (worst is None or time_s < worst)
         return self.game.stats.score > scores[-1]["score"]
 
     def update(self, dt: float, particles) -> State | None:
@@ -83,6 +109,10 @@ class GameOverState(State):
 
     def _handle_name_event(self, event: pygame.event.Event) -> State | None:
         if event.key == pygame.K_RETURN and self.name.strip():
+            time_s = self._elapsed_s
+            pps = None
+            if time_s and time_s > 0:
+                pps = self.game.stats.piece_count / time_s
             save_score(
                 self.name,
                 self.game.stats.score,
@@ -92,6 +122,8 @@ class GameOverState(State):
                 self.game.menu.mode if self.game.menu else "Normal",
                 speed_mode=self.game.speed_mode,
                 seed=self.game.seed,
+                game_mode=self._game_mode,
+                time_s=time_s,
             )
             if self.game.player_type == "Humain":
                 save_human_game(
@@ -101,8 +133,11 @@ class GameOverState(State):
                     self.game.stats.total_lines,
                     self.game.stats.piece_count,
                     seed=self.game.seed,
+                    time_s=time_s,
+                    pps=pps,
+                    finesse_faults=getattr(self.game, "finesse_faults", None),
                 )
-            self._scores = load_leaderboard()
+            self._scores = load_leaderboard(self._game_mode)
             # Find the just-saved entry to highlight it in red.
             self._highlight_index = next(
                 (

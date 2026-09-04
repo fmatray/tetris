@@ -27,27 +27,35 @@ class ColumnDef(NamedTuple):
 
 
 def draw_leaderboard(
-    screen: pygame.Surface, font: pygame.font.Font, scores: list[dict] | None = None, highlight_index: int | None = None
+    screen: pygame.Surface,
+    font: pygame.font.Font,
+    scores: list[dict] | None = None,
+    highlight_index: int | None = None,
+    game_mode: str = "marathon",
 ) -> None:
     """Render the top-10 leaderboard table onto *screen*.
 
     When *highlight_index* is set, that row (0-based) is rendered in red.
+    *game_mode* names the tab (marathon/sprint/blitz); sprint shows a
+    Time column instead of Lines and the mode in the title.
     """
     screen.fill(BLACK)
     if scores is None:
         scores = load_leaderboard()
-    title = get_large_font().render(tr("TOP 10 LEADERBOARD"), True, WHITE)
+    tab_suffix = "" if game_mode == "marathon" else f" — {game_mode.capitalize()}"
+    title = get_large_font().render(tr("TOP 10 LEADERBOARD") + tab_suffix, True, WHITE)
     screen.blit(title, (SCREEN_WIDTH // 2 - title.get_width() // 2, TITLE_Y))
     # Explicit pixel columns — proportional Arial breaks f-string padding.
     # pad gives breathing room between adjacent columns.
     margin = 150
     pad = 15
+    is_sprint = game_mode == "sprint"
     columns = [
         ColumnDef("#", 60, "right"),
         ColumnDef("Name", 240, "left"),
         ColumnDef("Score", 130, "right"),
         ColumnDef("Lvl", 60, "right"),
-        ColumnDef("Lines", 80, "right"),
+        ColumnDef("Time" if is_sprint else "Lines", 80, "right"),
         ColumnDef("Generator", 170, "left"),
         ColumnDef("Mode", 130, "left"),
         ColumnDef("Speed", 130, "left"),
@@ -70,12 +78,18 @@ def draw_leaderboard(
         y = CONTENT_Y + LINE_HEIGHT_SMALL + i * LINE_HEIGHT_SMALL
         gen = tr(GENERATOR_LABELS.get(entry.get("generator", ""), "Random"))
         mode = tr(entry.get("mode", "-") or "-")
+        time_s = entry.get("time_s")
+        if is_sprint and time_s is not None:
+            minutes, seconds = divmod(int(time_s), 60)
+            lines_cell = f"{minutes}:{seconds:02d}.{int(time_s * 10) % 10}"
+        else:
+            lines_cell = str(entry.get("lines", 0))
         values = [
             str(i),
             entry["name"],
             str(entry["score"]),
             str(entry["level"]),
-            str(entry["lines"]),
+            lines_cell,
             gen,
             mode,
             tr(SPEED_MODE_LABELS.get(entry.get("speed_mode", ""), "-")),

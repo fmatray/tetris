@@ -60,7 +60,7 @@ def test_update_skips_name_when_score_not_qualifying(monkeypatch):
     # Full leaderboard with a high minimum — score 0 won't qualify.
     monkeypatch.setattr(
         "tetris.states.game_over.load_leaderboard",
-        lambda: [{"name": "A", "score": 999, "level": 1, "lines": 1}] * 10,
+        lambda mode=None: [{"name": "A", "score": 999, "level": 1, "lines": 1}] * 10,
     )
     result = state.update(16, ParticleSystem())
     assert result is None
@@ -202,7 +202,7 @@ def test_draw_leaderboard_non_qualifying(monkeypatch):
     """draw() during LEADERBOARD with no highlight renders without error."""
     monkeypatch.setattr(
         "tetris.states.game_over.load_leaderboard",
-        lambda: [{"name": "A", "score": 999, "level": 1, "lines": 1}] * 10,
+        lambda mode=None: [{"name": "A", "score": 999, "level": 1, "lines": 1}] * 10,
     )
     state = _make_game_over()
     state.step = "LEADERBOARD"
