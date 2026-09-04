@@ -1,8 +1,9 @@
 # Roadmap
 
-## Current Status (as of 2026-08-31)
+## Current Status (as of 2026-09-04)
 
-All core features are **implemented and functional**:
+All core features are **implemented and functional**; the TOP 10 Technical
+list is fully closed (items #1–#10 all verified done — see the table below).
 
 | Feature | Status | Details |
 |---------|--------|---------|
@@ -70,6 +71,7 @@ current behavior stays the default until a replacement proves out.
 - **v3.3** — El-Tetris adoption, BFS path replay fix (survival bug), AI network widening
 - **v3.4** — Test debt repayment: i18n global-state leak fixed (language applied at app boot), debug toggle index repaired, hole/overhang markers render restored; ARE entry delay with IRS/IHS
 - **v3.5** — CI pipeline (GitHub Actions: ruff + zuban + headless pytest), Round 4 performance re-profile, AI model retrained (164 background episodes, criteria passed), zuban baseline fully clean
+- **v3.6** — Vectorized look-ahead simulation (`best_next_placements_batch`), dueling network head, imitation warm-start, visual layout regression harness, MCTS look-ahead (PUCT + V-network), self-play tournament (CLI + in-game loops), `q` quit-after-game-over key (AI/Bot/MCP)
 
 ---
 
@@ -80,8 +82,8 @@ current behavior stays the default until a replacement proves out.
 - [x] Clean `docs/studies/` — archive implemented studies (6 moved to `archived/`)
 - [x] Write `README.md` (English) + `README-fr.md` (French)
 - [x] Add Documentation Rules to `AGENTS.md`
-- [ ] Verify all Mermaid diagrams with `mmdc`
-- [ ] Verify documentation duplication < 1% with `jscpd`
+- [x] Verify all Mermaid diagrams with `mmdc` (all `docs/*.md` + READMEs pass, 2026-09-04)
+- [x] Verify documentation duplication < 1% with `jscpd` (0.33% across `docs/` + READMEs, 2026-09-04)
 
 AI model retraining and performance re-profiling are tracked as TOP 10 Technical items #1–2.
 
@@ -91,16 +93,16 @@ AI model retraining and performance re-profiling are tracked as TOP 10 Technical
 
 | Item | Location | Priority |
 |------|----------|----------|
-| French UI strings hardcoded in states | Various `draw()` methods | Low (UI labels intentionally French) |
-| No automated visual regression tests | N/A | Medium |
+| Legacy French settings values (`"Humain"`, `"Normal"`, `"Replay"`) persisted in `settings.json` and used as `player_type` identifiers | `tetris/states/menu.py`, `tetris/states/game.py` | Low (display-mapped via `FR_PLAYER_KEY` + `tr()`; format change would break saved settings) |
 
 ---
 
 ## Versioning
 
 This project uses a simple versioning scheme:
-- `main` branch — stable
-- `v3` branch — current development (contains all fixes)
-- Tags: `v1.0`, `v2.0`, `v3.0`, `v3.1`, `v3.2`, `v3.3`
+- `main` branch — stable, all development lands here
+- `v3` branch — alias of `main` (kept for history; not separately maintained)
+- `old-main`, `AIv2` — historical branches, kept for reference
+- Milestones (v1–v3.6) are documented above; no git tags are maintained
 
 No formal release process — `main` is always deployable.
