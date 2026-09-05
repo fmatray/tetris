@@ -119,6 +119,66 @@ def test_evaluate_population_uses_all_episodes_and_cap(monkeypatch):
     assert seen == [(7, 5), (8, 5), (9, 5)] * 3
 
 
+def test_evaluate_population_reports_progress(monkeypatch):
+    progress: dict = {}
+    monkeypatch.setattr(t, "make_agent", lambda ckpt, dueling: None)
+
+    def fake_evaluate(agent, ep_seed, piece_cap=PIECE_CAP):
+        return float(ep_seed)
+
+    scores = t.evaluate_population(
+        [{"online_net": {}} for _ in range(2)],
+        episodes=2,
+        seed=7,
+        dueling=False,
+        evaluate=fake_evaluate,
+        progress=progress,
+    )
+    assert scores == [7.5, 7.5]  # mean(7,8) — no default piece_cap path
+    assert progress["member"] == 1
+    assert progress["episode"] == 1
+
+
+def test_run_tournament_writes_progress(tmp_path):
+    model = str(tmp_path / "model.pt")
+    _write_checkpoint(model)
+    progress: dict = {}
+    t.run_tournament(
+        generations=2,
+        episodes=1,
+        population=2,
+        sigma=0.02,
+        seed=7,
+        piece_cap=10,
+        report_path=str(tmp_path / "report.json"),
+        best_path=str(tmp_path / "best.pt"),
+        model_path=model,
+        progress=progress,
+    )
+    assert progress["gen"] == 1  # last generation index
+    assert progress["best"] >= 0.0
+    assert progress["mean"] >= 0.0
+    assert len(progress["history"]) == 2  # one entry per generation
+    assert progress["member"] >= 0 and progress["episode"] >= 0
+
+
+def test_run_tournament_without_progress_still_works(tmp_path):
+    model = str(tmp_path / "model.pt")
+    _write_checkpoint(model)
+    report = t.run_tournament(
+        generations=1,
+        episodes=1,
+        population=2,
+        sigma=0.02,
+        seed=7,
+        piece_cap=10,
+        report_path=str(tmp_path / "report.json"),
+        best_path=str(tmp_path / "best.pt"),
+        model_path=model,
+    )
+    assert len(report["generations"]) == 1
+
+
 def test_run_tournament_end_to_end_isolated(tmp_path):
     rep = str(tmp_path / "report.json")
     best = str(tmp_path / "best.pt")

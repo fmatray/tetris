@@ -372,6 +372,16 @@ The loop mode repeats the tournament and chains the winners:
 3. After each loop, the winner (`tournament_best.pt`) replaces `ai_model.pt` — the winner re-seeds the model, so the next loop (and any later training session) starts from it.
 4. One entry is appended per loop to `data/tournament/loops.json`: `{loop, seed, best, mean, elapsed_s, timestamp}`.
 
+While the run executes, the worker thread reports progress through a plain dict that `TournamentState` polls at 60 FPS. Each key has a single writer (dict writes and `list.append` are GIL-atomic), so no locks are needed:
+
+| Key | Writer | Meaning |
+|---|---|---|
+| `loop`, `done` | `run_tournament_loops` | Current loop index (0-based); count of finished loops |
+| `gen` | `run_tournament_loops` resets, `run_tournament` advances | Generation index; `-1` between loops |
+| `member`, `episode` | `run_tournament` | Population member and episode currently evaluated; `-1` between loops |
+| `best`, `mean` | `run_tournament` | Best and mean fitness of the last evaluated generation |
+| `history` | `run_tournament` | Per-generation best scores, accumulated across loops (sparkline source) |
+
 After the run, `tournament_seed` advances by the number of loops and is persisted in `settings.json`, so consecutive runs never reuse a seed.
 
 ## Future Enhancements

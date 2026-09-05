@@ -191,6 +191,7 @@ def evaluate_population(
     dueling: bool,
     piece_cap: int = PIECE_CAP,
     evaluate: Callable[[DQNAgent, int], float] | None = None,
+    progress: dict | None = None,
 ) -> list[float]:
     """Mean fitness (score) of each checkpoint across seeded episodes."""
     if evaluate is None:
@@ -199,9 +200,15 @@ def evaluate_population(
             return run_episode(agent, ep_seed, piece_cap=piece_cap)
 
     scores: list[float] = []
-    for ckpt in checkpoints:
+    for i, ckpt in enumerate(checkpoints):
         agent = make_agent(ckpt, dueling)
-        total = sum(evaluate(agent, seed + e) for e in range(episodes))
+        if progress is not None:
+            progress["member"] = i
+        total = 0.0
+        for e in range(episodes):
+            if progress is not None:
+                progress["episode"] = e
+            total += evaluate(agent, seed + e)
         scores.append(total / episodes)
     return scores
 
@@ -218,6 +225,7 @@ def run_tournament(
     best_path: str = BEST_PATH,
     evaluate: Callable[[DQNAgent, int], float] | None = None,
     should_stop: Callable[[], bool] | None = None,
+    progress: dict | None = None,
 ) -> dict[str, Any]:
     """Full evolutionary loop; returns and persists the report."""
     import tetris.states.ai as ai_mod
@@ -258,20 +266,30 @@ def run_tournament(
         for gen in range(generations):
             if should_stop and should_stop():
                 break
-            fitness = evaluate_population(checkpoints, episodes, seed, dueling, piece_cap, evaluate)
+            fitness = evaluate_population(
+                checkpoints, episodes, seed, dueling, piece_cap, evaluate, progress
+            )
             gen_best = int(np.argmax(fitness))
+            gen_mean = float(np.mean(fitness))
             if fitness[gen_best] > best_score:
                 best_score = fitness[gen_best]
                 best_ckpt = checkpoints[gen_best]
+            if progress is not None:
+                # Single writer per key: GIL-atomic dict writes read by the
+                # FSM at 60 FPS (same lock-free pattern as run_tournament_loops).
+                progress["gen"] = gen
+                progress["best"] = fitness[gen_best]
+                progress["mean"] = gen_mean
+                progress.setdefault("history", []).append(fitness[gen_best])
             report["generations"].append(
                 {
                     "gen": gen,
                     "best": fitness[gen_best],
-                    "mean": float(np.mean(fitness)),
+                    "mean": gen_mean,
                     "scores": [float(f) for f in fitness],
                 }
             )
-            logger.info("generation %d: best=%.0f mean=%.0f", gen, fitness[gen_best], float(np.mean(fitness)))
+            logger.info("generation %d: best=%.0f mean=%.0f", gen, fitness[gen_best], gen_mean)
             if gen == generations - 1:
                 break
             survivors = select_survivors(fitness)
@@ -332,6 +350,8 @@ def run_tournament_loops(
         if progress is not None:
             progress["loop"] = k
             progress["gen"] = -1
+            progress["member"] = -1
+            progress["episode"] = -1
         start = time.monotonic()
         report = run_tournament(
             generations=generations,
@@ -343,6 +363,7 @@ def run_tournament_loops(
             piece_cap=piece_cap,
             report_path=report_path,
             best_path=best_path,
+            progress=progress,
             should_stop=should_stop,
         )
         elapsed = time.monotonic() - start

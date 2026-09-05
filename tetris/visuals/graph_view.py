@@ -12,6 +12,7 @@ import matplotlib
 matplotlib.use("Agg")  # headless renderer — no GUI window
 
 import matplotlib.pyplot as plt
+from matplotlib.ticker import MaxNLocator
 import pygame
 
 from tetris.i18n import tr
@@ -38,13 +39,18 @@ def _moving_average(values: list[int], window: int) -> list[float]:
     return out
 
 
-def render_score_graph(episodes: list[int], scores: list[int]) -> pygame.Surface:
+def render_score_graph(
+    episodes: list[int], scores: list[int], figsize: tuple[float, float] = (_FIG_W, _FIG_H)
+) -> pygame.Surface:
     """Render the episode-vs-score graph to a ``pygame.Surface``.
 
     A raw-score line (cyan) is overlaid with a 20-episode moving average
     (yellow) to make the learning trend visible through the noise.
+
+    ``figsize`` overrides the figure size in inches (at ``_DPI``); narrow
+    figures (e.g. ``(8, 6)``) leave room for side-panel text.
     """
-    fig, ax = plt.subplots(figsize=(_FIG_W, _FIG_H), dpi=_DPI)
+    fig, ax = plt.subplots(figsize=figsize, dpi=_DPI)
     fig.patch.set_facecolor(_BG)
     ax.set_facecolor(_BG)
 
@@ -55,6 +61,7 @@ def render_score_graph(episodes: list[int], scores: list[int]) -> pygame.Surface
         ax.plot(episodes, avg, color="yellow", linewidth=1.8, label=tr("Avg. {}").format(ma_window))
         ax.legend(facecolor=_BG, edgecolor=_FG, labelcolor=_FG)
 
+    ax.xaxis.set_major_locator(MaxNLocator(integer=True))
     ax.set_xlabel(tr("Episode"), color=_FG, fontsize=12)
     ax.set_ylabel(tr("Score"), color=_FG, fontsize=12)
     ax.set_title(tr("Score per episode"), color=_FG, fontsize=16)

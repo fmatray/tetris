@@ -271,15 +271,23 @@ classDiagram
             +tournament_menu: TournamentMenuState
             - _loops: int
             - _generations: int
+            - _population: int
+            - _episodes: int
             - _progress: dict
             - _should_stop: bool
             - _result: dict | None
             - _error: bool
+            - _last_done: int
+            - _bg: MenuBackgroundAnimation
             - _thread: threading.Thread
             +__init__(screen, font, audio, tournament_menu) None
             - _worker() None
             +handle_event(event: pygame.event.Event) State | None
             +update(dt: float, particles: ParticleSystem) State | None
+            - _celebrate(particles: ParticleSystem) None
+            - _progress_fraction() float
+            - _draw_progress_bar(screen: pygame.Surface) None
+            - _draw_sparkline(screen: pygame.Surface) None
             +draw(screen: pygame.Surface, particles: ParticleSystem | None) None
         }
 

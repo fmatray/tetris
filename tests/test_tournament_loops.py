@@ -39,6 +39,7 @@ class _Recorder:
         report_path,
         best_path,
         should_stop=None,
+        progress=None,
         evaluate=None,
     ):
         self.calls.append(

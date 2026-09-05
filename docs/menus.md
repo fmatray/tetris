@@ -157,7 +157,7 @@ Reached from **AI → Tournament**. This menu runs the post-training evolution l
 | **Start** | Action | — | — | — | Starts the run (disabled when no trained checkpoint exists) |
 | **Back** | Action | — | — | — | Returns to the AI submenu |
 
-**Start behavior**: the run executes in a background thread, so the menu stays responsive. The screen shows the current loop and generation. **Esc** requests a coarse cancel: the current generation finishes first, then the run stops. Loops already finished keep their results. The run advances `tournament_seed` by the number of loops and saves the settings.
+**Start behavior**: the run executes in a background thread, so the menu stays responsive. The live HUD shows counters (loops, generations, population member, episode), the current best and mean fitness, a global progress bar, and a sparkline of per-generation best scores — all over the animated menu background, with a particle burst each time a loop finishes. The worker thread reports its position through a progress dict that the state polls at 60 FPS (see [ai.md](ai.md#self-play-tournament)). **Esc** requests a coarse cancel: the current generation finishes first, then the run stops. Loops already finished keep their results. The run advances `tournament_seed` by the number of loops and saves the settings.
 
 **Seed rule**: loop `k` (0-based) uses `tournament_seed + k`. After the run, the seed advances by the number of loops run. This is persisted, so consecutive runs never reuse a seed.
 

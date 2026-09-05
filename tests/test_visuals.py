@@ -604,6 +604,35 @@ class TestRenderScoreGraph:
 
         assert _moving_average([], window=5) == []
 
+    def test_figsize_param(self) -> None:
+        surf = render_score_graph([1, 2, 3], [100, 200, 150], figsize=(8.0, 6.0))
+        assert isinstance(surf, pygame.Surface)
+        assert surf.get_width() == 800  # 8.0 inches at 100 dpi
+
+    def test_default_figsize(self) -> None:
+        surf = render_score_graph([1, 2, 3], [100, 200, 150])
+        assert surf.get_width() == 1100  # 11.0 inches at 100 dpi
+
+    def test_integer_x_ticks(self, monkeypatch) -> None:
+        from matplotlib.ticker import MaxNLocator
+
+        import tetris.visuals.graph_view as gv
+
+        captured: dict = {}
+        orig = gv.plt.subplots
+
+        def fake_subplots(*args, **kwargs):
+            fig, ax = orig(*args, **kwargs)
+            captured["ax"] = ax
+            return fig, ax
+
+        monkeypatch.setattr(gv.plt, "subplots", fake_subplots)
+        render_score_graph([1, 2, 3], [100, 200, 150])
+        locator = captured["ax"].xaxis.get_major_locator()
+        assert isinstance(locator, MaxNLocator)
+        ticks = captured["ax"].xaxis.get_major_locator().tick_values(1, 5)
+        assert all(float(t).is_integer() for t in ticks)
+
     def test_moving_average_large_window(self) -> None:
         from tetris.visuals.graph_view import _moving_average
 

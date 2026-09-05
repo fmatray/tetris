@@ -26,7 +26,7 @@ from tetris.visuals.fonts import (
 )
 from tetris.visuals.graph_view import render_score_graph
 
-_STAT_LABELS = [
+_STAT_LABELS: tuple[str, ...] = (
     "Episodes",
     "Average score",
     "Best score",
@@ -35,7 +35,48 @@ _STAT_LABELS = [
     "Best level",
     "Total lines",
     "Total pieces",
-]
+)
+
+
+def _draw_stats_screen(
+    screen: pygame.Surface,
+    font: pygame.font.Font,
+    labels: tuple[str, ...] | tuple[tuple[str, str], ...],
+    values: list[str],
+    graph: pygame.Surface | None,
+    instructions: str,
+) -> None:
+    """Shared stats page layout: title, label rows on the left, graph on the right.
+
+    Used by :class:`AIStatsState` and :class:`TournamentStatsState`, which
+    share the same screen shape (stats table + render_score_graph output).
+    """
+    screen.fill(BLACK)
+
+    # --- Stats on the left ---
+    x = 60
+    y = TITLE_Y
+
+    header = get_large_font().render(tr("Statistics"), True, WHITE)
+    screen.blit(header, (x, y))
+    y += LINE_HEIGHT_SMALL + 10
+
+    for label, value in zip(labels, values):
+        if isinstance(label, tuple):
+            label = label[0]
+        line = f"{tr(label)}: {value}"
+        surf = font.render(line, True, GRAY)
+        screen.blit(surf, (x, y))
+        y += LINE_HEIGHT_SMALL
+
+    # --- Graph on the right ---
+    if graph is not None:
+        gx = SCREEN_WIDTH - graph.get_width() - 30
+        gy = TITLE_Y
+        screen.blit(graph, (gx, gy))
+
+    instr = font.render(instructions, True, GRAY)
+    screen.blit(instr, (SCREEN_WIDTH // 2 - instr.get_width() // 2, INSTRUCTIONS_Y))
 
 
 class AIStatsState(State):
@@ -80,38 +121,9 @@ class AIStatsState(State):
         if self._surface is None or self._built_lang != get_language():
             self._build_surface()
 
-        screen.fill(BLACK)
-
-        # --- Stats on the left ---
-        x = 60
-        y = TITLE_Y
-
-        header = get_large_font().render(tr("Statistics"), True, WHITE)
-        screen.blit(header, (x, y))
-        y += LINE_HEIGHT_SMALL + 10
-
-        values = self._stat_values()
-        for label, value in zip(_STAT_LABELS, values):
-            line = f"{tr(label)}: {value}"
-            surf = self.font.render(line, True, GRAY)
-            screen.blit(surf, (x, y))
-            y += LINE_HEIGHT_SMALL
-
-        # --- Graph on the right ---
-        if self._surface is not None:
-            surf = self._surface
-            gx = SCREEN_WIDTH - surf.get_width() - 30
-            gy = TITLE_Y
-            screen.blit(surf, (gx, gy))
-
-        instr = self.font.render(
-            tr("{} episode(s) — Press any key to go back").format(self._episode_count),
-            True,
-            GRAY,
-        )
-        screen.blit(
-            instr,
-            (SCREEN_WIDTH // 2 - instr.get_width() // 2, INSTRUCTIONS_Y),
+        instr = tr("{} episode(s) — Press any key to go back").format(self._episode_count)
+        _draw_stats_screen(
+            screen, self.font, _STAT_LABELS, self._stat_values(), self._surface, instr
         )
 
     # --- Input ----------------------------------------------------------

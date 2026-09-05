@@ -13,14 +13,9 @@ import json
 import pygame
 
 from tetris.i18n import get_language, tr
-from tetris.settings import BLACK, GRAY, SCREEN_WIDTH, TOURNAMENT_LOOPS_PATH, WHITE
+from tetris.settings import TOURNAMENT_LOOPS_PATH
 from tetris.states.base import State
-from tetris.visuals.fonts import (
-    INSTRUCTIONS_Y,
-    LINE_HEIGHT_SMALL,
-    TITLE_Y,
-    get_large_font,
-)
+from tetris.states.ai_stats import _draw_stats_screen
 from tetris.visuals.graph_view import render_score_graph
 
 # (label, key) pairs in display order; keys index loops.json entries.
@@ -86,6 +81,7 @@ class TournamentStatsState(State):
             self._surface = render_score_graph(
                 [e["loop"] for e in self._entries],
                 [e["best"] for e in self._entries],
+                figsize=(8.0, 6.0),
             )
         else:
             self._surface = None
@@ -103,29 +99,11 @@ class TournamentStatsState(State):
         if self._built_lang != get_language():
             self._build_surface()
 
-        screen.fill(BLACK)
-
-        # --- Stats on the left ---
-        x = 60
-        y = TITLE_Y
-
-        header = get_large_font().render(tr("Statistics"), True, WHITE)
-        screen.blit(header, (x, y))
-        y += LINE_HEIGHT_SMALL + 10
-
-        values = self._stat_values()
-        for (label, _key), value in zip(_STAT_KEYS, values):
-            line = f"{tr(label)}: {value}"
-            surf = self.font.render(line, True, GRAY)
-            screen.blit(surf, (x, y))
-            y += LINE_HEIGHT_SMALL
-
-        # --- Graph on the right ---
-        if self._surface is not None:
-            surf = self._surface
-            gx = SCREEN_WIDTH - surf.get_width() - 30
-            gy = TITLE_Y
-            screen.blit(surf, (gx, gy))
-
-        instr = self.font.render(tr("Press any key to go back"), True, GRAY)
-        screen.blit(instr, (SCREEN_WIDTH // 2 - instr.get_width() // 2, INSTRUCTIONS_Y))
+        _draw_stats_screen(
+            screen,
+            self.font,
+            _STAT_KEYS,
+            self._stat_values(),
+            self._surface,
+            tr("Press any key to go back"),
+        )
