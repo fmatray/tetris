@@ -148,7 +148,10 @@ class TournamentState(State):
             return
         lo, hi = min(history), max(history)
         span = (hi - lo) or 1.0
-        inner = _SPARK_RECT.inflate(-24, -50)
+        # ponytail: label is 27px tall (small font) — reserve its band so the
+        # line never crosses "Best per generation" when the max occurs early.
+        inner = _SPARK_RECT.inflate(-24, 0).move(0, 36)
+        inner.height -= 48
         pts = [
             (
                 inner.x + int(inner.width * i / (len(history) - 1)),

@@ -56,3 +56,4 @@ Desktop.ini
 # --- AI Skills --- 
  .agents/skills/pytorch-patterns
  skills-lock.json
+local_cache/

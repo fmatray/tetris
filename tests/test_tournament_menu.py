@@ -340,3 +340,39 @@ def test_draw_no_error():
     state = _make_state(menu)
     screen = pygame.Surface((1500, 800))
     state.draw(screen)
+
+
+# ── Layout / i18n ────────────────────────────────────────────────────
+
+
+def test_menu_layout_all_languages():
+    """Regression: tournament menu text stays in bounds in EN/FR/ES/SL.
+
+    Uses RecordingFont to catch untranslated strings (wider than expected)
+    and off-screen overflow of the explanation column."""
+    from tests.layout_harness import (
+        RecordingFont,
+        RecordingScreen,
+        assert_layout_in_bounds,
+        assert_no_text_overlap,
+    )
+    from tetris.i18n import set_language
+    from tetris.audio import AudioManager
+
+    menu = _make_menu()
+    try:
+        for lang in ("en", "fr", "es", "sl"):
+            set_language(lang)
+            screen = RecordingScreen()
+            font = RecordingFont(None, 20)
+            audio = AudioManager(sound_volume=0, music_volume=0)
+            state = TournamentMenuState(screen, font, audio, _make_ai_menu(menu))
+            state.draw(screen)
+            assert_layout_in_bounds(screen)
+            assert_no_text_overlap(screen)
+            # no string may render as its English key in a non-English catalog
+            if lang != "en":
+                texts = [b[0] if isinstance(b, tuple) else "" for b in screen.text_blits]
+                assert "TOURNAMENT" not in texts
+    finally:
+        set_language("en")

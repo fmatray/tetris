@@ -159,3 +159,31 @@ def test_tournament_layout_all_languages():
             assert_no_text_overlap(screen)
     finally:
         set_language("en")
+
+
+def test_sparkline_line_never_crosses_label():
+    """Regression: line must stay below the in-box label even when the max
+    occurs at the first point (flat top line used to cross the text)."""
+    from tetris.states.tournament import _SPARK_RECT
+
+    state = _make_state()
+    state._progress.update(
+        {
+            "loop": 0,
+            "gen": 3,
+            "member": 0,
+            "episode": 0,
+            "best": 170386.0,
+            "mean": 166556.0,
+            "history": [170386, 170386, 170385, 170300, 170290],
+        }
+    )
+    screen = pygame.Surface((1500, 800))
+    state.draw(screen)  # must not raise; geometry checked below
+
+    inner = _SPARK_RECT.inflate(-24, 0).move(0, 36)
+    inner.height -= 48
+    label_w, label_h = state.font.size("Best per generation")
+    label_rect = pygame.Rect(_SPARK_RECT.x + 8, _SPARK_RECT.y + 6, label_w, label_h)
+    # inner band must start below the label band
+    assert inner.top >= label_rect.bottom
