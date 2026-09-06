@@ -174,7 +174,7 @@ class Renderer:
         pygame.draw.polygon(
             self.screen,
             WHITE,
-            [(cx - half, cy - half), (cx + half, cy - half), (cx, cy + half)],
+            [(cx - half, cy + half), (cx + half, cy + half), (cx, cy - half)],
         )
 
     def _draw_debug_bag(self, game: GameState) -> None:
