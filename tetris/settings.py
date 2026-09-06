@@ -148,6 +148,7 @@ GAME_OVER_PARTICLE_COUNT = 400
 AI_ACTION_DELAY_MS = 80  # normal-mode reaction delay
 AI_MODEL_SAVE_INTERVAL = 50  # save model every N episodes
 LEARN_PER_ACTION = 2  # gradient updates per locked piece
+BOT_IMITATION_TOP_N = 10  # best bot games (tetris, triple, score) used for warm-start
 
 # Curriculum learning: piece introduction order (easy → hard)
 CURRICULUM_ORDER: list[str] = ["O", "I", "L", "J", "T", "S", "Z"]
@@ -259,6 +260,7 @@ TOURNAMENT_LOOPS_PATH = os.path.join(DATA_DIR, "tournament", "loops.json")
 LOG_PATH = os.path.join(DATA_DIR, "ai_training_log.json")
 REPLAY_PATH = os.path.join(DATA_DIR, "replay_pieces.json")
 PLACEMENTS_PATH = os.path.join(DATA_DIR, "human_placements.jsonl")
+BOT_PLACEMENTS_PATH = os.path.join(DATA_DIR, "bot_placements.jsonl")
 DEBUG_LOG_PATH = os.path.join(DATA_DIR, "debug.log")
 STEP_LOG_PATH = os.path.join(DATA_DIR, "ai_step_log.jsonl")
 BEHAVIOR_LOG_PATH = os.path.join(DATA_DIR, "ai_behavior_log.jsonl")

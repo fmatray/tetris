@@ -16,7 +16,13 @@ import numpy as np
 import torch
 
 from tetris.ai.agent import DQNAgent
-from tetris.ai.imitation import _apply_placement, _split_games, imitation_pretrain
+from tetris.ai.imitation import (
+    _apply_placement,
+    _rank_games,
+    _split_games,
+    bot_imitation_pretrain,
+    imitation_pretrain,
+)
 from tetris.game.imitation import PlacementsLog, read_placements
 
 
@@ -28,6 +34,16 @@ def _write_game(path, moves, seed=7):
     log.close()
 
 
+def _write_game_with_result(path, moves, result, seed=7):
+    """Write a game header, moves, and a game-end summary record."""
+    log = PlacementsLog(path)
+    log.start_game(seed=seed, handicap=0)
+    for piece, rot, x, hold in moves:
+        log.record(piece, rot, x, hold=hold)
+    log.end_game(**result)
+    log.close()
+
+
 def test_recorder_roundtrip(tmp_path):
     p = str(tmp_path / "pl.jsonl")
     _write_game(p, [("I", 0, 0, False), ("T", 1, 4, True)])
@@ -35,6 +51,160 @@ def test_recorder_roundtrip(tmp_path):
     assert recs[0]["type"] == "game" and recs[0]["seed"] == 7
     assert recs[1] == {"type": "move", "piece": "I", "rot": 0, "x": 0, "hold": False}
     assert recs[2]["hold"] is True
+
+
+def test_end_game_record_roundtrip(tmp_path):
+    p = str(tmp_path / "pl.jsonl")
+    _write_game_with_result(
+        p, [("I", 0, 0, False)], {"score": 5000, "tetris": 2, "triple": 1, "lines": 12, "pieces": 80}
+    )
+    recs = read_placements(p)
+    assert recs[-1] == {
+        "type": "game_end",
+        "score": 5000,
+        "tetris": 2,
+        "triple": 1,
+        "lines": 12,
+        "pieces": 80,
+    }
+
+
+def test_rank_games_keeps_top_n_by_tetris_triple_score(tmp_path):
+    """Ranking key is (tetris, triple, score); result-less games are excluded."""
+    p = str(tmp_path / "pl.jsonl")
+    keys = [
+        {"score": 3000, "tetris": 0, "triple": 3, "lines": 3, "pieces": 60},  # triples beat high score alone
+        {"score": 5000, "tetris": 2, "triple": 1, "lines": 12, "pieces": 80},
+        {"score": 4000, "tetris": 2, "triple": 1, "lines": 12, "pieces": 80},  # fewer points than game 2
+        {"score": 9000, "tetris": 3, "triple": 2, "lines": 20, "pieces": 110},
+    ]
+    for key in keys:
+        _write_game_with_result(p, [("I", 0, 0, False)], key)
+    _write_game(p, [("I", 0, 0, False)])  # abandoned: no game_end record
+    recs = read_placements(p)
+    games = _rank_games(_split_games(recs), top_n=2)
+    assert len(games) == 2
+    got = []
+    for moves in games:
+        end = next(m for m in moves if m.get("type") == "game_end")
+        got.append(end["score"])
+    assert got == [9000, 5000]  # sorted by (tetris, triple, score) desc
+    for moves in games:
+        assert len([m for m in moves if m.get("type") == "move"]) == 1
+
+
+def test_bot_pretrain_trains_only_top_n(tmp_path):
+    """Only the top-N best games are used for warm-start."""
+    p = str(tmp_path / "pl.jsonl")
+    _write_game_with_result(p, [("I", 0, 0, False)], {"score": 100, "tetris": 0, "triple": 0, "lines": 0, "pieces": 30})
+    _write_game_with_result(p, [("I", 0, 0, False)], {"score": 200, "tetris": 1, "triple": 0, "lines": 4, "pieces": 40})
+    _write_game_with_result(
+        p, [("I", 0, 0, False)], {"score": 300, "tetris": 2, "triple": 1, "lines": 11, "pieces": 50}
+    )
+    agent = DQNAgent(seed=1)
+    # top_n=1: only the best game (tetris=2) trains — its single move,
+    # repeated over the 3 warm-start epochs. All three games would give 9.
+    assert bot_imitation_pretrain(agent, p, top_n=1) == 3
+
+
+def test_bot_pretrain_missing_file_is_silent_noop(tmp_path):
+    agent = DQNAgent(seed=1)
+    before = {k: v.clone() for k, v in agent.online_net.state_dict().items()}
+    assert bot_imitation_pretrain(agent, str(tmp_path / "nope.jsonl")) == 0
+    after = agent.online_net.state_dict()
+    for k, v in before.items():
+        assert torch.equal(v, after[k])
+
+
+def test_god_bot_records_placements(tmp_path, monkeypatch):
+    """God-level El-Tetris games write header, move, and game_end records."""
+    import pygame
+
+    from tetris.audio import AudioManager
+    from tetris.game.piece_provider import PieceProvider
+    from tetris.states.eltetris import BotConfig, ElTetrisState
+    from tetris.states.game import GameConfig
+    from tetris.visuals.particles import ParticleSystem
+
+    pygame.init()
+    log_path = str(tmp_path / "bot.jsonl")
+    monkeypatch.setattr("tetris.states.eltetris.BOT_PLACEMENTS_PATH", log_path)
+    bot = ElTetrisState(
+        screen=pygame.Surface((800, 600)),
+        font=pygame.font.Font(None, 20),
+        audio=AudioManager(sound_volume=0, music_volume=0),
+        config=GameConfig(
+            handicap=0,
+            sound_volume=0,
+            music_volume=0,
+            music_song="korobeiniki",
+            debug=False,
+            ghost_piece=True,
+            preview_count=1,
+            speed_mode="normal",
+        ),
+        piece_provider=PieceProvider(generator="7bag", seed=42),
+        bot_config=BotConfig(lookahead=False, lookahead_depth=1, level="god"),
+    )
+    assert bot._placement_recorder is not None
+    # Play a few pieces, then force a game-over flow.
+    parts = ParticleSystem()
+    for _ in range(200):
+        if bot.update(16, parts) is not None:
+            break
+    bot.game_over = True
+    bot.update(16, parts)  # routes into _do_game_over
+    recs = read_placements(log_path)
+    assert sum(r["type"] == "game" for r in recs) == 1
+    moves = [r for r in recs if r["type"] == "move"]
+    assert len(moves) >= 1
+    assert moves[0]["piece"] in ("I", "J", "L", "O", "S", "T", "Z")
+    ends = [r for r in recs if r["type"] == "game_end"]
+    assert len(ends) == 1
+    assert ends[0]["score"] == bot.stats.score
+    assert ends[0]["tetris"] == bot.stats.clear_counts.tetris
+    assert ends[0]["pieces"] == bot.stats.piece_count
+    assert bot._placement_recorder is None
+
+
+def test_non_god_bot_does_not_record(tmp_path, monkeypatch):
+    """Below-god levels do not record placements (imitation data is god-pure)."""
+    import pygame
+
+    from tetris.audio import AudioManager
+    from tetris.game.piece_provider import PieceProvider
+    from tetris.states.eltetris import BotConfig, ElTetrisState
+    from tetris.states.game import GameConfig
+    from tetris.visuals.particles import ParticleSystem
+
+    pygame.init()
+    log_path = str(tmp_path / "bot.jsonl")
+    monkeypatch.setattr("tetris.states.eltetris.BOT_PLACEMENTS_PATH", log_path)
+    bot = ElTetrisState(
+        screen=pygame.Surface((800, 600)),
+        font=pygame.font.Font(None, 20),
+        audio=AudioManager(sound_volume=0, music_volume=0),
+        config=GameConfig(
+            handicap=0,
+            sound_volume=0,
+            music_volume=0,
+            music_song="korobeiniki",
+            debug=False,
+            ghost_piece=True,
+            preview_count=1,
+            speed_mode="normal",
+        ),
+        piece_provider=PieceProvider(generator="7bag", seed=42),
+        bot_config=BotConfig(lookahead=False, lookahead_depth=1, level="noob"),
+    )
+    assert bot._placement_recorder is None
+    parts = ParticleSystem()
+    for _ in range(200):
+        if bot.update(16, parts) is not None:
+            break
+    bot.game_over = True
+    bot.update(16, parts)
+    assert not os.path.exists(log_path)
 
 
 def test_read_missing_file_is_empty(tmp_path):

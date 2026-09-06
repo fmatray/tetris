@@ -187,6 +187,16 @@ recorded human gameplay before the first episode:
 The effect: the V-network starts already preferring human-shaped placements,
 so early RL episodes explore from a stronger prior instead of noise.
 
+God-level El-Tetris games are recorded the same way to
+`data/bot_placements.jsonl` (separate file — bot data never mixes with
+human data). At AI startup, `bot_imitation_pretrain()` (`tetris/ai/imitation.py`)
+pre-trains from the **top-N best completed games only**, ranked by
+`(tetris, triple, score)` from each game's `game_end` record
+(`BOT_IMITATION_TOP_N` in `tetris/settings.py`, default 10). The ranking
+cap bounds how much of the heuristic bot's style the AI imitates, and
+abandoned games (no `game_end`) are excluded. Human games train first,
+bot games second — the human data is the intended expert.
+
 ### Learning Mode vs Playing Mode
 
 | Aspect | Learning Mode | Playing Mode |

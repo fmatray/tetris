@@ -402,6 +402,7 @@ classDiagram
             - _write(entry: dict) None
             +start_game(seed: int | None, handicap: int) None
             +record(piece: str, rot: int, x: int, hold: bool) None
+            +end_game(score: int, tetris: int, triple: int, lines: int, pieces: int) None
             +close() None
         }
         class GameState {
@@ -618,6 +619,9 @@ classDiagram
             +__init__(screen, font, audio, config, piece_provider, menu, bot_config) None
             +update(dt: float, particles: ParticleSystem) State | None
             - _update_reserved_column() None
+            - _placement_recorder: PlacementsLog | None
+            +_do_game_over() State
+            +_on_exit() None
         }
 
         class GameOverState {

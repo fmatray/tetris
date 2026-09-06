@@ -1,11 +1,17 @@
-"""Human placement recorder for imitation warm-start (roadmap #5).
+"""Placement recorder for imitation warm-start (roadmap #5).
 
-Writes one JSONL record per locked piece during human gameplay:
-``{type: "game", seed, handicap, ts}`` at game start, then
-``{type: "move", piece, rot, x, hold}`` per lock. The AI pretrainer
-(``tetris.ai.imitation``) replays these games to pre-train the V-network
-before RL. Only ``HumanState`` attaches a recorder — AI, El-Tetris, and
-MCP states never do (same architectural guarantee as human stats).
+Writes one JSONL record per locked piece during human or god-level
+El-Tetris bot gameplay: ``{type: "game", seed, handicap, ts}`` at game
+start, ``{type: "move", piece, rot, x, hold}`` per lock, and
+``{type: "game_end", score, tetris, triple, lines, pieces}`` when a
+recorded game ends. The AI pretrainer (``tetris.ai.imitation``) replays
+these games to pre-train the V-network before RL.
+
+Human games write to ``PLACEMENTS_PATH``, bot games to
+``BOT_PLACEMENTS_PATH`` — separate files so the two data sources stay
+unpolluted. Only ``HumanState`` and god-level ``ElTetrisState`` attach a
+recorder — AI and MCP states never do (same architectural guarantee as
+human stats).
 """
 
 from __future__ import annotations
@@ -41,6 +47,19 @@ class PlacementsLog:
     def record(self, piece: str, rot: int, x: int, hold: bool) -> None:
         """Append one locked-piece record."""
         self._write({"type": "move", "piece": piece, "rot": rot, "x": x, "hold": hold})
+
+    def end_game(self, score: int, tetris: int, triple: int, lines: int, pieces: int) -> None:
+        """Append the game-end summary record (for bot-game ranking)."""
+        self._write(
+            {
+                "type": "game_end",
+                "score": score,
+                "tetris": tetris,
+                "triple": triple,
+                "lines": lines,
+                "pieces": pieces,
+            }
+        )
 
     def _write(self, record: dict) -> None:
         """Append one JSON line, opening the file lazily. Best-effort."""

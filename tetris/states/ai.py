@@ -252,7 +252,7 @@ class AIState(BotMovesMixin, GameState):
                 # the configured architecture instead of crashing startup.
                 logger.warning("Model architecture mismatch — starting fresh: %s", e)
         if ai_config.imitation and ai_config.ai_mode == "learning":
-            from tetris.ai.imitation import imitation_pretrain
+            from tetris.ai.imitation import bot_imitation_pretrain, imitation_pretrain
 
             n = imitation_pretrain(self.agent)
             if n:
@@ -262,6 +262,10 @@ class AIState(BotMovesMixin, GameState):
                     "Imitation warm-start: no usable data in data/human_placements.jsonl"
                     " — play a human game to record placements"
                 )
+            # Bot warm-start is optional: no warning when bot data is missing.
+            n = bot_imitation_pretrain(self.agent)
+            if n:
+                logger.info("Bot imitation warm-start: trained on %d moves", n)
         # In playing mode: always greedy (no exploration, no learning)
         if self.ai_mode == "playing":
             self.agent.epsilon = 0.0

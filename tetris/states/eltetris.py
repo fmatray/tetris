@@ -2,7 +2,9 @@
 
 Picks the candidate placement maximizing the El-Tetris evaluation
 (:func:`tetris.ai.candidates.get_candidate_states` returns the values).
-No learning, no logging, no persistence — a watch/benchmark player.
+No learning, no RL logging, no persistence of its own — a
+watch/benchmark player. God-level games additionally record placements
+(``BOT_PLACEMENTS_PATH``) for AI imitation warm-start.
 
 Independent of ``AIState``: shares only ``BotMovesMixin`` (candidate
 enumeration + BFS move replay) via the ``tetris.bots`` library.
@@ -26,6 +28,7 @@ from tetris.game.rules import hard_drop_y
 from tetris.game.shapes import get_shape_rot
 from tetris.settings import (
     AI_ACTION_DELAY_MS,
+    BOT_PLACEMENTS_PATH,
     BOARD_HEIGHT,
     BOARD_WIDTH,
     PLAYER_LEVEL_PROFILES,
@@ -88,6 +91,12 @@ class ElTetrisState(BotMovesMixin, GameState):
         self.level: str = bot.level
         self._level_profile = PLAYER_LEVEL_PROFILES[bot.level]
         self._level_rng = random.Random()
+        # Imitation data: record god-level bot placements for AI warm-start.
+        if self.level == "god":
+            from tetris.game.imitation import PlacementsLog
+
+            self._placement_recorder = PlacementsLog(BOT_PLACEMENTS_PATH)
+            self._placement_recorder.start_game(seed=self.seed, handicap=config.handicap)
         # Anticipation cap: lower levels see fewer upcoming pieces.
         cap = self._level_profile["lookahead_cap"]
         self.lookahead: bool = bot.lookahead and cap > 0
@@ -168,3 +177,25 @@ class ElTetrisState(BotMovesMixin, GameState):
         result = super()._lock_and_spawn(hard_drop)
         self._prev_action = None
         return result
+
+    def _do_game_over(self) -> State:
+        """Write the game-end summary, close the recorder, then delegate."""
+        if self._placement_recorder is not None:
+            stats = self.stats
+            self._placement_recorder.end_game(
+                score=stats.score,
+                tetris=stats.clear_counts.tetris,
+                triple=stats.clear_counts.triple,
+                lines=stats.total_lines,
+                pieces=stats.piece_count,
+            )
+            self._placement_recorder.close()
+            self._placement_recorder = None
+        return super()._do_game_over()
+
+    def _on_exit(self) -> None:
+        """Close the recorder without a game_end record (game abandoned)."""
+        if self._placement_recorder is not None:
+            self._placement_recorder.close()
+            self._placement_recorder = None
+        super()._on_exit()

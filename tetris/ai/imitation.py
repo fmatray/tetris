@@ -1,10 +1,12 @@
-"""Imitation warm-start: pre-train the V-network from human placements.
+"""Imitation warm-start: pre-train the V-network from recorded games.
 
-Replays recorded human games (see ``tetris.game.imitation``), enumerates
-the candidate placements the AI would consider at each move, and pushes
-the V-value of the placement the human chose above the alternatives with a
-softmax cross-entropy ranking loss. Best-effort: un-replayable moves are
-skipped, a missing log is a no-op, and pretraining never crashes startup.
+Replays recorded human (``imitation_pretrain``) and top-N El-Tetris
+god games (``bot_imitation_pretrain``, see ``tetris.game.imitation``),
+enumerates the candidate placements the AI would consider at each move,
+and pushes the V-value of the placement that was played above the
+alternatives with a softmax cross-entropy ranking loss. Best-effort:
+un-replayable moves are skipped, a missing log is a no-op, and
+pretraining never crashes startup.
 """
 
 from __future__ import annotations
@@ -18,6 +20,7 @@ from tetris.game.imitation import read_placements
 from tetris.game.rules import hard_drop_y, place_cells
 from tetris.game.shapes import get_shape_rot
 from tetris.logger import get_logger
+from tetris.settings import BOT_IMITATION_TOP_N, BOT_PLACEMENTS_PATH
 
 _logger = get_logger("imitation")
 
@@ -52,6 +55,46 @@ def imitation_pretrain(
         return 0
 
     games = _split_games(records)
+    return _train_games(agent, games, epochs)
+
+
+def bot_imitation_pretrain(
+    agent: DQNAgent,
+    path: str | None = None,
+    top_n: int | None = None,
+) -> int:
+    """Pre-train ``agent`` from the top-N recorded El-Tetris god games.
+
+    Same ranking-loss training as :func:`imitation_pretrain`, but only
+    the ``top_n`` best completed games are used, ranked by
+    ``(tetris, triple, score)`` from their ``game_end`` records — this
+    bounds how much of the heuristic bot's style the AI imitates and
+    skips abandoned games entirely.
+
+    Args:
+        agent: The agent whose online net receives the gradients.
+        path: Bot placements JSONL path (default: ``BOT_PLACEMENTS_PATH``).
+        top_n: Number of best games to keep (default: ``BOT_IMITATION_TOP_N``).
+
+    Returns:
+        Number of moves trained on (0 if the log is missing or empty).
+    """
+    records = read_placements(path or BOT_PLACEMENTS_PATH)
+    if not records:
+        return 0
+    games = _rank_games(_split_games(records), top_n or BOT_IMITATION_TOP_N)
+    trained = _train_games(agent, games, epochs=3)
+    _logger.debug("Bot imitation warm-start: trained on %d moves", trained)
+    return trained
+
+
+def _train_games(agent: DQNAgent, games: list[list[dict]], epochs: int) -> int:
+    """Train the ranking loss over ``games`` for ``epochs`` passes.
+
+    Best-effort: raises never propagate (missing nets, I/O, etc. skip
+    pretraining, never crash agent startup). Restores the training mode.
+    Returns the number of moves trained on.
+    """
     trained = 0
     net = agent.online_net
     was_training = net.training
@@ -66,8 +109,26 @@ def imitation_pretrain(
     finally:
         if not was_training:
             net.eval()
-    _logger.debug("Imitation warm-start trained on %d moves", trained)
     return trained
+
+
+def _rank_games(games: list[list[dict]], top_n: int) -> list[list[dict]]:
+    """Keep the ``top_n`` games by ``(tetris, triple, score)``, descending.
+
+    Games without a ``game_end`` record (abandoned mid-game, crash) are
+    excluded — they have no ranking data. The ``game_end`` record itself
+    is skipped by :func:`_train_one_game` (no valid piece type), so no
+    filtering of the move list is needed.
+    """
+    scored: list[tuple[tuple[int, int, int], list[dict]]] = []
+    for moves in games:
+        end = next((m for m in moves if m.get("type") == "game_end"), None)
+        if end is None:
+            continue
+        key = (end.get("tetris", 0), end.get("triple", 0), end.get("score", 0))
+        scored.append((key, moves))
+    scored.sort(key=lambda item: item[0], reverse=True)
+    return [moves for _, moves in scored[:top_n]]
 
 
 def _split_games(records: list[dict]) -> list[list[dict]]:
