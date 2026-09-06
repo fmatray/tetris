@@ -1045,6 +1045,7 @@ classDiagram
             - _draw_hole_overhang_markers(game: GameState) None
             - _draw_cell_letter(letter: str, rect: pygame.Rect, color) None
             - _draw_hole_overhang_debug(game: GameState) None
+            - _draw_reserved_column_marker(game: GameState) None
         }
 
         class Particle {

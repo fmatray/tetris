@@ -221,6 +221,41 @@ class TestRendererFrame:
         particles = ParticleSystem()
         game.renderer.render_frame(game, particles)
 
+    def test_reserved_column_marker_drawn_in_debug(self) -> None:
+        """Debug-only triangle under the bot's committed tetris column."""
+        from tetris.settings import BLOCK_SIZE, BOARD_OFFSET_X, BOARD_OFFSET_Y, VISIBLE_ROWS, WHITE
+
+        game = _make_game(debug=True)
+        game.renderer.screen = pygame.Surface((1500, 800))
+        setattr(game, "_reserve_column", True)
+        setattr(game, "_reserved_column", 5)
+        particles = ParticleSystem()
+        game.renderer.render_frame(game, particles)
+        cx = BOARD_OFFSET_X + 5 * BLOCK_SIZE + BLOCK_SIZE // 2
+        cy = BOARD_OFFSET_Y + VISIBLE_ROWS * BLOCK_SIZE + 6
+        assert game.renderer.screen.get_at((cx, cy)) == WHITE
+
+    def test_reserved_column_marker_hidden_without_reservation(self) -> None:
+        """No marker when the bot has no committed column (or debug off)."""
+        from tetris.settings import BLACK, BLOCK_SIZE, BOARD_OFFSET_X, BOARD_OFFSET_Y, VISIBLE_ROWS
+
+        game = _make_game(debug=True)
+        game.renderer.screen = pygame.Surface((1500, 800))
+        setattr(game, "_reserve_column", True)
+        setattr(game, "_reserved_column", None)
+        particles = ParticleSystem()
+        game.renderer.render_frame(game, particles)
+        cx = BOARD_OFFSET_X + 5 * BLOCK_SIZE + BLOCK_SIZE // 2
+        cy = BOARD_OFFSET_Y + VISIBLE_ROWS * BLOCK_SIZE + 6
+        assert game.renderer.screen.get_at((cx, cy)) == BLACK
+
+        game2 = _make_game(debug=False)
+        game2.renderer.screen = pygame.Surface((1500, 800))
+        setattr(game2, "_reserve_column", True)
+        setattr(game2, "_reserved_column", 5)
+        game2.renderer.render_frame(game2, ParticleSystem())
+        assert game2.renderer.screen.get_at((cx, cy)) == BLACK
+
     def test_render_frame_paused(self) -> None:
         game = _make_game()
         game.paused = True

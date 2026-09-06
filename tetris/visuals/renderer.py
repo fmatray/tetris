@@ -97,6 +97,8 @@ class Renderer:
                 case "weighted":
                     self._draw_debug_weights(game)
             self._draw_hole_overhang_debug(game)
+            if getattr(game, "_reserve_column", False) and getattr(game, "_reserved_column", None) is not None:
+                self._draw_reserved_column_marker(game)
         mode = game.menu.mode if game.menu else "Normal"
         gen = tr(GENERATOR_LABELS.get(game.pieces.generator, "Random"))
         self._draw_text(f"{tr('MODE')}: {tr(mode)}", HUD_POSITIONS["mode"])
@@ -160,6 +162,20 @@ class Renderer:
             self._draw_text(
                 tr("Overhangs: {}").format(len(game.board.find_overhangs())), (x, y + self.font.get_height())
             )
+
+    def _draw_reserved_column_marker(self, game: GameState) -> None:
+        """Draw a small triangle under the bot's committed tetris column (debug only)."""
+        col = getattr(game, "_reserved_column", None)
+        if col is None:
+            return
+        cx = BOARD_OFFSET_X + col * BLOCK_SIZE + BLOCK_SIZE // 2
+        cy = BOARD_OFFSET_Y + VISIBLE_ROWS * BLOCK_SIZE + 6
+        half = 5
+        pygame.draw.polygon(
+            self.screen,
+            WHITE,
+            [(cx - half, cy - half), (cx + half, cy - half), (cx, cy + half)],
+        )
 
     def _draw_debug_bag(self, game: GameState) -> None:
         """Draw remaining bag pieces as colored blocks right of the next-piece panel."""
