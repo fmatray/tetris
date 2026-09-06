@@ -155,6 +155,30 @@ CURRICULUM_ORDER: list[str] = ["O", "I", "L", "J", "T", "S", "Z"]
 # on an empty board: S/Z/O create awkward gaps right from the start).
 FIRST_PIECE_TYPES: list[str] = ["I", "J", "L", "T"]
 
+# --- Player skill levels (Bot + AI playing mode; never training) ------
+PLAYER_LEVELS = ("noob", "good", "advanced", "champion", "god")
+PLAYER_LEVEL_LABELS = {
+    "noob": "Noob",
+    "good": "Good",
+    "advanced": "Advanced",
+    "champion": "Champion",
+    "god": "God",
+}
+# Per-level playing-skill profile:
+#   misstep:     probability of NOT taking the argmax placement
+#   temp:        softmax temperature over z-normalized values (higher = more random)
+#   delay_mult:  decision-delay multiplier (1.0 = current speed)
+#   lookahead_cap: max lookahead depth (0 = lookahead off)
+# "god" = no reduction = exactly the pre-level behavior.
+PLAYER_LEVEL_PROFILES = {
+    "noob": {"misstep": 0.60, "temp": 1.5, "delay_mult": 4.0, "lookahead_cap": 0},
+    "good": {"misstep": 0.30, "temp": 1.0, "delay_mult": 2.0, "lookahead_cap": 1},
+    "advanced": {"misstep": 0.15, "temp": 0.6, "delay_mult": 1.5, "lookahead_cap": 2},
+    "champion": {"misstep": 0.05, "temp": 0.4, "delay_mult": 1.0, "lookahead_cap": 3},
+    "god": {"misstep": 0.0, "temp": 1.0, "delay_mult": 1.0, "lookahead_cap": 3},
+}
+DEFAULT_PLAYER_LEVEL = "god"
+
 # --- Menu background animation -----------------------------------------
 MENU_ANIM_MAX_PIECES = 35  # max simultaneously falling tetrominos
 MENU_ANIM_BLOCK_SIZE = 15  # block size for falling tetrominos (px)

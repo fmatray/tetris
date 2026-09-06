@@ -13,16 +13,16 @@ heuristic; the bot descends from that feature family.
 
 from __future__ import annotations
 
+import random
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-import numpy as np
 import pygame
 
 from tetris.ai.candidates import Placement
-from tetris.bots.moves import BotMovesMixin
+from tetris.bots.moves import BotMovesMixin, level_select
 from tetris.game.board import LineClearResult
-from tetris.settings import AI_ACTION_DELAY_MS
+from tetris.settings import AI_ACTION_DELAY_MS, PLAYER_LEVEL_PROFILES
 from tetris.states.base import State
 from tetris.states.game import GameConfig, GameState
 from tetris.visuals.particles import ParticleSystem
@@ -39,6 +39,7 @@ class BotConfig:
 
     lookahead: bool
     lookahead_depth: int
+    level: str = "god"
 
 
 class ElTetrisState(BotMovesMixin, GameState):
@@ -75,8 +76,13 @@ class ElTetrisState(BotMovesMixin, GameState):
         self.player_type = "Bot"
         self._handicap = config.handicap
         bot = bot_config or BotConfig(lookahead=False, lookahead_depth=1)
-        self.lookahead: bool = bot.lookahead
-        self.lookahead_depth: int = bot.lookahead_depth
+        self.level: str = bot.level
+        self._level_profile = PLAYER_LEVEL_PROFILES[bot.level]
+        self._level_rng = random.Random()
+        # Anticipation cap: lower levels see fewer upcoming pieces.
+        cap = self._level_profile["lookahead_cap"]
+        self.lookahead: bool = bot.lookahead and cap > 0
+        self.lookahead_depth: int = min(bot.lookahead_depth, int(cap))
         self._candidate_placements: list[Placement] = []
         self._prev_action: int | None = None
         self._action_timer: float = 0.0
@@ -96,14 +102,18 @@ class ElTetrisState(BotMovesMixin, GameState):
         # the piece to spawn before replaying.
         if self._prev_action is None:
             self._action_timer += dt
-            delay = min(AI_ACTION_DELAY_MS, self.current_speed * 4000)
+            delay = min(
+                AI_ACTION_DELAY_MS * self._level_profile["delay_mult"],
+                self.current_speed * 4000,
+            )
             if self._action_timer < delay:
                 return super().update(dt, particles)
             self._action_timer = 0.0
 
             candidates, actions, _ = self._get_candidate_states()
             if len(candidates) > 0:
-                chosen_idx = int(np.argmax(self._pick_values))
+                prof = self._level_profile
+                chosen_idx = level_select(self._pick_values, prof["misstep"], prof["temp"], self._level_rng)
                 self._prev_action = actions[chosen_idx]
                 self.episode_steps += 1
                 self._execute_move_sequence(actions[chosen_idx])

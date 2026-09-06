@@ -9,6 +9,7 @@ enumeration and BFS move replay.
 
 from __future__ import annotations
 
+import random
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -21,6 +22,29 @@ from tetris.ai.rewards import board_to_grid
 if TYPE_CHECKING:
     from tetris.game.board import Board
     from tetris.game.tetromino import Tetromino
+
+
+def level_select(
+    values: np.ndarray,
+    misstep: float,
+    temp: float,
+    rng: random.Random,
+) -> int:
+    """Argmax with level-based misstep.
+
+    With probability ``misstep`` (skill degradation), sample the placement
+    from a softmax over z-normalized values at temperature ``temp`` instead
+    of taking the argmax. Scale-free: z-normalization makes ``temp`` work
+    for any value range (El-Tetris heuristic or V-network).
+    """
+    if len(values) < 2 or misstep <= 0.0:
+        return int(np.argmax(values))
+    if rng.random() < misstep:
+        z = (values - values.mean()) / (values.std() + 1e-9)
+        e = np.exp(z / temp - np.max(z / temp))
+        probs = e / e.sum()
+        return int(rng.choices(range(len(values)), weights=probs, k=1)[0])
+    return int(np.argmax(values))
 
 
 class BotMovesMixin:

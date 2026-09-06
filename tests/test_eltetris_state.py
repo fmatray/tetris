@@ -46,6 +46,7 @@ def _make_bot(
     lookahead: bool = False,
     lookahead_depth: int = 1,
     preview_count: int = 1,
+    level: str = "god",
 ) -> ElTetrisState:
     screen = pygame.Surface((800, 600))
     font = pygame.font.Font(None, 20)
@@ -66,7 +67,7 @@ def _make_bot(
             speed_mode="normal",
         ),
         piece_provider=provider,
-        bot_config=BotConfig(lookahead=lookahead, lookahead_depth=lookahead_depth),
+        bot_config=BotConfig(lookahead=lookahead, lookahead_depth=lookahead_depth, level=level),
     )
 
 
@@ -80,6 +81,46 @@ class TestElTetrisPick:
 
     def test_single(self):
         assert int(np.argmax(np.array([5.0]))) == 0
+
+
+class TestLevelSelect:
+    def test_no_misstep_always_argmax(self):
+        import random
+
+        from tetris.bots.moves import level_select
+
+        values = np.array([1.0, 3.0, 2.0])
+        rng = random.Random(0)
+        for _ in range(50):
+            assert level_select(values, 0.0, 1.0, rng) == 1
+
+    def test_misstep_sometimes_picks_suboptimal(self):
+        import random
+
+        from tetris.bots.moves import level_select
+
+        values = np.array([0.0, 100.0, 0.0])
+        rng = random.Random(7)
+        picks = {level_select(values, 1.0, 1e6, rng) for _ in range(200)}
+        # Near-uniform softmax at huge temperature: suboptimal indices occur.
+        assert picks != {1}
+
+    def test_deterministic_under_seed(self):
+        import random
+
+        from tetris.bots.moves import level_select
+
+        values = np.array([1.0, 3.0, 2.0, 0.5])
+        a = [level_select(values, 0.5, 1.0, random.Random(42)) for _ in range(20)]
+        b = [level_select(values, 0.5, 1.0, random.Random(42)) for _ in range(20)]
+        assert a == b
+
+    def test_single_candidate_returns_zero(self):
+        import random
+
+        from tetris.bots.moves import level_select
+
+        assert level_select(np.array([5.0]), 1.0, 1.0, random.Random(0)) == 0
 
 
 class TestElTetrisStateInit:
@@ -113,6 +154,22 @@ class TestElTetrisStateInit:
         bot = _make_bot(lookahead=True, lookahead_depth=2, preview_count=3)
         assert bot.lookahead is True
         assert bot.lookahead_depth == 2
+
+    def test_level_caps_lookahead(self):
+        bot = _make_bot(lookahead=True, lookahead_depth=2, preview_count=3, level="noob")
+        assert bot.lookahead is False
+        assert bot.lookahead_depth == 0
+        good = _make_bot(lookahead=True, lookahead_depth=2, preview_count=3, level="good")
+        assert good.lookahead is True
+        assert good.lookahead_depth == 1
+
+    def test_god_level_no_reduction(self):
+        bot = _make_bot(lookahead=True, lookahead_depth=2, preview_count=3)
+        assert bot.level == "god"
+        assert bot.lookahead is True
+        assert bot.lookahead_depth == 2
+        assert bot._level_profile["misstep"] == 0.0
+        assert bot._level_profile["delay_mult"] == 1.0
 
 
 class TestElTetrisIndependence:
@@ -217,8 +274,28 @@ class TestBotMenu:
         menu = self._make_menu()
         menu.bot_lookahead = "preview"
         bm = BotMenuState(menu.screen, menu.font, menu.audio, menu)
-        bm.selection = 0
+        bm.selection = 1  # Look-ahead
         bm._toggle(1)
         assert menu.bot_lookahead == "none"
         bm._toggle(1)
         assert menu.bot_lookahead == "preview"
+
+    def test_bot_menu_level_toggle_cycles(self):
+        menu = self._make_menu()
+        bm = BotMenuState(menu.screen, menu.font, menu.audio, menu)
+        bm.selection = 0  # Level
+        assert menu.bot_level == "god"
+        bm._toggle(1)
+        assert menu.bot_level == "noob"
+        bm._toggle(1)
+        assert menu.bot_level == "good"
+        bm._toggle(-1)
+        assert menu.bot_level == "noob"
+        bm._toggle(-1)
+        assert menu.bot_level == "god"  # wraps
+
+    def test_bot_menu_level_value_label(self):
+        menu = self._make_menu()
+        menu.bot_level = "champion"
+        bm = BotMenuState(menu.screen, menu.font, menu.audio, menu)
+        assert bm._value_label(0) == "Champion"

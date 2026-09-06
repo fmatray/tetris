@@ -178,13 +178,14 @@ def test_ai_menu_options():
         "Training",
         "Tournament",
         "Statistics",
+        "Level",
         "Reset AI",
         "Back",
     )
 
 
 def test_ai_menu_toggle_indices():
-    assert AIMenuState._toggle_indices == frozenset({0, 1})
+    assert AIMenuState._toggle_indices == frozenset({0, 1, 5})
 
 
 def test_ai_menu_value_labels():
@@ -194,6 +195,8 @@ def test_ai_menu_value_labels():
     assert state._value_label(0) == "Training"
     # Speed default "normal"
     assert state._value_label(1) == "Normal"
+    # Level default "god"
+    assert state._value_label(5) == "God"
     # Others have no value
     assert state._value_label(2) == ""
 
@@ -212,6 +215,30 @@ def test_ai_menu_toggle_speed():
     state.selection = 1
     state._toggle(1)
     assert menu.ai_speed == "fast"
+
+
+def test_ai_menu_toggle_level_cycles():
+    menu = _make_menu()
+    state = _make_state(AIMenuState, menu)
+    state.selection = 5
+    assert menu.ai_level == "god"
+    state._toggle(1)
+    assert menu.ai_level == "noob"
+    state._toggle(1)
+    assert menu.ai_level == "good"
+    state._toggle(-1)
+    assert menu.ai_level == "noob"
+    state._toggle(-1)
+    assert menu.ai_level == "god"  # wraps
+
+
+def test_ai_menu_level_disabled_in_learning():
+    menu = _make_menu()
+    state = _make_state(AIMenuState, menu)
+    menu.ai_mode = "learning"
+    assert state._is_disabled(5) is True
+    menu.ai_mode = "playing"
+    assert state._is_disabled(5) is False
 
 
 @pytest.fixture
@@ -341,7 +368,7 @@ def test_ai_menu_select_tournament_navigates():
 def test_ai_menu_select_reset_first_press_confirms():
     menu = _make_menu()
     state = _make_state(AIMenuState, menu)
-    state.selection = 5
+    state.selection = 6
     result = state._on_select()
     assert result is None
     assert state._confirm_reset is True
@@ -350,7 +377,7 @@ def test_ai_menu_select_reset_first_press_confirms():
 def test_ai_menu_select_reset_second_press_deletes():
     menu = _make_menu()
     state = _make_state(AIMenuState, menu)
-    state.selection = 5
+    state.selection = 6
     state._confirm_reset = True
     # Create dummy files to test deletion
     from pathlib import Path
@@ -365,7 +392,7 @@ def test_ai_menu_select_reset_second_press_deletes():
 def test_ai_menu_select_reset_no_files_no_error():
     menu = _make_menu()
     state = _make_state(AIMenuState, menu)
-    state.selection = 5
+    state.selection = 6
     state._confirm_reset = True
     # Ensure files don't exist
     for path in [MODEL_PATH, LOG_PATH]:
@@ -377,7 +404,7 @@ def test_ai_menu_select_reset_no_files_no_error():
 def test_ai_menu_select_retour_returns_menu():
     menu = _make_menu()
     state = _make_state(AIMenuState, menu)
-    state.selection = 6
+    state.selection = 7
     result = state._on_select()
     assert result is menu
 
@@ -392,7 +419,7 @@ def test_ai_menu_option_text_confirm_reset():
     menu = _make_menu()
     state = _make_state(AIMenuState, menu)
     state._confirm_reset = True
-    text = state._option_text(5, True)
+    text = state._option_text(6, True)
     assert "Confirm" in text
 
 
@@ -407,7 +434,7 @@ def test_ai_menu_option_color_confirm_reset():
     menu = _make_menu()
     state = _make_state(AIMenuState, menu)
     state._confirm_reset = True
-    color = state._option_color(5, True, False)
+    color = state._option_color(6, True, False)
     assert color == (255, 0, 0)
 
 
@@ -1027,10 +1054,14 @@ def test_menu_state_save_settings_roundtrip():
     menu = _make_menu()
     menu.handicap = 3
     menu.sound_volume = 1
+    menu.bot_level = "champion"
+    menu.ai_level = "noob"
     menu.save_settings()
     menu2 = _make_menu()
     assert menu2.handicap == 3
     assert menu2.sound_volume == 1
+    assert menu2.bot_level == "champion"
+    assert menu2.ai_level == "noob"
 
 
 # ── LeaderboardState ──────────────────────────────────────────────────

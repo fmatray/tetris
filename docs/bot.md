@@ -11,10 +11,11 @@ the full published El-Tetris evaluation.
 ## Player type
 
 `player = "Bot"` in `data/settings.json` (menu: Joueur → Bot).
-Its sub-menu ("Bot El-Tetris") has one setting:
+Its sub-menu ("Bot El-Tetris") has two settings:
 
 | Option | Values | Meaning |
 |---|---|---|
+| Level | Noob / Good / Advanced / Champion / God | The skill level of the bot. It controls how often the bot makes a bad move, how long it waits between decisions, and how many preview pieces it plans with. See [Player levels](#player-levels). |
 | Anticipation | Non / Comme aperçu | Whether the bot plans using the pieces shown in the preview. "Comme aperçu" uses the game menu's `preview_count` as look-ahead depth. |
 
 ## Selection algorithm
@@ -32,7 +33,12 @@ Its sub-menu ("Bot El-Tetris") has one setting:
    weight −4.5) and `rows_eliminated` (weight +3.42), with the published
    PSO-tuned weights
    ([El-Tetris](https://imake.ninja/el-tetris-an-improvement-on-pierre-dellacheries-algorithm/)).
-3. **Pick** — `int(np.argmax(values))`; ties resolve to the lowest index.
+3. **Pick** — `level_select(values, misstep, temperature, rng)` in
+   `tetris/bots/moves.py`. At level God, `misstep` is 0 and the pick is
+   `argmax` (ties resolve to the lowest index), so God is the exact
+   previous behavior. At lower levels, the values are z-normalized and
+   sampled through a softmax with probability `misstep`, so the bot
+   sometimes picks a weaker placement.
 4. **Execute** — the placement's recorded BFS move sequence is replayed
    atomically (`BotMovesMixin._execute_move_sequence`), so the piece
    lands exactly where the evaluation saw it. No execution mismatch.
@@ -40,12 +46,40 @@ Its sub-menu ("Bot El-Tetris") has one setting:
 With look-ahead enabled, `get_candidate_states` simulates each upcoming
 preview piece with the same El-Tetris evaluation and keeps the best
 continuation (argmax) per candidate — the same machinery the DQN's
-look-ahead uses.
+look-ahead uses. The level caps the look-ahead depth: the effective
+depth is `min(configured_depth, level_cap)`, and a cap of 0 disables
+look-ahead entirely.
 
-The bot plays at fixed `AI_ACTION_DELAY_MS` (80ms) between decisions so
-a human can watch; lock delay runs normally (500ms).
+The bot plays at `AI_ACTION_DELAY_MS` (80ms) between decisions so a
+human can watch; lower levels multiply this delay (up to 4x at Noob).
+Lock delay runs normally (500ms).
 
 The bot is subject to the ARE entry delay: its selection is deferred during ARE, and the `GameState` base class handles the delay. See [game_rules.md §12](game_rules.md#12-are-appearance-delay-irs-ihs).
+
+## Player levels
+
+The bot and the AI in playing mode share the same five skill levels.
+The level profile has three numbers:
+
+| Profile value | Meaning |
+|---|---|
+| `misstep` | The probability that the bot samples a placement through softmax instead of taking the best one. |
+| `temperature` | The softmax temperature. A higher temperature makes the sampled placement more random. |
+| `delay_mult` | The multiplier on the decision delay. A higher multiplier makes the bot play slower. |
+| `lookahead_cap` | The maximum look-ahead depth. A cap of 0 disables look-ahead. |
+
+| Level | `misstep` | `temperature` | `delay_mult` | `lookahead_cap` |
+|---|---|---|---|---|
+| Noob | 0.60 | 1.5 | 4.0 | 0 |
+| Good | 0.30 | 1.0 | 2.0 | 1 |
+| Advanced | 0.15 | 0.6 | 1.5 | 2 |
+| Champion | 0.05 | 0.4 | 1.0 | 3 |
+| God | 0.0 | 1.0 | 1.0 | 3 |
+
+God is the default. Its `misstep` is 0, its delay multiplier is 1, and
+its look-ahead cap is 3, so God plays exactly like the bot before
+levels existed. The profiles live in `PLAYER_LEVEL_PROFILES` in
+`tetris/settings.py`.
 
 ## BFS Path Replay Fix (Survival Bug Root Cause)
 

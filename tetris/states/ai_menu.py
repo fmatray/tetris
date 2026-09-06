@@ -1,4 +1,4 @@
-"""AI sub-menu: mode, speed, learning submenu, stats, reset, back."""
+"""AI sub-menu: mode, speed, level, learning submenu, stats, reset, back."""
 
 from __future__ import annotations
 
@@ -7,6 +7,8 @@ import os
 from tetris.settings import (
     LOG_PATH,
     MODEL_PATH,
+    PLAYER_LEVEL_LABELS,
+    PLAYER_LEVELS,
     RED,
 )
 from tetris.states.base import State
@@ -18,14 +20,25 @@ AI_FILES = [MODEL_PATH, LOG_PATH]
 
 
 class AIMenuState(MenuBase):
-    """AI sub-menu: mode, speed, learning submenu, stats, reset, back.
+    """AI sub-menu: mode, speed, level, learning submenu, stats, reset, back.
 
     Mode and speed are AI settings stored on the parent ``MenuState``.
     Learning submenu is disabled when Mode = Game (playing).
+    Level (Noob → God) applies to playing mode only — it never affects
+    training — so it is disabled while Mode = Training (learning).
     """
 
-    _OPTIONS = ("Mode", "Speed", "Training", "Tournament", "Statistics", "Reset AI", "Back")
-    _toggle_indices = frozenset({0, 1})  # Mode, Speed
+    _OPTIONS = (
+        "Mode",  # 0
+        "Speed",  # 1
+        "Training",  # 2
+        "Tournament",  # 3
+        "Statistics",  # 4
+        "Level",  # 5
+        "Reset AI",  # 6
+        "Back",  # 7
+    )
+    _toggle_indices = frozenset({0, 1, 5})  # Mode, Speed, Level
     _title = "AI"
 
     def __init__(self, screen, font, audio, menu) -> None:
@@ -41,6 +54,8 @@ class AIMenuState(MenuBase):
                 return tr("Training") if self.menu.ai_mode == "learning" else tr("Game")
             case 1:  # Speed
                 return tr("Fast") if self.menu.ai_speed == "fast" else tr("Normal")
+            case 5:  # Level
+                return tr(PLAYER_LEVEL_LABELS[self.menu.ai_level])
             case _:
                 return ""
 
@@ -49,6 +64,8 @@ class AIMenuState(MenuBase):
             return self.menu.ai_mode == "playing" or self.menu.training_in_progress()
         if i == 3:  # Tournament — needs a trained checkpoint to evolve
             return not os.path.exists(MODEL_PATH)
+        if i == 5:  # Level — playing-mode skill only, never training
+            return self.menu.ai_mode == "learning"
         return False
 
     def _toggle(self, direction: int) -> None:
@@ -57,6 +74,10 @@ class AIMenuState(MenuBase):
                 self.menu.ai_mode = "playing" if self.menu.ai_mode == "learning" else "learning"
             case 1:  # Speed
                 self.menu.ai_speed = "fast" if self.menu.ai_speed == "normal" else "normal"
+            case 5:  # Level
+                levels = PLAYER_LEVELS
+                idx = levels.index(self.menu.ai_level)
+                self.menu.ai_level = levels[(idx + direction) % len(levels)]
 
     def _save(self) -> None:
         self.menu.save_settings()
@@ -84,24 +105,27 @@ class AIMenuState(MenuBase):
                 from tetris.states.ai_stats import AIStatsState
 
                 return AIStatsState(self.screen, self.font, self.audio, self)
-            case 5:  # Reset AI
+            case 5:  # Level — toggle
+                self._toggle(-1)
+                self._save()
+            case 6:  # Reset AI
                 if not self._confirm_reset:
                     self._confirm_reset = True
                 else:
                     self._reset_ai()
                     self._confirm_reset = False
-            case 6:  # Back
+            case 7:  # Back
                 return self.menu
         return None
 
     def _option_text(self, i: int, is_sel: bool) -> str:
-        if i == 5 and self._confirm_reset:
+        if i == 6 and self._confirm_reset:
             prefix = "> " if is_sel else "  "
             return f"{prefix}{tr('Confirm reset?')} (Enter)"
         return super()._option_text(i, is_sel)
 
     def _option_color(self, i: int, is_sel: bool, disabled: bool) -> tuple[int, int, int]:
-        if i == 5 and self._confirm_reset:
+        if i == 6 and self._confirm_reset:
             return RED
         return super()._option_color(i, is_sel, disabled)
 

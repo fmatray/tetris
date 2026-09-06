@@ -26,6 +26,8 @@ flowchart TD
     AI --> Training[Training Config]
     AI --> Tourn[Tournament]
     AI --> AIStats[AI Stats + Graph]
+    AI --> Stats[Statistics]
+    AI --> LevelAI[Level: Noob / Good / Advanced / Champion / God]
     AI --> ResetAI[Reset AI Model + Log]
     AI --> Back2[Back]
 
@@ -53,6 +55,7 @@ flowchart TD
     Tourn --> TournStart[Start]
     Tourn --> BackTrn[Back]
 
+    Bot --> LevelBot[Level: Noob / Good / Advanced / Champion / God]
     Bot --> LookaheadBot[Look-ahead: None / As Preview]
     Bot --> BackB[Back]
 
@@ -112,6 +115,7 @@ flowchart TD
 | **Training** | Submenu | — | All DQN hyperparameters (see below). Locked while training is in progress: changing hyperparameters mid-run would alter an ongoing training. Unlocks after Reset AI removes the trained model and log. Greyed out when Mode = Playing |
 | **Tournament** | Submenu | — | Post-training evolution loop (see below). Needs a trained checkpoint (`ai_model.pt`). Greyed out when Mode = Playing or while training is in progress |
 | **Statistics** | Submenu | — | Training metrics, score graph (matplotlib → pygame surface) |
+| **Level** | Toggle | Noob / Good / Advanced / Champion / God | Playing skill of the AI. Disabled in learning mode (training always uses God). See [ai.md](ai.md#player-levels-playing-mode-only) |
 | **Reset AI** | Action | — | Deletes `ai_model.pt`, `ai_training_log.json`, `ai_step_log.jsonl`, `ai_behavior_log.jsonl`, `runs/` (confirmation required) |
 | **Back** | Action | — | Returns to Main Menu |
 
@@ -169,6 +173,7 @@ Reached from **AI → Tournament**. This menu runs the post-training evolution l
 
 | Option | Type | Values | Description |
 |--------|------|--------|-------------|
+| **Level** | Toggle | Noob / Good / Advanced / Champion / God | Skill level of the bot. See [bot.md](bot.md#player-levels) |
 | **Look-ahead** | Toggle | None / As Preview | "As Preview" uses the game's `preview_count` setting as look-ahead depth |
 | **Back** | Action | — | Returns to Main Menu |
 
@@ -295,8 +300,10 @@ All menu settings are persisted to `data/settings.json` via `MenuState.save_sett
   "ai_learn_per_action": 2,
   "ai_lookahead": true,
   "ai_lookahead_depth": 1,
+  "ai_level": "god",                    // "noob" / "good" / "advanced" / "champion" / "god"
   "mcp_port": 8765,
   "bot_lookahead": "none",              // "none" / "preview"
+  "bot_level": "god",                   // "noob" / "good" / "advanced" / "champion" / "god"
   "seed": null,                         // int or null
   "keybinds": {                         // action → pygame keycode
     "left": 276, "right": 275, "rot_cw": 273,

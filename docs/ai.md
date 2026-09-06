@@ -194,6 +194,15 @@ so early RL episodes explore from a stronger prior instead of noise.
 
 **Playing-mode logging**: Separate files, mode implicit by filename — no `mode` field in entries. Training files never written by playing mode. `_on_exit()` saves model + flushes TB only in learning mode; playing mode flushes playing log only.
 
+### Player levels (playing mode only)
+
+The AI submenu has a **Level** option (Noob / Good / Advanced / Champion / God) that is disabled in learning mode. The level changes how the AI plays, never how it trains:
+
+- In **learning mode**, the level is pinned to God. Training behavior is identical to before levels existed.
+- In **playing mode**, the level applies the same profile as the bot: a `misstep` probability of sampling a placement through softmax, a `delay_mult` on the decision delay, and a `lookahead_cap` on the look-ahead depth. See [bot.md](bot.md#player-levels) for the profile table and the shared `level_select` picker in `tetris/bots/moves.py`.
+
+The level does not change the network, the reward, or the candidate enumeration. It only changes which candidate is picked and how long the AI waits before picking it.
+
 The ARE entry delay and its IRS/IHS buffering follow the shared rule in [game_rules.md §12](game_rules.md#12-are-appearance-delay-irs-ihs).
 
 ### Configurable Hyperparameters (in AI Submenu, persisted to `settings.json`)

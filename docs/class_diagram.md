@@ -80,6 +80,8 @@ classDiagram
             +ghost_piece: bool
             +preview_count: int
             +debug: bool
+            +bot_level: str
+            +ai_level: str
             +ai_speed: str
             +ai_epsilon_decay: float
             +ai_epsilon_end: float
@@ -554,6 +556,9 @@ classDiagram
             - _mcts_rng: random.Random
             +mcts: bool
             +mcts_iterations: int
+            +level: str
+            - _level_profile: dict
+            - _level_rng: random.Random
             +__init__(screen, font, audio, config, ai_config, piece_provider, speed, menu, seed, device) None
             - _lock_and_spawn(hard_drop: bool) tuple~int, list~
             +update(dt: float, particles: ParticleSystem) State | None
@@ -605,6 +610,9 @@ classDiagram
             +_lock_and_spawn(hard_drop: bool) LineClearResult
             - _action_timer: float
             +episode_steps: int
+            +level: str
+            - _level_profile: dict
+            - _level_rng: random.Random
             +__init__(screen, font, audio, config, piece_provider, menu, bot_config) None
             +update(dt: float, particles: ParticleSystem) State | None
         }

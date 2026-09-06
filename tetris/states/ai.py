@@ -43,6 +43,7 @@ class AIConfig:
     imitation: bool = False
     mcts: bool = False
     mcts_iterations: int = 200
+    level: str = "god"
 
 
 from typing import TYPE_CHECKING, NamedTuple
@@ -65,7 +66,7 @@ from tetris.ai.rewards import (
     extract_features,
 )
 from tetris.ai.trainer import TrainingLog
-from tetris.bots.moves import BotMovesMixin
+from tetris.bots.moves import BotMovesMixin, level_select
 from tetris.audio import AudioManager
 from tetris.game.board import Board, LineClearResult
 from tetris.game.piece_provider import PieceProvider
@@ -82,6 +83,7 @@ from tetris.settings import (
     MODEL_PATH,
     PLAYING_BEHAVIOR_LOG_PATH,
     PLAYING_LOG_PATH,
+    PLAYER_LEVEL_PROFILES,
     STEP_LOG_PATH,
     TB_LOG_DIR,
 )
@@ -198,9 +200,19 @@ class AIState(BotMovesMixin, GameState):
         self.episode = self.log.total_episodes
         self.speed = speed
         self.ai_mode = ai_config.ai_mode
+        # Levels degrade playing skill ONLY. Learning mode is pinned to the
+        # god profile (no reduction) regardless of the configured level.
+        self.level = ai_config.level if self.ai_mode == "playing" else "god"
+        self._level_profile = PLAYER_LEVEL_PROFILES[self.level]
+        self._level_rng = random.Random(self._episode_seed)
         self.learn_per_action = ai_config.learn_per_action
         self.lookahead = ai_config.lookahead
         self.lookahead_depth = ai_config.lookahead_depth
+        if self.ai_mode == "playing":
+            # Anticipation cap: lower levels see fewer upcoming pieces.
+            cap = self._level_profile["lookahead_cap"]
+            self.lookahead = self.lookahead and cap > 0
+            self.lookahead_depth = min(self.lookahead_depth, int(cap))
         self._candidate_placements: list[Placement] = []
         # Last 5 moves for HUD display
         self._last_moves: list[MoveRecord] = []
@@ -364,7 +376,10 @@ class AIState(BotMovesMixin, GameState):
         # Fast mode: act immediately — no artificial delay.
         if self.speed == "normal" and self._prev_action is None and not self.game_over:
             self._action_timer += dt
-            delay = min(AI_ACTION_DELAY_MS, self.current_speed * 4000)
+            delay = min(
+                AI_ACTION_DELAY_MS * self._level_profile["delay_mult"],
+                self.current_speed * 4000,
+            )
             if self._action_timer < delay:
                 new_state = super().update(dt, particles)
                 return self._on_episode_end() if new_state is not None else None
@@ -374,7 +389,19 @@ class AIState(BotMovesMixin, GameState):
             candidates, actions, eval_values = self._get_candidate_states()
             if len(candidates) > 0:
                 prior_values = eval_values if self.warm_start else None
-                if self.mcts and self.agent.epsilon > 0 and random.random() < self.agent.epsilon:
+                prof = self._level_profile
+                if self.ai_mode == "playing" and prof["misstep"] > 0.0:
+                    # Level-based skill degradation (playing mode only):
+                    # sometimes pick a suboptimal placement instead of the
+                    # argmax. Overrides MCTS — the level is the skill knob.
+                    self.agent.last_action_was_random = False
+                    chosen_idx = level_select(
+                        self.agent.values(candidates),
+                        prof["misstep"],
+                        prof["temp"],
+                        self._level_rng,
+                    )
+                elif self.mcts and self.agent.epsilon > 0 and random.random() < self.agent.epsilon:
                     # Exploration branch unchanged — epsilon-greedy semantics
                     # in learning mode are preserved (warm-start softmax etc).
                     chosen_idx = self.agent.select_action(candidates, prior_values)

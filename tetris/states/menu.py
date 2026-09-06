@@ -12,6 +12,7 @@ from tetris.states.game import GameConfig
 from tetris.states.ai import AIConfig
 from tetris.logger import configure_logging, get_logger
 from tetris.settings import (
+    DEFAULT_PLAYER_LEVEL,
     DEFAULT_SPEED_MODE,
     LOG_PATH,
     MCP_SERVER_PORT,
@@ -103,6 +104,8 @@ class MenuState(MenuBase):
         self.tournament_sigma = 0.02
         self.tournament_seed = 1
         self.bot_lookahead = "preview"  # "none" or "preview"
+        self.bot_level = DEFAULT_PLAYER_LEVEL
+        self.ai_level = DEFAULT_PLAYER_LEVEL
         # DEFAULT_KEYBINDS imported locally to avoid circular import at module load.
         from tetris.settings import DEFAULT_KEYBINDS
 
@@ -149,6 +152,8 @@ class MenuState(MenuBase):
         "are": "are",
         "mcp_port": "mcp_port",
         "bot_lookahead": "bot_lookahead",
+        "bot_level": "bot_level",
+        "ai_level": "ai_level",
         "seed": "seed",
         "language": "language",
         "tournament_loops": "tournament_loops",
@@ -320,6 +325,7 @@ class MenuState(MenuBase):
             BotConfig(
                 lookahead=lookahead,
                 lookahead_depth=self.preview_count if lookahead else 1,
+                level=self.bot_level,
             ),
         )
 
@@ -352,6 +358,7 @@ class MenuState(MenuBase):
                 imitation=self.ai_imitation,
                 mcts=self.ai_mcts,
                 mcts_iterations=self.ai_mcts_iterations,
+                level=self.ai_level,
             ),
             ai_provider,
             seed=self.seed,

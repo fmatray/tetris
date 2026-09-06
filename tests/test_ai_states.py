@@ -86,6 +86,7 @@ def _make_ai_full(learning: bool = True, speed: str = "fast", **kwargs: object) 
             learn_per_action=cast(int, kwargs.get("learn_per_action", 2)),
             lookahead=cast(bool, kwargs.get("lookahead", True)),
             lookahead_depth=cast(int, kwargs.get("lookahead_depth", 1)),
+            level=cast(str, kwargs.get("level", "god")),
         ),
         piece_provider=provider,
         speed=speed,
@@ -148,6 +149,34 @@ class TestInit:
         torch.save({"wrong_key": 0}, MODEL_PATH)
         ai = _make_ai()
         assert ai is not None
+
+
+class TestPlayerLevel:
+    def test_learning_mode_pinned_to_god(self):
+        """Levels never affect training: learning mode ignores the level."""
+        ai = _make_ai(learning=True, level="noob")
+        assert ai.level == "god"
+        assert ai._level_profile["misstep"] == 0.0
+        assert ai._level_profile["delay_mult"] == 1.0
+
+    def test_playing_mode_applies_level(self):
+        ai = _make_ai(learning=False, level="noob")
+        assert ai.level == "noob"
+        assert ai._level_profile["misstep"] > 0.0
+
+    def test_playing_mode_lookahead_cap(self):
+        ai = _make_ai(learning=False, level="noob", lookahead=True, lookahead_depth=3)
+        assert ai.lookahead is False
+        assert ai.lookahead_depth == 0
+        good = _make_ai(learning=False, level="good", lookahead=True, lookahead_depth=3)
+        assert good.lookahead is True
+        assert good.lookahead_depth == 1
+
+    def test_playing_mode_god_no_reduction(self):
+        ai = _make_ai(learning=False, level="god", lookahead=True, lookahead_depth=3)
+        assert ai.lookahead is True
+        assert ai.lookahead_depth == 3
+        assert ai._level_profile["misstep"] == 0.0
 
 
 # ---------------------------------------------------------------------------
