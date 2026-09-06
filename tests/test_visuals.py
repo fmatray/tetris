@@ -227,8 +227,8 @@ class TestRendererFrame:
 
         game = _make_game(debug=True)
         game.renderer.screen = pygame.Surface((1500, 800))
-        setattr(game, "_reserve_column", True)
-        setattr(game, "_reserved_column", 5)
+        setattr(game, "_reserve_column", True)  # noqa: B010
+        setattr(game, "_reserved_column", 5)  # noqa: B010
         particles = ParticleSystem()
         game.renderer.render_frame(game, particles)
         cx = BOARD_OFFSET_X + 5 * BLOCK_SIZE + BLOCK_SIZE // 2
@@ -241,8 +241,8 @@ class TestRendererFrame:
 
         game = _make_game(debug=True)
         game.renderer.screen = pygame.Surface((1500, 800))
-        setattr(game, "_reserve_column", True)
-        setattr(game, "_reserved_column", None)
+        setattr(game, "_reserve_column", True)  # noqa: B010
+        setattr(game, "_reserved_column", None)  # noqa: B010
         particles = ParticleSystem()
         game.renderer.render_frame(game, particles)
         cx = BOARD_OFFSET_X + 5 * BLOCK_SIZE + BLOCK_SIZE // 2
@@ -251,8 +251,8 @@ class TestRendererFrame:
 
         game2 = _make_game(debug=False)
         game2.renderer.screen = pygame.Surface((1500, 800))
-        setattr(game2, "_reserve_column", True)
-        setattr(game2, "_reserved_column", 5)
+        setattr(game2, "_reserve_column", True)  # noqa: B010
+        setattr(game2, "_reserved_column", 5)  # noqa: B010
         game2.renderer.render_frame(game2, ParticleSystem())
         assert game2.renderer.screen.get_at((cx, cy)) == BLACK
 
