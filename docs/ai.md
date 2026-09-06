@@ -118,6 +118,13 @@ with published PSO-tuned weights from the [El-Tetris paper](https://imake.ninja/
 
 The PBRS potential (`DELLACHERIE_WEIGHTS`) is unchanged — only the selection prior adds these terms.
 
+The bot's pick path additionally applies a placement-level column
+reservation penalty (`RESERVE_COLUMN_PENALTY`) in
+`BotMovesMixin._get_candidate_states` (see [bot.md](bot.md#selection-algorithm)).
+This runs only on the bot path — the AI's warm-start priors and MCTS root
+priors use the raw `el_tetris_value_batch` values, so AI training and
+playing behavior are unaffected by the reservation.
+
 ## Neural Network Architecture
 
 ```

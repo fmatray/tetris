@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
-from tetris.settings import BOARD_WIDTH
+from tetris.settings import BOARD_WIDTH, RESERVED_COLUMN, RESERVE_COLUMN_PENALTY
 from tetris.ai.candidates import Placement, get_candidate_states
 from tetris.ai.rewards import board_to_grid
 
@@ -62,6 +62,12 @@ class BotMovesMixin:
       ``_get_candidate_states`` — hosts use it to pick a placement
     """
 
+    # Column reservation is a bot-only strategy (ElTetrisState). AIState
+    # shares this mixin but must NOT reserve a column — its warm-start
+    # priors and MCTS root priors use the raw El-Tetris values, and any
+    # penalty would shift AI training/playing behavior.
+    _reserve_column: bool = False
+
     if TYPE_CHECKING:
         # Host contract declarations — satisfied by the GameState host.
         board: Board
@@ -98,6 +104,15 @@ class BotMovesMixin:
         )
         self._candidate_placements = placements
         self._pick_values = pick_values
+        # Column reservation (bot-only): penalize non-I placements whose
+        # filled cells touch the reserved column, so the bot keeps that
+        # column open for I-pieces and scores tetrises. Placement-level
+        # rule (board features are constant across candidates in a step,
+        # so eval-only tweaks cannot flip the argmax). I-pieces exempt.
+        if self._reserve_column:
+            for i, p in enumerate(placements):
+                if p.piece_type != "I" and any(RESERVED_COLUMN == p.px + cx for cx, _ in p.shape):
+                    pick_values[i] += RESERVE_COLUMN_PENALTY
         return candidates, actions, pick_values
 
     def _execute_move_sequence(self, action: int) -> None:

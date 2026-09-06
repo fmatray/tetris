@@ -33,13 +33,23 @@ Its sub-menu ("Bot El-Tetris") has two settings:
    weight −4.5) and `rows_eliminated` (weight +3.42), with the published
    PSO-tuned weights
    ([El-Tetris](https://imake.ninja/el-tetris-an-improvement-on-pierre-dellacheries-algorithm/)).
-3. **Pick** — `level_select(values, misstep, temperature, rng)` in
+3. **Reserve a column** — `BotMovesMixin._get_candidate_states` applies a
+   placement-level penalty: any non-I placement whose filled cells touch
+   the reserved column (`RESERVED_COLUMN = 9`) gets `RESERVE_COLUMN_PENALTY
+   = -60` added to its pick value. I-pieces are exempt. This keeps the
+   column open for I-pieces so the bot scores tetrises and triples.
+   Board-level evaluation terms cannot do this: within one decision all
+   candidates share the same pre-clear board, so board features are
+   constant across candidates and never flip the argmax. The reservation
+   is a placement-level rule on the bot-only path — it never runs on AI
+   training (see [ai.md](ai.md#warm-start-priors)).
+4. **Pick** — `level_select(values, misstep, temperature, rng)` in
    `tetris/bots/moves.py`. At level God, `misstep` is 0 and the pick is
    `argmax` (ties resolve to the lowest index), so God is the exact
    previous behavior. At lower levels, the values are z-normalized and
    sampled through a softmax with probability `misstep`, so the bot
    sometimes picks a weaker placement.
-4. **Execute** — the placement's recorded BFS move sequence is replayed
+5. **Execute** — the placement's recorded BFS move sequence is replayed
    atomically (`BotMovesMixin._execute_move_sequence`), so the piece
    lands exactly where the evaluation saw it. No execution mismatch.
 
@@ -103,6 +113,14 @@ The bot uses the **El-Tetris evaluation** (`el_tetris_value_batch` in `tetris/ai
 - `rows_eliminated` (weight +3.42) — lines cleared by this placement
 
 with published PSO-tuned weights from the [El-Tetris paper](https://imake.ninja/el-tetris-an-improvement-on-pierre-dellacheries-algorithm/).
+
+The column reservation (step 3 above) is what lets the bot score tetrises
+and triples. Measured on 300-piece runs (seeds 42/7/123, God, look-ahead
+depth 2): without reservation the bot scores 0 tetrises and ~0 triples;
+with it, 1–4 tetrises and 6–13 triples per run, score +19–23%, and no
+survival regression (both variants reach the 5000-piece frame cap on all
+seeds). The penalty must stay in `[-80, -40]`: `-100` tops out early
+(68 pieces) and `-80` already degrades one seed.
 
 Literature benchmark: ~16M lines average (vs ~5M for classic Dellacherie). The bot serves as a score floor and oracle for debugging candidate generation.
 

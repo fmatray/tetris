@@ -291,6 +291,13 @@ class TestGenPlacements:
         chosen = ai.agent.select_action(candidates, eval_values)
         assert 0 <= chosen < len(candidates)
 
+    def test_ai_does_not_reserve_column(self):
+        """Column reservation is bot-only: AIState shares BotMovesMixin but
+        must keep the raw El-Tetris values (warm-start priors, MCTS root
+        priors). The reservation flag stays off for AI."""
+        ai = _make_ai()
+        assert ai._reserve_column is False
+
 
 # ---------------------------------------------------------------------------
 # Macro-action execution

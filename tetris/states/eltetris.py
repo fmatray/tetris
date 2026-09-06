@@ -74,6 +74,7 @@ class ElTetrisState(BotMovesMixin, GameState):
         """
         super().__init__(screen, font, audio, config, piece_provider, menu)
         self.player_type = "Bot"
+        self._reserve_column = True  # bot-only column reservation (AIState stays off)
         self._handicap = config.handicap
         bot = bot_config or BotConfig(lookahead=False, lookahead_depth=1)
         self.level: str = bot.level

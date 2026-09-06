@@ -606,6 +606,7 @@ classDiagram
             +lookahead_depth: int
             +player_type: str
             - _handicap: int
+            - _reserve_column: bool
             - _candidate_placements: list~Placement~
             +_lock_and_spawn(hard_drop: bool) LineClearResult
             - _action_timer: float

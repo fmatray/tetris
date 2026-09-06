@@ -231,6 +231,82 @@ class TestElTetrisGameplay:
         assert len(bot._pick_values) == len(candidates)
         assert returned is bot._pick_values
 
+    def test_column_reservation_scores_tetris(self):
+        """God-level bot reserves a column for I-pieces and scores tetrises.
+
+        Regression guard for the column-reservation strategy: without it the
+        bot never scores a tetris (board-level eval terms cannot flip the
+        argmax). With the -60 penalty on non-I placements touching the
+        reserved column, seed 42 clears its first tetris by ~2900 frames.
+        """
+        screen = pygame.Surface((800, 600))
+        font = pygame.font.Font(None, 20)
+        audio = AudioManager(sound_volume=0, music_volume=0)
+        bot = ElTetrisState(
+            screen=screen,
+            font=font,
+            audio=audio,
+            config=GameConfig(
+                handicap=0,
+                sound_volume=0,
+                music_volume=0,
+                music_song="korobeiniki",
+                debug=False,
+                ghost_piece=True,
+                preview_count=1,
+                speed_mode="normal",
+                seed=42,
+                are=True,
+            ),
+            piece_provider=PieceProvider(generator="7bag", seed=42),
+            bot_config=BotConfig(lookahead=False, lookahead_depth=1, level="god"),
+        )
+        parts = ParticleSystem()
+        for _ in range(4000):
+            if bot.update(1000 / 60, parts) is not None:
+                break
+        assert bot.stats.clear_counts.tetris >= 1, (
+            f"bot scored no tetris in 4000 frames (pieces={bot.stats.piece_count})"
+        )
+
+    def test_reservation_penalizes_non_i_in_reserved_column(self):
+        """Non-I placements touching the reserved column get the penalty;
+        I-placements are exempt. Deterministic via a stubbed candidate set."""
+        import tetris.bots.moves as moves_mod
+        from tetris.ai.candidates import Placement
+        from tetris.settings import RESERVED_COLUMN, RESERVE_COLUMN_PENALTY
+
+        bot = _make_bot()
+
+        # Stub the imported get_candidate_states to return a fixed candidate
+        # set: an I placement in the reserved column and a T placement
+        # touching it. The mixin's reservation loop runs on top.
+        def fake_get_candidate_states(**kwargs):
+            placements = [
+                Placement("I", 0, RESERVED_COLUMN, 0, False, []),  # I in reserved col
+                Placement("T", 0, RESERVED_COLUMN - 1, 0, False, []),  # T touches it
+                Placement("O", 0, 0, 0, False, []),  # O far away
+            ]
+            return (
+                np.zeros((3, 17)),
+                [0, 1, 2],
+                np.array([10.0, 10.0, 10.0]),
+                placements,
+            )
+
+        orig = moves_mod.get_candidate_states
+        try:
+            moves_mod.get_candidate_states = fake_get_candidate_states  # type: ignore[assignment]
+            _candidates, _actions, pick_values = bot._get_candidate_states()
+        finally:
+            moves_mod.get_candidate_states = orig
+        # I in reserved column: exempt, keeps 10.0.
+        assert pick_values[0] == 10.0
+        # T touching reserved column: penalized.
+        assert pick_values[1] == 10.0 + RESERVE_COLUMN_PENALTY
+        # O far away: untouched.
+        assert pick_values[2] == 10.0
+
 
 class TestBotMenu:
     def _make_menu(self) -> MenuState:
