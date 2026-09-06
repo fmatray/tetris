@@ -44,6 +44,7 @@ def _entry(loop: int, best: float, mean: float, seed: int) -> dict:
         "timestamp": "2026-01-01T00:00:00",
     }
 
+
 _THREE_ENTRIES = [
     _entry(0, 100.0, 50.0, 1),
     _entry(1, 300.0, 200.0, 2),
@@ -96,6 +97,7 @@ def test_any_key_returns_parent():
     event = pygame.event.Event(pygame.KEYDOWN, key=pygame.K_RETURN)
     assert state.handle_event(event) is parent
 
+
 def test_graph_is_narrow_enough_for_text(_isolated_loops_path):
     """800px graph at gx=670 must clear the widest stat line (FR ~480px at x=60)."""
     entries = _THREE_ENTRIES
@@ -106,6 +108,42 @@ def test_graph_is_narrow_enough_for_text(_isolated_loops_path):
     assert state._surface is not None
     gx = 1500 - state._surface.get_width() - 30
     assert gx >= 670  # leaves >=130px margin past the widest text
+
+
+def test_graph_uses_chronological_ordinal_not_loop_index(_isolated_loops_path, monkeypatch):
+    """loops.json accumulates across runs; "loop" restarts at 0 per run.
+
+    The graph must plot the entry ordinal (0..N-1) so the line is
+    chronological, and use loop terminology, not the AI-training
+    episode labels.
+    """
+    entries = [
+        _entry(0, 100.0, 50.0, 1),
+        _entry(1, 300.0, 200.0, 2),
+        _entry(2, 200.0, 150.0, 3),
+        _entry(0, 400.0, 250.0, 4),  # second run: loop index resets
+        _entry(1, 500.0, 300.0, 5),
+        _entry(2, 450.0, 350.0, 6),
+    ]
+    _isolated_loops_path.write_text(json.dumps(entries))
+
+    captured = {}
+
+    def fake_render(episodes, scores, figsize=(8.0, 6.0), title=None, xlabel=None):
+        captured["episodes"] = episodes
+        captured["scores"] = scores
+        captured["title"] = title
+        captured["xlabel"] = xlabel
+        surf = pygame.Surface((800, 600))
+        return surf
+
+    monkeypatch.setattr("tetris.states.tournament_stats.render_score_graph", fake_render)
+    state = _make_state()
+    state._build_surface()
+    assert captured["episodes"] == [0, 1, 2, 3, 4, 5]
+    assert captured["scores"] == [100.0, 300.0, 200.0, 400.0, 500.0, 450.0]
+    assert captured["title"] == "Score per loop"
+    assert captured["xlabel"] == "Loop"
 
 
 def test_stats_layout_all_languages(_isolated_loops_path):

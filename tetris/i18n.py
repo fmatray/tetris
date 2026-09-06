@@ -272,6 +272,8 @@ _FR: dict[str, str] = {
     # Graph view
     "Episode": "Épisode",
     "Score per episode": "Score par épisode",
+    "Loop": "Ronde",
+    "Score per loop": "Score par ronde",
     "Avg. {}": "Moy. {}",
     # Volume labels
     "Off": "Off",
@@ -501,6 +503,8 @@ _ES: dict[str, str] = {
     "No": "No",
     "Episode": "Episodio",
     "Score per episode": "Puntuación por episodio",
+    "Loop": "Ronda",
+    "Score per loop": "Puntuación por ronda",
     "Avg. {}": "Media {}",
     "Off": "Apagado",
     "Low": "Bajo",
@@ -729,6 +733,8 @@ _SL: dict[str, str] = {
     "No": "Ne",
     "Episode": "Epizoda",
     "Score per episode": "Točke na epizodo",
+    "Loop": "Runda",
+    "Score per loop": "Točke na rundo",
     "Avg. {}": "Povp. {}",
     "Off": "Izklj.",
     "Low": "Nizko",

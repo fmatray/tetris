@@ -78,10 +78,15 @@ class TournamentStatsState(State):
     def _build_surface(self) -> None:
         self._entries = self._load_entries()
         if self._entries:
+            # loops.json accumulates across runs, and each entry's "loop"
+            # field is the per-run index (restarts at 0). Plot the run
+            # ordinal (0..N-1) so the line is chronological.
             self._surface = render_score_graph(
-                [e["loop"] for e in self._entries],
+                list(range(len(self._entries))),
                 [e["best"] for e in self._entries],
                 figsize=(8.0, 6.0),
+                title=tr("Score per loop"),
+                xlabel=tr("Loop"),
             )
         else:
             self._surface = None

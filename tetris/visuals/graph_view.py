@@ -40,7 +40,11 @@ def _moving_average(values: list[int], window: int) -> list[float]:
 
 
 def render_score_graph(
-    episodes: list[int], scores: list[int], figsize: tuple[float, float] = (_FIG_W, _FIG_H)
+    episodes: list[int],
+    scores: list[int],
+    figsize: tuple[float, float] = (_FIG_W, _FIG_H),
+    title: str | None = None,
+    xlabel: str | None = None,
 ) -> pygame.Surface:
     """Render the episode-vs-score graph to a ``pygame.Surface``.
 
@@ -49,6 +53,9 @@ def render_score_graph(
 
     ``figsize`` overrides the figure size in inches (at ``_DPI``); narrow
     figures (e.g. ``(8, 6)``) leave room for side-panel text.
+
+    ``title`` and ``xlabel`` override the axis labels; the defaults suit the
+    AI training graph (episode-vs-score).
     """
     fig, ax = plt.subplots(figsize=figsize, dpi=_DPI)
     fig.patch.set_facecolor(_BG)
@@ -62,9 +69,9 @@ def render_score_graph(
         ax.legend(facecolor=_BG, edgecolor=_FG, labelcolor=_FG)
 
     ax.xaxis.set_major_locator(MaxNLocator(integer=True))
-    ax.set_xlabel(tr("Episode"), color=_FG, fontsize=12)
+    ax.set_xlabel(xlabel or tr("Episode"), color=_FG, fontsize=12)
     ax.set_ylabel(tr("Score"), color=_FG, fontsize=12)
-    ax.set_title(tr("Score per episode"), color=_FG, fontsize=16)
+    ax.set_title(title or tr("Score per episode"), color=_FG, fontsize=16)
     ax.tick_params(colors=_FG)
     ax.grid(True, color=_GRID, alpha=0.5)
     for spine in ax.spines.values():

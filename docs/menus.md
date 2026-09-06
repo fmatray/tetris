@@ -163,7 +163,7 @@ Reached from **AI → Tournament**. This menu runs the post-training evolution l
 
 **Restore checkpoint**: two presses confirm the restore. The first **Enter** arms the confirm ("Press again to restore"); the second copies the pre-tournament checkpoint over `ai_model.pt`. Moving the selection away clears the confirm.
 
-**Statistics**: the stats view reads `data/tournament/loops.json`. It shows a table (loops run, all-time best score, last round best/mean/seed, next seed) and a best-score-per-loop graph. Missing or empty file shows `—` placeholders.
+**Statistics**: the stats view reads `data/tournament/loops.json`. It shows a table (loops run, all-time best score, last round best/mean/seed, next seed) and a graph of best score per recorded loop, in chronological order across runs (the file accumulates; each entry's `loop` field is the 0-based index within its run). Missing or empty file shows `—` placeholders.
 
 ### Bot Submenu (Player = Bot)
 
