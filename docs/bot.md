@@ -35,13 +35,19 @@ Its sub-menu ("Bot El-Tetris") has two settings:
    ([El-Tetris](https://imake.ninja/el-tetris-an-improvement-on-pierre-dellacheries-algorithm/)).
 3. **Reserve a column** — `BotMovesMixin._get_candidate_states` applies a
    placement-level penalty: any non-I placement whose filled cells touch
-   the reserved column (`RESERVED_COLUMN = 9`) gets `RESERVE_COLUMN_PENALTY
-   = -60` added to its pick value. I-pieces are exempt. This keeps the
-   column open for I-pieces so the bot scores tetrises and triples.
-   Board-level evaluation terms cannot do this: within one decision all
-   candidates share the same pre-clear board, so board features are
-   constant across candidates and never flip the argmax. The reservation
-   is a placement-level rule on the bot-only path — it never runs on AI
+   the committed column gets `RESERVE_COLUMN_PENALTY = -60` added to its
+   pick value. I-pieces are exempt. This keeps the column open for
+   I-pieces so the bot scores tetrises and triples. The committed column
+   is chosen from board state (`ElTetrisState._update_reserved_column`):
+   among clean columns (no filled cell), the one where a vertical I would
+   clear the most lines right now, highest index on ties (a flat empty
+   board therefore picks column 9). The bot commits to that column and
+   re-chooses only when it becomes dirty; if no column is clean the
+   reservation turns off until a line clear opens one. Board-level
+   evaluation terms cannot do this: within one decision all candidates
+   share the same pre-clear board, so board features are constant across
+   candidates and never flip the argmax. The reservation is a
+   placement-level rule on the bot-only path — it never runs on AI
    training (see [ai.md](ai.md#warm-start-priors)).
 4. **Pick** — `level_select(values, misstep, temperature, rng)` in
    `tetris/bots/moves.py`. At level God, `misstep` is 0 and the pick is

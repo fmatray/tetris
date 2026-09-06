@@ -180,13 +180,14 @@ PLAYER_LEVEL_PROFILES = {
 DEFAULT_PLAYER_LEVEL = "god"
 
 # --- Bot column reservation (El-Tetris) ----------------------------------
-# The bot reserves one column for I-pieces so it can score tetrises.
+# The bot commits to one column for I-pieces so it can score tetrises.
+# The column is chosen from board state (cleanest, most tetris-ready)
+# and re-chosen only when it becomes dirty; no clean column -> off.
 # Non-I placements whose filled cells touch the reserved column get a
 # pick-value penalty; I-pieces are exempt (they are the payoff). This is
 # a placement-level rule applied on the bot-only path (BotMovesMixin),
 # never on AI training. Penalty must stay in [-80, -40]: <= -100 tops out
 # early (68 pieces), -80 already degrades one seed.
-RESERVED_COLUMN = 9
 RESERVE_COLUMN_PENALTY = -60.0
 
 # --- Menu background animation -----------------------------------------

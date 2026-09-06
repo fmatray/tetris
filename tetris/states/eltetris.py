@@ -22,7 +22,14 @@ import pygame
 from tetris.ai.candidates import Placement
 from tetris.bots.moves import BotMovesMixin, level_select
 from tetris.game.board import LineClearResult
-from tetris.settings import AI_ACTION_DELAY_MS, PLAYER_LEVEL_PROFILES
+from tetris.game.rules import hard_drop_y
+from tetris.game.shapes import get_shape_rot
+from tetris.settings import (
+    AI_ACTION_DELAY_MS,
+    BOARD_HEIGHT,
+    BOARD_WIDTH,
+    PLAYER_LEVEL_PROFILES,
+)
 from tetris.states.base import State
 from tetris.states.game import GameConfig, GameState
 from tetris.visuals.particles import ParticleSystem
@@ -75,6 +82,7 @@ class ElTetrisState(BotMovesMixin, GameState):
         super().__init__(screen, font, audio, config, piece_provider, menu)
         self.player_type = "Bot"
         self._reserve_column = True  # bot-only column reservation (AIState stays off)
+        self._reserved_column: int | None = None  # committed I-column, chosen from board state
         self._handicap = config.handicap
         bot = bot_config or BotConfig(lookahead=False, lookahead_depth=1)
         self.level: str = bot.level
@@ -111,6 +119,7 @@ class ElTetrisState(BotMovesMixin, GameState):
                 return super().update(dt, particles)
             self._action_timer = 0.0
 
+            self._update_reserved_column()
             candidates, actions, _ = self._get_candidate_states()
             if len(candidates) > 0:
                 prof = self._level_profile
@@ -121,6 +130,38 @@ class ElTetrisState(BotMovesMixin, GameState):
 
         # Natural gravity drop, lock delay (inherited from GameState.update)
         return super().update(dt, particles)
+
+    def _update_reserved_column(self) -> None:
+        """Re-choose the committed I-column when it is dirty or unset.
+
+        Choice (situation-related, all columns eligible), maximize in order:
+          1. cleanliness — a column with any filled cell is not a candidate
+             (a tetris needs an empty column);
+          2. readiness — lines a vertical I would clear if hard-dropped
+             into that column now (exploits an existing well);
+          3. higher column index (deterministic; on a flat empty board
+             this preserves the proven col-9 behavior).
+        No clean column -> reservation off (None) until a clear opens one.
+        """
+        col = self._reserved_column
+        if col is not None and not any(self.board.grid[y][col] is not None for y in range(BOARD_HEIGHT)):
+            return  # committed column still clean — keep it (no thrash)
+        i_vertical = get_shape_rot("I", 1)  # [(2,0),(2,1),(2,2),(2,3)]
+        best: int | None = None
+        best_readiness = -1
+        for c in range(BOARD_WIDTH):
+            if any(self.board.grid[y][c] is not None for y in range(BOARD_HEIGHT)):
+                continue  # dirty — not a candidate
+            drop_y = hard_drop_y(self.board.grid, i_vertical, c - 2, 0)
+            readiness = sum(
+                1
+                for y in range(drop_y, drop_y + 4)
+                if all(self.board.grid[y][x] is not None for x in range(BOARD_WIDTH) if x != c)
+            )
+            if readiness > best_readiness or (readiness == best_readiness and (best is None or c > best)):
+                best = c
+                best_readiness = readiness
+        self._reserved_column = best
 
     def _lock_and_spawn(self, hard_drop: bool = False) -> LineClearResult:
         """Reset the action latch on lock so the bot selects the next piece."""

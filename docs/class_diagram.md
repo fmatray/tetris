@@ -607,6 +607,7 @@ classDiagram
             +player_type: str
             - _handicap: int
             - _reserve_column: bool
+            - _reserved_column: int | None
             - _candidate_placements: list~Placement~
             +_lock_and_spawn(hard_drop: bool) LineClearResult
             - _action_timer: float
@@ -616,6 +617,7 @@ classDiagram
             - _level_rng: random.Random
             +__init__(screen, font, audio, config, piece_provider, menu, bot_config) None
             +update(dt: float, particles: ParticleSystem) State | None
+            - _update_reserved_column() None
         }
 
         class GameOverState {

@@ -270,21 +270,22 @@ class TestElTetrisGameplay:
         )
 
     def test_reservation_penalizes_non_i_in_reserved_column(self):
-        """Non-I placements touching the reserved column get the penalty;
+        """Non-I placements touching the committed column get the penalty;
         I-placements are exempt. Deterministic via a stubbed candidate set."""
         import tetris.bots.moves as moves_mod
         from tetris.ai.candidates import Placement
-        from tetris.settings import RESERVED_COLUMN, RESERVE_COLUMN_PENALTY
+        from tetris.settings import RESERVE_COLUMN_PENALTY
 
         bot = _make_bot()
+        bot._reserved_column = 9  # commit a column directly (bypasses the choice)
 
         # Stub the imported get_candidate_states to return a fixed candidate
-        # set: an I placement in the reserved column and a T placement
+        # set: an I placement in the committed column and a T placement
         # touching it. The mixin's reservation loop runs on top.
         def fake_get_candidate_states(**kwargs):
             placements = [
-                Placement("I", 0, RESERVED_COLUMN, 0, False, []),  # I in reserved col
-                Placement("T", 0, RESERVED_COLUMN - 1, 0, False, []),  # T touches it
+                Placement("I", 0, 9, 0, False, []),  # I in committed col
+                Placement("T", 0, 8, 0, False, []),  # T touches it
                 Placement("O", 0, 0, 0, False, []),  # O far away
             ]
             return (
@@ -300,12 +301,37 @@ class TestElTetrisGameplay:
             _candidates, _actions, pick_values = bot._get_candidate_states()
         finally:
             moves_mod.get_candidate_states = orig
-        # I in reserved column: exempt, keeps 10.0.
+        # I in committed column: exempt, keeps 10.0.
         assert pick_values[0] == 10.0
-        # T touching reserved column: penalized.
+        # T touching committed column: penalized.
         assert pick_values[1] == 10.0 + RESERVE_COLUMN_PENALTY
         # O far away: untouched.
         assert pick_values[2] == 10.0
+
+    def test_reserved_column_choice(self):
+        """The committed column is chosen from board state: cleanest,
+        most tetris-ready, rightmost tie-break; dirty -> re-choose;
+        no clean column -> reservation off."""
+        from tetris.settings import BOARD_HEIGHT, BOARD_WIDTH
+
+        bot = _make_bot()
+
+        # 1. Flat empty board -> rightmost clean column (col 9).
+        bot._update_reserved_column()
+        assert bot._reserved_column == 9
+
+        # 2. Committed column dirty -> re-choose among clean columns.
+        bot._reserved_column = 9
+        bot.board.grid[BOARD_HEIGHT - 1][9] = (255, 0, 0)
+        bot.board.grid[BOARD_HEIGHT - 1][8] = (255, 0, 0)
+        bot._update_reserved_column()
+        assert bot._reserved_column == 7  # highest clean column
+
+        # 3. No clean column -> reservation off (None).
+        for x in range(BOARD_WIDTH):
+            bot.board.grid[BOARD_HEIGHT - 1][x] = (255, 0, 0)
+        bot._update_reserved_column()
+        assert bot._reserved_column is None
 
 
 class TestBotMenu:
