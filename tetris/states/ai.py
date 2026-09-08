@@ -200,6 +200,9 @@ class AIState(BotMovesMixin, GameState):
         self.episode = self.log.total_episodes
         self.speed = speed
         self.ai_mode = ai_config.ai_mode
+        # Level cap applies to playing mode only — never to training.
+        if self.ai_mode == "learning":
+            self.level_cap = None
         # Levels degrade playing skill ONLY. Learning mode is pinned to the
         # god profile (no reduction) regardless of the configured level.
         self.level = ai_config.level if self.ai_mode == "playing" else "god"

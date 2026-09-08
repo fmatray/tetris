@@ -68,6 +68,13 @@ B2B_MULTIPLIER = 1.5
 # Lines required to advance one level
 LINES_PER_LEVEL = 10
 
+# Level cap: ends the game when the player's level reaches the cap.
+# OFF (None) disables the rule; otherwise a value from LEVEL_CAP_VALUES.
+# Applies to Human / Bot / AI playing mode only (never AI training).
+DEFAULT_LEVEL_CAP = 1000
+LEVEL_CAP_VALUES = tuple(range(500, 20_001, 500))
+LEVEL_CAP_OFF = None
+
 # --- Gameplay timing ---------------------------------------------------
 LOCK_DELAY_MS = 500  # ms before a grounded piece locks
 LOCK_DELAY_RESETS = 15  # max move/rotate resets before forced lock

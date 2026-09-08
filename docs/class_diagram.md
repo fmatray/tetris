@@ -416,6 +416,7 @@ classDiagram
             +ghost_piece: bool
             +preview_count: int
             +are: bool
+            +level_cap: int | None
             +speed_mode: str
             +renderer: Renderer
             +board: Board
@@ -531,6 +532,7 @@ classDiagram
         class AIState {
             +ghost_piece: bool
             +player_type: str
+            +level_cap: int | None
             +agent: DQNAgent
             +log: TrainingLog
             - _behavior_log_path: str

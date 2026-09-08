@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from tetris.i18n import tr
-from tetris.settings import GENERATOR_LABELS, SPEED_MODE_LABELS, SPEED_MODE_ORDER
+from tetris.settings import GENERATOR_LABELS, LEVEL_CAP_VALUES, SPEED_MODE_LABELS, SPEED_MODE_ORDER
 from tetris.states.base import State
 from tetris.states.menu_base import MenuBase
 
@@ -14,12 +14,25 @@ _PREVIEW_VALUES = (0, 1, 3)
 _HOLES_OVERHANGS_LABELS = ("None", "Holes", "Overhangs", "Both")
 _HOLES_OVERHANGS_VALUES = ("none", "holes", "overhangs", "both")
 
+_LEVEL_CAP_LABELS = ("OFF",) + tuple(str(v) for v in LEVEL_CAP_VALUES)
+_LEVEL_CAP_VALUES = (None,) + LEVEL_CAP_VALUES
+
 
 class GameRulesMenuState(MenuBase):
-    """Game rules sub-menu: random generator, preview count, handicap, speed mode, ghost piece, back."""
+    """Game rules sub-menu: generator, preview count, handicap, speed mode, ghost piece, level cap, back."""
 
-    _OPTIONS = ("Generator", "Preview", "Handicap", "Speed", "Ghost piece", "Holes and overhangs", "ARE", "Back")
-    _toggle_indices = frozenset({0, 1, 2, 3, 4, 5, 6})
+    _OPTIONS = (
+        "Generator",
+        "Preview",
+        "Handicap",
+        "Speed",
+        "Ghost piece",
+        "Holes and overhangs",
+        "ARE",
+        "Level cap",
+        "Back",
+    )
+    _toggle_indices = frozenset({0, 1, 2, 3, 4, 5, 6, 7})
     _title = "Game rules"
 
     def __init__(self, screen, font, audio, menu) -> None:
@@ -43,6 +56,9 @@ class GameRulesMenuState(MenuBase):
                 return tr(_HOLES_OVERHANGS_LABELS[_HOLES_OVERHANGS_VALUES.index(self.menu.holes_overhangs_help)])
             case 6:
                 return "ON" if self.menu.are else "OFF"
+            case 7:
+                idx = _LEVEL_CAP_VALUES.index(self.menu.level_cap)
+                return _LEVEL_CAP_LABELS[idx]
             case _:
                 return ""
 
@@ -68,6 +84,19 @@ class GameRulesMenuState(MenuBase):
                 ]
             case 6:
                 self.menu.are = not self.menu.are
+            case 7:
+                if self.menu.level_cap is None:
+                    self.menu.level_cap = LEVEL_CAP_VALUES[0]
+                elif direction > 0:
+                    idx = LEVEL_CAP_VALUES.index(self.menu.level_cap)
+                    self.menu.level_cap = (
+                        None
+                        if idx == len(LEVEL_CAP_VALUES) - 1
+                        else LEVEL_CAP_VALUES[(idx + 1) % len(LEVEL_CAP_VALUES)]
+                    )
+                else:
+                    idx = LEVEL_CAP_VALUES.index(self.menu.level_cap)
+                    self.menu.level_cap = None if idx == 0 else LEVEL_CAP_VALUES[(idx - 1) % len(LEVEL_CAP_VALUES)]
 
     def _save(self) -> None:
         self.menu.save_settings()
@@ -76,7 +105,7 @@ class GameRulesMenuState(MenuBase):
         return self.menu
 
     def _on_select(self) -> State | None:
-        if self.selection == 7:  # Back
+        if self.selection == 8:  # Back
             return self.menu
         self._toggle(1)
         self._save()

@@ -26,6 +26,7 @@ class GameConfig:
     holes_overhangs_help: str = "none"
     are: bool = False
     seed: int | None = None
+    level_cap: int | None = None
 
 
 import random
@@ -118,6 +119,7 @@ class GameState(State):
         self.ghost_piece = config.ghost_piece
         self.preview_count = config.preview_count
         self.are = config.are
+        self.level_cap = config.level_cap
 
         self.holes_overhangs_help = config.holes_overhangs_help
         self.renderer = Renderer(screen, font)
@@ -485,8 +487,18 @@ class GameState(State):
         self._last_level = self.stats.level
         if self._pending_level_up and self.audio.play("level_up"):
             self._pending_level_up = False
+        # Level cap: end the game through the normal game-over flow when the
+        # level reaches the cap. Applies to Human/Bot/AI playing only — MCP
+        # (external agent, no recording path) and AI learning mode opt out.
+        if (
+            not self.game_over
+            and self.level_cap is not None
+            and self.stats.level >= self.level_cap
+            and self.player_type in ("Humain", "IA", "Bot")
+        ):
+            self.game_over = True
         if self.game_over:
-            return self._do_game_over()  # type: ignore[unreachable]
+            return self._do_game_over()
         return None
 
     def _emit_line_particles(self, particles: ParticleSystem, rows_data: list[ClearedRow]) -> None:

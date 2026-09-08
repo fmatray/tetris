@@ -255,6 +255,7 @@ All game rule settings are configurable via the **Game Rules** menu and persiste
 | Handicap | 0–5 | 0 | Initial garbage rows |
 | Speed Mode | None / Easy / Normal / Medium / Hard / Crazy / Insane | Normal | Gravity curve preset |
 | Ghost Piece | On / Off | On | Show piece landing preview |
+| Level Cap | Off / 500–20000 (step 500) | 1000 | Ends the game when the player's level reaches the cap (Human, Bot, AI playing; never AI training) |
 | Piece Generator | Same as Generator | 7-Bag | (Duplicate — legacy) |
 
 **Files:** `tetris/settings.py` — `GENERATOR_LABELS`, `SPEED_MODE_LABELS`, `DEFAULT_SETTINGS`

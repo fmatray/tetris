@@ -12,6 +12,7 @@ from tetris.states.game import GameConfig
 from tetris.states.ai import AIConfig
 from tetris.logger import configure_logging, get_logger
 from tetris.settings import (
+    DEFAULT_LEVEL_CAP,
     DEFAULT_PLAYER_LEVEL,
     DEFAULT_SPEED_MODE,
     LOG_PATH,
@@ -77,6 +78,7 @@ class MenuState(MenuBase):
 
         self.holes_overhangs_help = "none"
         self.are = True
+        self.level_cap: int | None = DEFAULT_LEVEL_CAP
         self.seed: int | None = None
         self.ai_epsilon_decay = 0.999
         self.ai_epsilon_end = 0.1
@@ -150,6 +152,7 @@ class MenuState(MenuBase):
         "speed_mode": "speed_mode",
         "holes_overhangs_help": "holes_overhangs_help",
         "are": "are",
+        "level_cap": "level_cap",
         "mcp_port": "mcp_port",
         "bot_lookahead": "bot_lookahead",
         "bot_level": "bot_level",
@@ -244,6 +247,7 @@ class MenuState(MenuBase):
             holes_overhangs_help=self.holes_overhangs_help,
             are=self.are,
             seed=self.seed,
+            level_cap=self.level_cap,
         )
 
     def _on_select(self) -> State | None:

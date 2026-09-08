@@ -198,7 +198,8 @@ The MCP server exposes `play` and `start_game` tools plus `board://state` and `t
 | **Speed** | Toggle | None / Easy / Normal / Medium / Hard / Crazy / Insane | Normal | Gravity curve preset (see Speed Modes below) |
 | **Ghost Piece** | Toggle | ON / OFF | ON | Show piece landing preview |
 | **ARE** | Toggle | ON / OFF | ON | Entry delay (100ms) with IRS/IHS input buffering ([game_rules.md §12](game_rules.md#12-are-appearance-delay-irs-ihs)) |
-| **Back** | Action | — | — | Returns to Main Menu (last item, 8th) |
+| **Level cap** | Toggle | OFF / 500–20000 (step 500) | 1000 | Ends the game when the player's level reaches the cap (Human, Bot, AI playing; never AI training) |
+| **Back** | Action | — | — | Returns to Main Menu (last item, 9th) |
 
 #### Speed Modes (Gravity Curves)
 
@@ -286,6 +287,7 @@ All menu settings are persisted to `data/settings.json` via `MenuState.save_sett
   "preview_count": 1,                   // 0/1/3
   "piece_generator": "7bag",            // "random" / "7bag" / "35bag" / "weighted"
   "speed_mode": "normal",               // "none" / "easy" / "normal" / "medium" / "hard" / "crazy" / "insane"
+  "level_cap": 1000,                    // null (OFF) or 500-20000 step 500
   "ai_speed": "normal",                 // "normal" / "fast"
   "ai_epsilon_decay": 0.999,
   "ai_epsilon_end": 0.1,
