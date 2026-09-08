@@ -100,8 +100,8 @@ def test_handle_event_name_backspace():
     assert state.name == "AB"
 
 
-def test_handle_event_name_return_empty_no_transition(tmp_path, monkeypatch):
-    """K_RETURN with empty name does NOT transition to LEADERBOARD."""
+def test_handle_event_name_return_empty_skips_and_advances(tmp_path, monkeypatch):
+    """K_RETURN with empty name advances to LEADERBOARD without saving a record."""
     monkeypatch.setattr("tetris.storage.LEADERBOARD_PATH", str(tmp_path / "lb.json"))
     monkeypatch.setattr("tetris.storage.HUMAN_STATS_PATH", str(tmp_path / "hs.json"))
     state = _make_game_over()
@@ -109,11 +109,13 @@ def test_handle_event_name_return_empty_no_transition(tmp_path, monkeypatch):
     assert state.name == ""
     result = state.handle_event(_keydown(pygame.K_RETURN))
     assert result is None
-    assert state.step == "NAME"
+    assert state.step == "LEADERBOARD"
+    assert state._scores == []
+    assert state._highlight_index is None
 
 
-def test_handle_event_name_return_whitespace_no_transition(tmp_path, monkeypatch):
-    """K_RETURN with only-whitespace name does NOT transition (strip check)."""
+def test_handle_event_name_return_whitespace_skips_and_advances(tmp_path, monkeypatch):
+    """K_RETURN with only-whitespace name skips the record and advances (strip check)."""
     monkeypatch.setattr("tetris.storage.LEADERBOARD_PATH", str(tmp_path / "lb.json"))
     monkeypatch.setattr("tetris.storage.HUMAN_STATS_PATH", str(tmp_path / "hs.json"))
     state = _make_game_over()
@@ -121,7 +123,9 @@ def test_handle_event_name_return_whitespace_no_transition(tmp_path, monkeypatch
     state.name = "   "
     result = state.handle_event(_keydown(pygame.K_RETURN))
     assert result is None
-    assert state.step == "NAME"
+    assert state.step == "LEADERBOARD"
+    assert state._scores == []
+    assert state._highlight_index is None
 
 
 def test_handle_event_name_return_saves_and_transitions(tmp_path, monkeypatch):

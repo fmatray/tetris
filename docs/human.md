@@ -298,7 +298,9 @@ best-effort and never crash gameplay.
 ### GameOverState (`tetris/states/game_over.py`)
 
 - Shows final score, lines, level
-- **Name entry** for leaderboard (A-Z, 0-9, max 15 chars)
+- **Name entry** for leaderboard (A-Z, 0-9, max 15 chars). An empty or
+  whitespace-only name skips the leaderboard record and the human-stats
+  entry, but still advances to the leaderboard view (nothing highlighted).
 - Leaderboard capped at 10 entries (`LEADERBOARD_SIZE`)
 - Saves to `data/leaderboard.json` and `data/human_stats.json`
 - Returns to `MenuState` on confirm

@@ -108,45 +108,50 @@ class GameOverState(State):
         return None
 
     def _handle_name_event(self, event: pygame.event.Event) -> State | None:
-        if event.key == pygame.K_RETURN and self.name.strip():
-            time_s = self._elapsed_s
-            pps = None
-            if time_s and time_s > 0:
-                pps = self.game.stats.piece_count / time_s
-            save_score(
-                self.name,
-                self.game.stats.score,
-                self.game.stats.level,
-                self.game.stats.total_lines,
-                self.game.pieces.generator,
-                self.game.menu.mode if self.game.menu else "Normal",
-                speed_mode=self.game.speed_mode,
-                seed=self.game.seed,
-                game_mode=self._game_mode,
-                time_s=time_s,
-            )
-            if self.game.player_type == "Humain":
-                save_human_game(
+        if event.key == pygame.K_RETURN:
+            if self.name.strip():
+                time_s = self._elapsed_s
+                pps = None
+                if time_s and time_s > 0:
+                    pps = self.game.stats.piece_count / time_s
+                save_score(
                     self.name,
                     self.game.stats.score,
                     self.game.stats.level,
                     self.game.stats.total_lines,
-                    self.game.stats.piece_count,
+                    self.game.pieces.generator,
+                    self.game.menu.mode if self.game.menu else "Normal",
+                    speed_mode=self.game.speed_mode,
                     seed=self.game.seed,
+                    game_mode=self._game_mode,
                     time_s=time_s,
-                    pps=pps,
-                    finesse_faults=getattr(self.game, "finesse_faults", None),
                 )
-            self._scores = load_leaderboard(self._game_mode)
-            # Find the just-saved entry to highlight it in red.
-            self._highlight_index = next(
-                (
-                    i
-                    for i, e in enumerate(self._scores)
-                    if e["name"] == self.name and e["score"] == self.game.stats.score
-                ),
-                None,
-            )
+                if self.game.player_type == "Humain":
+                    save_human_game(
+                        self.name,
+                        self.game.stats.score,
+                        self.game.stats.level,
+                        self.game.stats.total_lines,
+                        self.game.stats.piece_count,
+                        seed=self.game.seed,
+                        time_s=time_s,
+                        pps=pps,
+                        finesse_faults=getattr(self.game, "finesse_faults", None),
+                    )
+                self._scores = load_leaderboard(self._game_mode)
+                # Find the just-saved entry to highlight it in red.
+                self._highlight_index = next(
+                    (
+                        i
+                        for i, e in enumerate(self._scores)
+                        if e["name"] == self.name and e["score"] == self.game.stats.score
+                    ),
+                    None,
+                )
+            else:
+                # Empty name: skip the leaderboard record but still advance.
+                self._scores = load_leaderboard(self._game_mode)
+                self._highlight_index = None
             self.step = "LEADERBOARD"
         elif event.key == pygame.K_BACKSPACE:
             self.name = self.name[:-1]
