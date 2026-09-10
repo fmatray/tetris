@@ -59,8 +59,8 @@ class _Recorder:
 @pytest.fixture()
 def paths(tmp_path):
     return {
-        "model": str(tmp_path / "ai_model.pt"),
-        "pre": str(tmp_path / "ai_model.pre_tournament.pt"),
+        "model": str(tmp_path / "model.pt"),
+        "pre": str(tmp_path / "model.pre_tournament.pt"),
         "best": str(tmp_path / "tournament_best.pt"),
         "report": str(tmp_path / "report.json"),
         "loops": str(tmp_path / "tournament" / "loops.json"),

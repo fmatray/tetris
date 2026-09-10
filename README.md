@@ -54,7 +54,7 @@ A complete Tetris game built in Python with Pygame, featuring an embedded Deep Q
 - ✅ **Settings** — `data/settings.json` (all menu prefs, keybinds, AI hyperparams)
 - ✅ **Leaderboard** — Top 10 scores per game mode: marathon, sprint (ranked by time), blitz (`data/leaderboard.json`)
 - ✅ **Human stats** — Unbounded game history incl. PPS + finesse faults (`data/human_stats.json`)
-- ✅ **AI model** — PyTorch checkpoint (`data/ai_model.pt`: weights, optimizer, epsilon, curriculum state)
+- ✅ **AI model** — PyTorch checkpoint (`data/ai/model.pt`: weights, optimizer, epsilon, curriculum state)
 - ✅ **Training logs** — 5-tier observability (see AI Player section)
 - ✅ **Centralized logging** — `tetris.logger` module, debug mode writes to `data/debug.log`
 

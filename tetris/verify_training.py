@@ -17,7 +17,7 @@ pygame.init()
 pygame.mixer.init()
 
 from tetris.audio import AudioManager
-from tetris.settings import DATA_DIR, MODEL_PATH
+from tetris.settings import AI_DATA_DIR, DATA_DIR, MODEL_PATH
 from tetris.states.game import GameConfig
 from tetris.states.ai import AIConfig
 from tetris.states.ai import AIState
@@ -25,6 +25,7 @@ from tetris.visuals.fonts import get_small_font
 from tetris.visuals.particles import ParticleSystem
 
 os.makedirs(DATA_DIR, exist_ok=True)
+os.makedirs(AI_DATA_DIR, exist_ok=True)
 
 # Step duration in ms (matches 60fps game loop)
 DT = 16.67

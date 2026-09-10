@@ -16,7 +16,7 @@ import pygame
 from tetris.audio import AudioManager
 from tetris.i18n import set_language
 from tetris.logger import configure_logging, get_logger
-from tetris.settings import DATA_DIR, SCREEN_HEIGHT, SCREEN_WIDTH, SETTINGS_PATH
+from tetris.settings import AI_DATA_DIR, DATA_DIR, SCREEN_HEIGHT, SCREEN_WIDTH, SETTINGS_PATH
 from tetris.states.base import State
 from tetris.states.menu import MenuState
 from tetris.visuals.fonts import get_small_font
@@ -29,6 +29,7 @@ class TetrisApp:
     def __init__(self) -> None:
         """Initialize pygame, create the display, and start at the root menu."""
         os.makedirs(DATA_DIR, exist_ok=True)
+        os.makedirs(AI_DATA_DIR, exist_ok=True)
         configure_logging(False)
         pygame.init()
         pygame.mixer.init()

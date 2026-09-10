@@ -6,17 +6,17 @@ over generations (top-half survival + mutated/crossover offspring).
 
 Reuses :class:`~tetris.states.ai.AIState` for evaluation so the exact
 shipped playing loop (seeding, lock delay, scoring) measures fitness.
-Path isolation: playing-mode logs are redirected into ``data/tournament/``
+Path isolation: playing-mode logs are redirected into ``data/ai/tournament/``
 by patching module attributes before each ``AIState`` construction; the
 shipped model checkpoint is never written.
 
 Outputs:
-- ``data/tournament_report.json`` — per-generation fitness statistics.
-- ``data/tournament_best.pt`` — best weights (never ``MODEL_PATH``).
+- ``data/ai/tournament/tournament_report.json`` — per-generation fitness statistics.
+- ``data/ai/tournament/tournament_best.pt`` — best weights (never ``MODEL_PATH``).
 - ``run_tournament_loops`` additionally writes:
-  ``data/ai_model.pre_tournament.pt`` (base checkpoint), copies each loop's
+  ``data/ai/model.pre_tournament.pt`` (base checkpoint), copies each loop's
   winner over ``MODEL_PATH``, and appends per-loop history to
-  ``data/tournament/loops.json``.
+  ``data/ai/tournament/loops.json``.
 """
 
 from __future__ import annotations
@@ -36,7 +36,7 @@ import torch
 
 from tetris.ai.agent import DQNAgent
 from tetris.logger import get_logger
-from tetris.settings import MODEL_PATH, PRE_TOURNAMENT_PATH, TOURNAMENT_LOOPS_PATH
+from tetris.settings import MODEL_PATH, PRE_TOURNAMENT_PATH, TOURNAMENT_DIR, TOURNAMENT_LOOPS_PATH
 
 logger = get_logger(__name__)
 
@@ -44,7 +44,7 @@ logger = get_logger(__name__)
 # strong agents diverge from weak ones, low enough for practical runtime.
 PIECE_CAP: int = 400
 
-REPORT_DIR = os.path.join("data", "tournament")
+REPORT_DIR = TOURNAMENT_DIR
 REPORT_PATH = os.path.join(REPORT_DIR, "tournament_report.json")
 BEST_PATH = os.path.join(REPORT_DIR, "tournament_best.pt")
 
@@ -266,9 +266,7 @@ def run_tournament(
         for gen in range(generations):
             if should_stop and should_stop():
                 break
-            fitness = evaluate_population(
-                checkpoints, episodes, seed, dueling, piece_cap, evaluate, progress
-            )
+            fitness = evaluate_population(checkpoints, episodes, seed, dueling, piece_cap, evaluate, progress)
             gen_best = int(np.argmax(fitness))
             gen_mean = float(np.mean(fitness))
             if fitness[gen_best] > best_score:

@@ -278,7 +278,7 @@ Displays persistent game history from `data/human_stats.json`:
 **Architectural Guarantee:** AI games **never** pollute human stats.
 - `save_human_game()` only called in `GameOverState._handle_name_entry()`
 - `AIState` has its own `_on_episode_end()` and never creates `GameOverState`
-- Separate log files: `ai_training_log.json` / `ai_playing_log.json`
+- Separate log files: `data/ai/training_log.json` / `data/ai/playing_log.json`
 
 ### Placement Recording (Imitation Data)
 

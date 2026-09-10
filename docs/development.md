@@ -221,12 +221,12 @@ All in `data/` (gitignored via blanket `data/` rule):
 | `settings.json` | `SETTINGS_PATH` | JSON | Menu prefs, AI hyperparams, keybinds, debug flag |
 | `leaderboard.json` | `LEADERBOARD_PATH` | JSON | Top 10 scores (capped) |
 | `human_stats.json` | `HUMAN_STATS_PATH` | JSON | Unbounded human game history |
-| `ai_model.pt` | `MODEL_PATH` | PyTorch | DQN weights + optimizer + epsilon |
-| `ai_training_log.json` | `LOG_PATH` | JSON | Per-episode training metrics (35 fields) |
-| `ai_step_log.jsonl` | `STEP_LOG_PATH` | JSONL | Per-`learn()`-call metrics (rotates at 100K lines) |
-| `ai_behavior_log.jsonl` | `BEHAVIOR_LOG_PATH` | JSONL | Per-episode behavioral analytics |
-| `ai_playing_log.json` | `PLAYING_LOG_PATH` | JSON | Per-episode playing-mode metrics |
-| `ai_playing_behavior_log.jsonl` | `PLAYING_BEHAVIOR_LOG_PATH` | JSONL | Per-episode playing-mode behavioral analytics |
+| `data/ai/model.pt` | `MODEL_PATH` | PyTorch | DQN weights + optimizer + epsilon |
+| `data/ai/training_log.json` | `LOG_PATH` | JSON | Per-episode training metrics (35 fields) |
+| `data/ai/step_log.jsonl` | `STEP_LOG_PATH` | JSONL | Per-`learn()`-call metrics (rotates at 100K lines) |
+| `data/ai/behavior_log.jsonl` | `BEHAVIOR_LOG_PATH` | JSONL | Per-episode behavioral analytics |
+| `data/ai/playing_log.json` | `PLAYING_LOG_PATH` | JSON | Per-episode playing-mode metrics |
+| `data/ai/playing_behavior_log.jsonl` | `PLAYING_BEHAVIOR_LOG_PATH` | JSONL | Per-episode playing-mode behavioral analytics |
 | `runs/` | `TB_LOG_DIR` | TensorBoard | TensorBoard event files |
 | `replay_pieces.json` | `REPLAY_PATH` | JSON | Stored piece sequences for Replay mode |
 

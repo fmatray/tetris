@@ -206,7 +206,7 @@ bot games second — the human data is the intended expert.
 | ARE entry delay | Fast-forwarded (no delay, training speed preserved) | Full 100ms delay, IRS/IHS buffered |
 | Replay buffer | Stores transitions | No storage |
 | Learning | `learn_per_action` updates per piece | Skipped |
-| Logging | `ai_training_log.json`, `ai_step_log.jsonl`, `ai_behavior_log.jsonl`, TensorBoard | `ai_playing_log.json`, `ai_playing_behavior_log.jsonl` |
+| Logging | `data/ai/training_log.json`, `data/ai/step_log.jsonl`, `data/ai/behavior_log.jsonl`, TensorBoard | `data/ai/playing_log.json`, `data/ai/playing_behavior_log.jsonl` |
 | Model save | Every 50 episodes + on exit | Never |
 | Curriculum | Active if enabled | Disabled |
 
@@ -316,11 +316,11 @@ The AI submenu includes a **Graph** option that opens a full-screen score-vs-epi
 
 | Tier | Target | File | Format |
 |------|--------|------|--------|
-| 1 | Per-episode enriched log | `ai_training_log.json` | JSON (35 fields: 9 original + 26 observability) |
-| 2 | Per-`learn()` call metrics | `ai_step_log.jsonl` | JSONL (rotates at 1M lines) |
-| 3 | Per-episode behavioral analytics | `ai_behavior_log.jsonl` | JSONL (column/rotation histograms, placement success rate) |
+| 1 | Per-episode enriched log | `data/ai/training_log.json` | JSON (35 fields: 9 original + 26 observability) |
+| 2 | Per-`learn()` call metrics | `data/ai/step_log.jsonl` | JSONL (rotates at 1M lines) |
+| 3 | Per-episode behavioral analytics | `data/ai/behavior_log.jsonl` | JSONL (column/rotation histograms, placement success rate) |
 | 4 | Reward decomposition | `compute_reward_components()` | 9 components (sum = total reward) |
-| 5 | Live dashboards | `SummaryWriter` → `data/runs/` | TensorBoard scalars |
+| 5 | Live dashboards | `SummaryWriter` → `data/ai/runs/` | TensorBoard scalars |
 
 **Key APIs**: `DQNAgent.training_metrics()` snapshots dynamics; `DQNAgent.flush_logs()` flushes TB writer; `AIState._write_behavior_log()` writes behavioral JSONL; `compute_reward_components()` in `rewards.py` decomposes reward. All I/O is best-effort — training never crashes on log failures. Playing mode disables step log and TB writer.
 
@@ -382,11 +382,11 @@ python -m tetris.tournament --generations 3 --episodes 2 --population 8 --sigma 
 
 The tournament works as follows:
 
-1. It loads the checkpoint at `data/ai_model.pt`.
+1. It loads the checkpoint at `data/ai/model.pt`.
 2. It builds a population from the base checkpoint plus Gaussian mutants (`sigma` = noise scale).
 3. Each generation evaluates every checkpoint in headless playing-mode episodes. The episode score up to a piece cap is the fitness.
 4. The top half of the population survives. Mutated survivors and uniform-crossover pairs refill the population.
-5. It writes the report to `data/tournament/tournament_report.json` and the best weights to `data/tournament/tournament_best.pt`.
+5. It writes the report to `data/ai/tournament/tournament_report.json` and the best weights to `data/ai/tournament/tournament_best.pt`.
 
 ### In-Game Loop Mode
 
@@ -394,10 +394,10 @@ The game also exposes the tournament as a menu: **AI → Tournament**. See [menu
 
 The loop mode repeats the tournament and chains the winners:
 
-1. Before the first loop, the base model `data/ai_model.pt` is copied to `data/ai_model.pre_tournament.pt` (a checkpoint, overwritten each run).
+1. Before the first loop, the base model `data/ai/model.pt` is copied to `data/ai/model.pre_tournament.pt` (a checkpoint, overwritten each run).
 2. Each loop `k` (0-based) runs one tournament with seed `tournament_seed + k`.
-3. After each loop, the winner (`tournament_best.pt`) replaces `ai_model.pt` — the winner re-seeds the model, so the next loop (and any later training session) starts from it.
-4. One entry is appended per loop to `data/tournament/loops.json`: `{loop, seed, best, mean, elapsed_s, timestamp}`. Entries accumulate across runs; `loop` is the 0-based index within its own run (it restarts at 0 for each run), so the tournament stats graph plots chronological entry ordinals rather than `loop` itself.
+3. After each loop, the winner (`tournament_best.pt`) replaces `data/ai/model.pt` — the winner re-seeds the model, so the next loop (and any later training session) starts from it.
+4. One entry is appended per loop to `data/ai/tournament/loops.json`: `{loop, seed, best, mean, elapsed_s, timestamp}`. Entries accumulate across runs; `loop` is the 0-based index within its own run (it restarts at 0 for each run), so the tournament stats graph plots chronological entry ordinals rather than `loop` itself.
 
 While the run executes, the worker thread reports progress through a plain dict that `TournamentState` polls at 60 FPS. Each key has a single writer (dict writes and `list.append` are GIL-atomic), so no locks are needed:
 

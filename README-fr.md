@@ -54,7 +54,7 @@ Un jeu Tetris complet développé en Python avec Pygame, incluant un agent IA De
 - ✅ **Réglages** — `data/settings.json` (tous prefs menus, keybinds, hyperparams IA)
 - ✅ **Classement** — Top 10 par mode de jeu : marathon, sprint (classé au temps), blitz (`data/leaderboard.json`)
 - ✅ **Stats humain** — Historique parties non borné, incluant PPS + fautes de finesse (`data/human_stats.json`)
-- ✅ **Modèle IA** — Checkpoint PyTorch (`data/ai_model.pt`: poids, optimiseur, epsilon, état curriculum)
+- ✅ **Modèle IA** — Checkpoint PyTorch (`data/ai/model.pt`: poids, optimiseur, epsilon, état curriculum)
 - ✅ **Logs entraînement** — Observabilité 5 niveaux (voir section IA Joueur)
 - ✅ **Logging centralisé** — Module `tetris.logger`, mode debug écrit dans `data/debug.log`
 

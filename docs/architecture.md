@@ -195,12 +195,12 @@ All runtime-generated files live in `data/` (gitignored):
 | `settings.json` | `SETTINGS_PATH` | Menu prefs, AI hyperparams, keybinds, debug flag |
 | `leaderboard.json` | `LEADERBOARD_PATH` | Top 10 scores (capped) |
 | `human_stats.json` | `HUMAN_STATS_PATH` | Unbounded human game history |
-| `ai_model.pt` | `MODEL_PATH` | DQN weights + optimizer + epsilon |
-| `ai_training_log.json` | `LOG_PATH` | Per-episode training metrics (35 fields) |
-| `ai_step_log.jsonl` | `STEP_LOG_PATH` | Per-`learn()`-call metrics (rotates at 1M lines) |
-| `ai_behavior_log.jsonl` | `BEHAVIOR_LOG_PATH` | Per-episode behavioral analytics |
-| `ai_playing_log.json` | `PLAYING_LOG_PATH` | Per-episode playing-mode metrics |
-| `ai_playing_behavior_log.jsonl` | `PLAYING_BEHAVIOR_LOG_PATH` | Playing-mode behavioral analytics |
+| `data/ai/model.pt` | `MODEL_PATH` | DQN weights + optimizer + epsilon |
+| `data/ai/training_log.json` | `LOG_PATH` | Per-episode training metrics (35 fields) |
+| `data/ai/step_log.jsonl` | `STEP_LOG_PATH` | Per-`learn()`-call metrics (rotates at 1M lines) |
+| `data/ai/behavior_log.jsonl` | `BEHAVIOR_LOG_PATH` | Per-episode behavioral analytics |
+| `data/ai/playing_log.json` | `PLAYING_LOG_PATH` | Per-episode playing-mode metrics |
+| `data/ai/playing_behavior_log.jsonl` | `PLAYING_BEHAVIOR_LOG_PATH` | Playing-mode behavioral analytics |
 | `runs/` | `TB_LOG_DIR` | TensorBoard event files |
 | `replay_pieces.json` | `REPLAY_PATH` | Stored piece sequences for Replay mode |
 

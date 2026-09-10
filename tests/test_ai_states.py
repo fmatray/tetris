@@ -846,7 +846,7 @@ class TestObservabilityCounters:
             assert "game_over" in comps
 
     def test_behavior_log_jsonl_written(self):
-        """After an episode, ai_behavior_log.jsonl has a valid JSON line."""
+        """After an episode, data/ai/behavior_log.jsonl has a valid JSON line."""
         import json
         import tempfile
 

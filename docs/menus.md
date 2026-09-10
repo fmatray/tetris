@@ -113,10 +113,10 @@ flowchart TD
 | **Mode** | Toggle | Learning / Playing | Learning: ε-greedy, trains, saves model/log. Playing: greedy (ε=0), no training, full lock delay |
 | **Speed** | Toggle | Normal / Fast | Normal: respects lock delay. Fast: fast-forwards lock delay (learning only) |
 | **Training** | Submenu | — | All DQN hyperparameters (see below). Locked while training is in progress: changing hyperparameters mid-run would alter an ongoing training. Unlocks after Reset AI removes the trained model and log. Greyed out when Mode = Playing |
-| **Tournament** | Submenu | — | Post-training evolution loop (see below). Needs a trained checkpoint (`ai_model.pt`). Greyed out when Mode = Playing or while training is in progress |
+| **Tournament** | Submenu | — | Post-training evolution loop (see below). Needs a trained checkpoint (`data/ai/model.pt`). Greyed out when Mode = Playing or while training is in progress |
 | **Statistics** | Submenu | — | Training metrics, score graph (matplotlib → pygame surface) |
 | **Level** | Toggle | Noob / Good / Advanced / Champion / God | Playing skill of the AI. Disabled in learning mode (training always uses God). See [ai.md](ai.md#player-levels-playing-mode-only) |
-| **Reset AI** | Action | — | Deletes `ai_model.pt`, `ai_training_log.json`, `ai_step_log.jsonl`, `ai_behavior_log.jsonl`, `runs/` (confirmation required) |
+| **Reset AI** | Action | — | Deletes `data/ai/model.pt`, `data/ai/training_log.json`, `data/ai/step_log.jsonl`, `data/ai/behavior_log.jsonl`, `runs/` (confirmation required) |
 | **Back** | Action | — | Returns to Main Menu |
 
 #### Training Hyperparameters
@@ -147,7 +147,7 @@ flowchart TD
 
 #### Tournament
 
-Reached from **AI → Tournament**. This menu runs the post-training evolution loop in the game. It is available when a trained checkpoint (`data/ai_model.pt`) exists. "Reset AI" deletes the checkpoint and locks this entry again. See [ai.md](ai.md#self-play-tournament) for the loop semantics.
+Reached from **AI → Tournament**. This menu runs the post-training evolution loop in the game. It is available when a trained checkpoint (`data/ai/model.pt`) exists. "Reset AI" deletes the checkpoint and locks this entry again. See [ai.md](ai.md#self-play-tournament) for the loop semantics.
 
 | Option | Type | Range | Default | Step | Description |
 |--------|------|-------|---------|------|-------------|
@@ -157,7 +157,7 @@ Reached from **AI → Tournament**. This menu runs the post-training evolution l
 | **Population** | Toggle | 2–12 | 6 | 2 | Agents per generation (even: half survive). Bigger = more exploration, slower |
 | **Sigma** | Toggle | 0.005–0.10 | 0.02 | 0.005 | Mutation strength: Gaussian noise scale on weights. Small = fine-tune, big = explore |
 | **Statistics** | Submenu | — | — | — | Tournament stats view (disabled when no loop results are recorded) |
-| **Restore checkpoint** | Action | — | — | — | Copies `data/ai_model.pre_tournament.pt` back to `ai_model.pt` (disabled when no checkpoint file exists) |
+| **Restore checkpoint** | Action | — | — | — | Copies `data/ai/model.pre_tournament.pt` back to `data/ai/model.pt` (disabled when no checkpoint file exists) |
 | **Start** | Action | — | — | — | Starts the run (disabled when no trained checkpoint exists) |
 | **Back** | Action | — | — | — | Returns to the AI submenu |
 
@@ -165,9 +165,9 @@ Reached from **AI → Tournament**. This menu runs the post-training evolution l
 
 **Seed rule**: loop `k` (0-based) uses `tournament_seed + k`. After the run, the seed advances by the number of loops run. This is persisted, so consecutive runs never reuse a seed.
 
-**Restore checkpoint**: two presses confirm the restore. The first **Enter** arms the confirm ("Press again to restore"); the second copies the pre-tournament checkpoint over `ai_model.pt`. Moving the selection away clears the confirm.
+**Restore checkpoint**: two presses confirm the restore. The first **Enter** arms the confirm ("Press again to restore"); the second copies the pre-tournament checkpoint over `data/ai/model.pt`. Moving the selection away clears the confirm.
 
-**Statistics**: the stats view reads `data/tournament/loops.json`. It shows a table (loops run, all-time best score, last round best/mean/seed, next seed) and a graph of best score per recorded loop, in chronological order across runs (the file accumulates; each entry's `loop` field is the 0-based index within its run). Missing or empty file shows `—` placeholders.
+**Statistics**: the stats view reads `data/ai/tournament/loops.json`. It shows a table (loops run, all-time best score, last round best/mean/seed, next seed) and a graph of best score per recorded loop, in chronological order across runs (the file accumulates; each entry's `loop` field is the 0-based index within its run). Missing or empty file shows `—` placeholders.
 
 ### Bot Submenu (Player = Bot)
 

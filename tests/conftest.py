@@ -23,7 +23,7 @@ def _backup_data_dir() -> Iterator[None]:
 
     Tests destructively modify real data files (MODEL_PATH, LOG_PATH,
     SETTINGS_PATH, etc.). This fixture snapshots the entire data/ tree
-    (including data/runs/) to a temp dir before tests run and restores
+    (including data/ai/runs/) to a temp dir before tests run and restores
     it after, so real training/playing data is never corrupted.
     """
     from tetris.settings import DATA_DIR

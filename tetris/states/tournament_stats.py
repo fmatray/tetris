@@ -1,6 +1,6 @@
 """Tournament statistics page: loop stats table + best-score graph.
 
-Reads ``data/tournament/loops.json`` (list of per-loop entries) and
+Reads ``data/ai/tournament/loops.json`` (list of per-loop entries) and
 mirrors the :class:`AIStatsState` layout: stats table on the left,
 best-score-per-loop graph on the right. Missing or empty file shows
 placeholders — a brand-new install has no loops yet.

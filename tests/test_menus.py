@@ -259,7 +259,7 @@ def test_ai_menu_disabled_when_playing():
 
 
 def test_ai_menu_tournament_available_when_model_exists(monkeypatch, tmp_path):
-    """Tournament opens when ai_model.pt exists — even in playing mode."""
+    """Tournament opens when data/ai/model.pt exists — even in playing mode."""
     import tetris.states.ai_menu as ai_menu_mod
 
     model = tmp_path / "model.pt"
