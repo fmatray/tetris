@@ -262,8 +262,7 @@ class AIState(BotMovesMixin, GameState):
                 logger.info("Imitation warm-start: trained on %d moves", n)
             else:
                 logger.warning(
-                    "Imitation warm-start: no usable data in data/human_placements.jsonl"
-                    " — play a human game to record placements"
+                    "Imitation warm-start: no usable data in data/human/ — play a human game to record placements"
                 )
             # Bot warm-start is optional: no warning when bot data is missing.
             n = bot_imitation_pretrain(self.agent)

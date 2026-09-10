@@ -283,13 +283,13 @@ Displays persistent game history from `data/human_stats.json`:
 ### Placement Recording (Imitation Data)
 
 Every human game also records each locked placement (piece type, rotation,
-column, hold flag) to `data/human_placements.jsonl` via `PlacementsLog`
-(`tetris/game/imitation.py`). The [AI imitation warm-start](ai.md) replays
-these records to pre-train the V-network. The architectural guarantee holds
-for this file: only `HumanState` attaches a recorder, so AI and bot games
-never write to it. God-level bot games write to a **separate** file
-(`data/bot_placements.jsonl`) — see [the bot docs](bot.md). Writes are
-best-effort and never crash gameplay.
+column, hold flag) to a per-game file under `data/human/` via
+`PlacementsLog` (`tetris/game/imitation.py`). The [AI imitation
+warm-start](ai.md) replays these records to pre-train the V-network. The
+architectural guarantee holds for this directory: only `HumanState` attaches
+a recorder, so AI and bot games never write to it. God-level bot games write
+to a **separate** directory (`data/bot/`) — see [the bot docs](bot.md).
+Writes are best-effort and never crash gameplay.
 
 ---
 

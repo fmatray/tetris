@@ -4,7 +4,7 @@ Picks the candidate placement maximizing the El-Tetris evaluation
 (:func:`tetris.ai.candidates.get_candidate_states` returns the values).
 No learning, no RL logging, no persistence of its own — a
 watch/benchmark player. God-level games additionally record placements
-(``BOT_PLACEMENTS_PATH``) for AI imitation warm-start.
+(``BOT_PLACEMENTS_DIR``) for AI imitation warm-start.
 
 Independent of ``AIState``: shares only ``BotMovesMixin`` (candidate
 enumeration + BFS move replay) via the ``tetris.bots`` library.
@@ -28,7 +28,7 @@ from tetris.game.rules import hard_drop_y
 from tetris.game.shapes import get_shape_rot
 from tetris.settings import (
     AI_ACTION_DELAY_MS,
-    BOT_PLACEMENTS_PATH,
+    BOT_PLACEMENTS_DIR,
     BOARD_HEIGHT,
     BOARD_WIDTH,
     PLAYER_LEVEL_PROFILES,
@@ -95,7 +95,7 @@ class ElTetrisState(BotMovesMixin, GameState):
         if self.level == "god":
             from tetris.game.imitation import PlacementsLog
 
-            self._placement_recorder = PlacementsLog(BOT_PLACEMENTS_PATH)
+            self._placement_recorder = PlacementsLog(dir=BOT_PLACEMENTS_DIR)
             self._placement_recorder.start_game(seed=self.seed, handicap=config.handicap)
         # Anticipation cap: lower levels see fewer upcoming pieces.
         cap = self._level_profile["lookahead_cap"]

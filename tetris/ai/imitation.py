@@ -11,16 +11,18 @@ pretraining never crashes startup.
 
 from __future__ import annotations
 
+import os
+
 import numpy as np
 import torch
 
 from tetris.ai.agent import DQNAgent
 from tetris.ai.candidates import gen_placements, get_candidate_states
-from tetris.game.imitation import read_placements
+from tetris.game.imitation import read_placements, read_placements_dir
 from tetris.game.rules import hard_drop_y, place_cells
 from tetris.game.shapes import get_shape_rot
 from tetris.logger import get_logger
-from tetris.settings import BOT_IMITATION_TOP_N, BOT_PLACEMENTS_PATH
+from tetris.settings import BOT_IMITATION_TOP_N, BOT_PLACEMENTS_DIR, HUMAN_PLACEMENTS_DIR
 
 _logger = get_logger("imitation")
 
@@ -43,13 +45,14 @@ def imitation_pretrain(
 
     Args:
         agent: The agent whose online net receives the gradients.
-        path: Placements JSONL path (default: the shared ``PLACEMENTS_PATH``).
+        path: Placements JSONL path (default: the ``data/human/``
+            per-game directory).
         epochs: Passes over the recorded games.
 
     Returns:
         Number of moves trained on (0 if the log is missing or empty).
     """
-    records = read_placements() if path is None else read_placements(path)
+    records = read_placements_dir(HUMAN_PLACEMENTS_DIR) if path is None else read_placements(path)
     if not records:
         _logger.info("No placement records — imitation warm-start skipped")
         return 0
@@ -73,13 +76,15 @@ def bot_imitation_pretrain(
 
     Args:
         agent: The agent whose online net receives the gradients.
-        path: Bot placements JSONL path (default: ``BOT_PLACEMENTS_PATH``).
+        path: Bot placements JSONL path or per-game directory (default:
+            the ``data/bot/`` per-game directory).
         top_n: Number of best games to keep (default: ``BOT_IMITATION_TOP_N``).
 
     Returns:
         Number of moves trained on (0 if the log is missing or empty).
     """
-    records = read_placements(path or BOT_PLACEMENTS_PATH)
+    source = path or BOT_PLACEMENTS_DIR
+    records = read_placements_dir(source) if os.path.isdir(source) else read_placements(source)
     if not records:
         return 0
     games = _rank_games(_split_games(records), top_n or BOT_IMITATION_TOP_N)

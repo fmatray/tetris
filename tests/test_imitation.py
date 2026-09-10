@@ -23,7 +23,7 @@ from tetris.ai.imitation import (
     bot_imitation_pretrain,
     imitation_pretrain,
 )
-from tetris.game.imitation import PlacementsLog, read_placements
+from tetris.game.imitation import PlacementsLog, next_game_path, read_placements, read_placements_dir
 
 
 def _write_game(path, moves, seed=7):
@@ -44,6 +44,17 @@ def _write_game_with_result(path, moves, result, seed=7):
     log.close()
 
 
+def _write_game_dir(dir_path, moves, seed=7, result=None):
+    """Write one game into a per-game directory (dir= mode)."""
+    log = PlacementsLog(dir=dir_path)
+    log.start_game(seed=seed, handicap=0)
+    for piece, rot, x, hold in moves:
+        log.record(piece, rot, x, hold=hold)
+    if result is not None:
+        log.end_game(**result)
+    log.close()
+
+
 def test_recorder_roundtrip(tmp_path):
     p = str(tmp_path / "pl.jsonl")
     _write_game(p, [("I", 0, 0, False), ("T", 1, 4, True)])
@@ -51,6 +62,42 @@ def test_recorder_roundtrip(tmp_path):
     assert recs[0]["type"] == "game" and recs[0]["seed"] == 7
     assert recs[1] == {"type": "move", "piece": "I", "rot": 0, "x": 0, "hold": False}
     assert recs[2]["hold"] is True
+
+
+def test_placements_log_per_game_mode(tmp_path):
+    """dir= mode writes one file per game, in game order."""
+    d = str(tmp_path / "games")
+    _write_game_dir(
+        d, [("I", 0, 0, False)], seed=7, result={"score": 100, "tetris": 0, "triple": 0, "lines": 0, "pieces": 10}
+    )
+    _write_game_dir(d, [("T", 1, 4, True)], seed=8)
+    files = sorted(os.listdir(d))
+    assert files == ["game_000001.jsonl", "game_000002.jsonl"]
+    recs = read_placements_dir(d)
+    assert [r["type"] for r in recs] == ["game", "move", "game_end", "game", "move"]
+    assert recs[0]["seed"] == 7 and recs[3]["seed"] == 8
+    assert recs[4]["hold"] is True
+
+
+def test_placements_log_no_start_game_is_noop(tmp_path):
+    """record/end_game before start_game in dir mode must not create files."""
+    d = str(tmp_path / "games")
+    log = PlacementsLog(dir=d)
+    log.record("I", 0, 0, hold=False)
+    log.end_game(score=1, tetris=0, triple=0, lines=0, pieces=1)
+    log.close()
+    assert not os.path.exists(d)
+
+
+def test_next_game_path_collision_suffix(tmp_path):
+    """next_game_path skips existing names, never overwriting."""
+    d = str(tmp_path / "games")
+    os.makedirs(d)
+    # Gap: game_000002.jsonl missing but game_000003.jsonl present — the
+    # len+1 index collides and must increment past it.
+    for name in ("game_000001.jsonl", "game_000003.jsonl"):
+        (tmp_path / "games" / name).write_text("{}\n")
+    assert os.path.basename(next_game_path(d)) == "game_000004.jsonl"
 
 
 def test_end_game_record_roundtrip(tmp_path):
@@ -121,14 +168,15 @@ def test_god_bot_records_placements(tmp_path, monkeypatch):
     import pygame
 
     from tetris.audio import AudioManager
+    from tetris.game.imitation import read_placements_dir
     from tetris.game.piece_provider import PieceProvider
     from tetris.states.eltetris import BotConfig, ElTetrisState
     from tetris.states.game import GameConfig
     from tetris.visuals.particles import ParticleSystem
 
     pygame.init()
-    log_path = str(tmp_path / "bot.jsonl")
-    monkeypatch.setattr("tetris.states.eltetris.BOT_PLACEMENTS_PATH", log_path)
+    log_dir = str(tmp_path / "bot")
+    monkeypatch.setattr("tetris.states.eltetris.BOT_PLACEMENTS_DIR", log_dir)
     bot = ElTetrisState(
         screen=pygame.Surface((800, 600)),
         font=pygame.font.Font(None, 20),
@@ -154,7 +202,7 @@ def test_god_bot_records_placements(tmp_path, monkeypatch):
             break
     bot.game_over = True
     bot.update(16, parts)  # routes into _do_game_over
-    recs = read_placements(log_path)
+    recs = read_placements_dir(log_dir)
     assert sum(r["type"] == "game" for r in recs) == 1
     moves = [r for r in recs if r["type"] == "move"]
     assert len(moves) >= 1
@@ -178,8 +226,8 @@ def test_non_god_bot_does_not_record(tmp_path, monkeypatch):
     from tetris.visuals.particles import ParticleSystem
 
     pygame.init()
-    log_path = str(tmp_path / "bot.jsonl")
-    monkeypatch.setattr("tetris.states.eltetris.BOT_PLACEMENTS_PATH", log_path)
+    log_dir = str(tmp_path / "bot")
+    monkeypatch.setattr("tetris.states.eltetris.BOT_PLACEMENTS_DIR", log_dir)
     bot = ElTetrisState(
         screen=pygame.Surface((800, 600)),
         font=pygame.font.Font(None, 20),
@@ -204,11 +252,23 @@ def test_non_god_bot_does_not_record(tmp_path, monkeypatch):
             break
     bot.game_over = True
     bot.update(16, parts)
-    assert not os.path.exists(log_path)
+    assert not os.path.exists(log_dir)
 
 
 def test_read_missing_file_is_empty(tmp_path):
     assert read_placements(str(tmp_path / "nope.jsonl")) == []
+
+
+def test_read_placements_dir_missing_and_malformed(tmp_path):
+    """Missing dir → []; malformed lines skipped; non-game files ignored."""
+    assert read_placements_dir(str(tmp_path / "nope")) == []
+    d = tmp_path / "games"
+    d.mkdir()
+    (d / "game_000001.jsonl").write_text('{"type": "game"}\nnot-json\n')
+    (d / "game_000002.jsonl").write_text('{"type": "move", "piece": "I", "rot": 0, "x": 0, "hold": false}\n')
+    (d / "notes.txt").write_text('{"type": "game"}\n')
+    recs = read_placements_dir(str(d))
+    assert [r["type"] for r in recs] == ["game", "move"]
 
 
 def test_read_skips_malformed_lines(tmp_path):
@@ -255,6 +315,30 @@ def test_pretrain_noop_on_missing_log(tmp_path):
     after = agent.online_net.state_dict()
     for k, v in before.items():
         assert torch.equal(v, after[k])
+
+
+def test_pretrain_reads_dir_default(tmp_path, monkeypatch):
+    """imitation_pretrain() with no path reads the human per-game dir."""
+    d = str(tmp_path / "human")
+    monkeypatch.setattr("tetris.ai.imitation.HUMAN_PLACEMENTS_DIR", d)
+    _write_game_dir(d, [("I", 0, 0, False)], seed=7)
+    agent = DQNAgent(seed=1)
+    assert imitation_pretrain(agent) == 3  # one move × 3 warm-start epochs
+
+
+def test_bot_pretrain_accepts_dir(tmp_path):
+    """bot_imitation_pretrain() reads a per-game dir or a flat file."""
+    d = str(tmp_path / "bot")
+    _write_game_dir(
+        d, [("I", 0, 0, False)], seed=7, result={"score": 100, "tetris": 0, "triple": 0, "lines": 0, "pieces": 10}
+    )
+    agent = DQNAgent(seed=1)
+    assert bot_imitation_pretrain(agent, d, top_n=1) == 3  # one move × 3 epochs
+    # Flat-file path still works (explicit override).
+    p = str(tmp_path / "flat.jsonl")
+    _write_game_with_result(p, [("I", 0, 0, False)], {"score": 100, "tetris": 0, "triple": 0, "lines": 0, "pieces": 10})
+    agent2 = DQNAgent(seed=1)
+    assert bot_imitation_pretrain(agent2, p, top_n=1) == 3
 
 
 def test_pretrain_pushes_human_choice_up():
@@ -343,7 +427,7 @@ def test_human_state_records_placements(tmp_path, monkeypatch):
 
     log_path = str(tmp_path / "pl.jsonl")
     orig_init = PlacementsLog.__init__
-    monkeypatch.setattr(PlacementsLog, "__init__", lambda self, path=log_path: orig_init(self, path))
+    monkeypatch.setattr(PlacementsLog, "__init__", lambda self, path=None, dir=None: orig_init(self, path=log_path))
     audio = AudioManager(sound_volume=0, music_volume=0)
     menu = MenuState(screen, font, audio)
     cfg = GameConfig(

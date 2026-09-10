@@ -146,7 +146,7 @@ The bot returns to the menu on game over. It never writes to the
 leaderboard, human stats, AI training logs, or any `data/` file beyond
 the piece provider's own record/replay path. The one exception:
 **god-level** games record their placements to
-`data/bot_placements.jsonl` (see [AI warm-start](ai.md)) so the DQN can
+`data/bot/` (see [AI warm-start](ai.md)) so the DQN can
 pre-train from the bot's best plays. No other level records. Press `q`
 during play to return to the menu after the current game ends.
 

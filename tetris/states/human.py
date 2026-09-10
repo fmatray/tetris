@@ -64,8 +64,9 @@ class HumanState(GameState):
         self._setup_keybinds(menu)
         # Imitation data: record placements for AI warm-start (roadmap #5).
         from tetris.game.imitation import PlacementsLog
+        from tetris.settings import HUMAN_PLACEMENTS_DIR
 
-        self._placement_recorder = PlacementsLog()
+        self._placement_recorder = PlacementsLog(dir=HUMAN_PLACEMENTS_DIR)
         self._placement_recorder.start_game(seed=self.seed, handicap=config.handicap)
         self._das_held: dict[int, float] = {}
         # Special modes (Sprint/Blitz) and efficiency accounting. AI/Bot/MCP

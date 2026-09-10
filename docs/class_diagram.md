@@ -394,9 +394,10 @@ classDiagram
             +seed: int | None
         }
         class PlacementsLog {
-            +path: str
+            +path: str | None
+            +dir: str | None
             - _fh: IO~str~ | None
-            +__init__(path: str) None
+            +__init__(path: str | None, dir: str | None) None
             +__enter__() PlacementsLog
             +__exit__(exc_type, exc, tb) None
             - _write(entry: dict) None
