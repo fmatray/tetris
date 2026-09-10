@@ -451,3 +451,13 @@ def test_human_state_records_placements(tmp_path, monkeypatch):
     moves = [r for r in recs if r["type"] == "move"]
     assert len(moves) >= 1
     assert moves[0]["piece"] in ("I", "J", "L", "O", "S", "T", "Z")
+    # Game over must write a game_end record (same as bot games).
+    state.game_over = True
+    state.update(1 / 60, particles)
+    recs = read_placements(log_path)
+    ends = [r for r in recs if r["type"] == "game_end"]
+    assert len(ends) == 1
+    assert ends[0]["score"] == state.stats.score
+    assert ends[0]["tetris"] == state.stats.clear_counts.tetris
+    assert ends[0]["pieces"] == state.stats.piece_count
+    assert state._placement_recorder is None

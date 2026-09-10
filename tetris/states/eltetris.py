@@ -178,21 +178,6 @@ class ElTetrisState(BotMovesMixin, GameState):
         self._prev_action = None
         return result
 
-    def _do_game_over(self) -> State:
-        """Write the game-end summary, close the recorder, then delegate."""
-        if self._placement_recorder is not None:
-            stats = self.stats
-            self._placement_recorder.end_game(
-                score=stats.score,
-                tetris=stats.clear_counts.tetris,
-                triple=stats.clear_counts.triple,
-                lines=stats.total_lines,
-                pieces=stats.piece_count,
-            )
-            self._placement_recorder.close()
-            self._placement_recorder = None
-        return super()._do_game_over()
-
     def _on_exit(self) -> None:
         """Close the recorder without a game_end record (game abandoned)."""
         if self._placement_recorder is not None:

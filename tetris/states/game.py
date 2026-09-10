@@ -381,6 +381,17 @@ class GameState(State):
 
     def _do_game_over(self) -> State:
         """Stop music, save, and transition to GameOverState (or menu on q-quit)."""
+        if self._placement_recorder is not None:
+            stats = self.stats
+            self._placement_recorder.end_game(
+                score=stats.score,
+                tetris=stats.clear_counts.tetris,
+                triple=stats.clear_counts.triple,
+                lines=stats.total_lines,
+                pieces=stats.piece_count,
+            )
+            self._placement_recorder.close()
+            self._placement_recorder = None
         if self.quit_pending:
             self.audio.stop_music()
             self.pieces.save()
